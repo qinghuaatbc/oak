@@ -1,0 +1,10 @@
+{
+  "name": "oak",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Independently-designed device-driver platform: JSON manifests + a sandboxed Node.js runtime + an orchestrator",
+  "license": "MIT",
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}

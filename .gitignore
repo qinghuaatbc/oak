@@ -3,5 +3,8 @@ orchestrator/config.json
 orchestrator/macros.json
 orchestrator/cameras.json
 orchestrator/models/
+orchestrator/vapid_keys.json
+orchestrator/push_subscriptions.json
+orchestrator/comm_chat.json
 *.log
 .DS_Store

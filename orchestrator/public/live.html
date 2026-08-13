@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Oak Live</title>
+<script>
+  if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+</script>
 <style>
   /* Palette + card/sidebar language ported directly from qti/public/
      live.html's own :root tokens - QTI is this project's own code, so this
@@ -26,7 +29,7 @@
     --mono: ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
   }
   @media (prefers-color-scheme: dark){
-    :root{
+    :root:not([data-theme='light']){
       --page-bg: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.04) 0%, transparent 55%),
                  radial-gradient(ellipse at 75% 70%, rgba(80,140,200,0.25) 0%, transparent 55%),
                  linear-gradient(135deg, #0f1720 0%, #141d27 50%, #101820 100%);
@@ -41,8 +44,35 @@
       --good:#58c993; --bad:#ef8a82;
     }
   }
+  /* Explicit override (via the themeBtn toggle) wins in both directions,
+     regardless of what the OS preference says - :root[data-theme='dark']
+     needs to win even when the system is in light mode, and vice versa. */
+  :root[data-theme='dark']{
+    --page-bg: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.04) 0%, transparent 55%),
+               radial-gradient(ellipse at 75% 70%, rgba(80,140,200,0.25) 0%, transparent 55%),
+               linear-gradient(135deg, #0f1720 0%, #141d27 50%, #101820 100%);
+    --ink:#f0ead9; --ink-soft:#c9b98f;
+    --sidebar-bg:rgba(20,26,32,0.72); --sidebar-border:rgba(255,255,255,0.08);
+    --cat-active-bg:rgba(255,190,80,0.22);
+    --card-bg:rgba(30,38,46,0.65); --card-border:rgba(255,255,255,0.08);
+    --card-shadow:0 2px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+    --accent:#e8c273; --accent-strong:#c99a4e; --accent-tint:rgba(255,190,80,0.16);
+    --surface:rgba(255,255,255,0.06); --surface-strong:rgba(255,255,255,0.10);
+    --hairline:rgba(255,255,255,0.10);
+    --good:#58c993; --bad:#ef8a82;
+  }
   *{ box-sizing:border-box; }
   body{ margin:0; font-family:var(--sans); color:var(--ink); background:var(--page-bg); transition:background .3s; }
+
+  /* Voice command mic - floating, fixed to the viewport corner (not the
+     scrolling topbar) so it's always reachable with one thumb, bigger than
+     the other top-bar icon buttons since it's the primary customer-facing
+     action on this page. Ported from QTI's own #cmdBtn/#cmdFeedback. */
+  #cmdBtn{ position:fixed; bottom:24px; right:24px; width:64px; height:64px; font-size:28px; box-shadow:0 6px 20px rgba(0,0,0,0.3); z-index:200; }
+  #cmdBtn.listening{ background:rgba(217,99,78,0.2); border-color:var(--bad); color:var(--bad); animation:pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
+  #cmdFeedback{ position:fixed; bottom:96px; right:24px; z-index:200; max-width:min(320px, calc(100vw - 48px)); background:var(--card-bg); backdrop-filter:blur(20px) saturate(1.6); -webkit-backdrop-filter:blur(20px) saturate(1.6); border:1px solid var(--card-border); border-radius:12px; box-shadow:var(--card-shadow); padding:10px 14px; font-family:var(--mono); font-size:.76rem; color:var(--ink-soft); opacity:0; pointer-events:none; transition:opacity .2s; }
+  #cmdFeedback.show{ opacity:1; }
 
   .sky-wrap{ display:flex; min-height:100vh; width:100%; }
   .sky-sidebar{ width:112px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:10px; padding:24px 10px; background:var(--sidebar-bg); border-right:1px solid var(--sidebar-border); }
@@ -51,14 +81,61 @@
   .sky-cat.active{ opacity:1; background:var(--cat-active-bg); }
 
   .sky-main{ position:relative; flex:1; padding:24px 28px; overflow:auto; display:flex; flex-direction:column; }
-  .sky-topbar{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
-  .sky-title{ font-size:1.1rem; font-weight:700; }
+  .sky-topbar{ display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .sky-title{ font-size:1.1rem; font-weight:700; margin-right:auto; }
+  .topbtn{ width:34px; height:34px; padding:0; border-radius:50%; background:var(--sidebar-bg); border:1px solid var(--sidebar-border); cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--ink); font-size:15px; font-weight:700; position:relative; }
+  .topbtn.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
   #conn{ display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:.72rem; color:var(--ink); padding:5px 10px; border-radius:999px; background:var(--sidebar-bg); border:1px solid var(--sidebar-border); white-space:nowrap; }
   #dot{ width:8px; height:8px; border-radius:50%; background:var(--bad); transition:background .3s; flex:none; display:inline-block; }
   #conn.connected #dot{ background:var(--good); }
 
   .sky-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:16px; }
+  .sky-grid.size-l{ grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); }
+  .sky-grid.size-m{ grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); }
+  .sky-grid.size-s{ grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); }
   .sky-hidden{ display:none !important; }
+
+  /* Comm: text chat + 1:1 WebRTC calling, ported from QTI's comm.js. Same
+     frosted-glass card language as .sky-card/#conn elsewhere on this page. */
+  .comm-unread-dot{ display:none; position:absolute; top:2px; right:2px; width:9px; height:9px; border-radius:50%; background:var(--bad); border:1.5px solid var(--sidebar-bg); }
+  .comm-unread-dot.show{ display:block; }
+  .comm-panel{ position:fixed; top:70px; right:20px; z-index:150; width:min(340px, calc(100vw - 40px)); max-height:min(70vh, 560px); display:flex; flex-direction:column; background:var(--card-bg); backdrop-filter:blur(20px) saturate(1.6); -webkit-backdrop-filter:blur(20px) saturate(1.6); border:1px solid var(--card-border); border-radius:16px; box-shadow:var(--card-shadow); overflow:hidden; }
+  .comm-panel-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 14px; border-bottom:1px solid var(--hairline); }
+  .comm-panel-title{ font-size:14px; font-weight:700; color:var(--ink); }
+  .comm-panel-close{ background:none; border:none; color:var(--ink-soft); font-size:16px; cursor:pointer; padding:2px 6px; }
+  .comm-name-row{ padding:8px 14px; border-bottom:1px solid var(--hairline); display:flex; flex-direction:column; gap:6px; }
+  .comm-name-row input{ width:100%; box-sizing:border-box; padding:6px 9px; border-radius:8px; border:1px solid var(--hairline); background:var(--surface); color:var(--ink); font-size:12px; font-family:var(--sans); }
+  #commPushToggle{ align-self:flex-start; padding:5px 10px; border-radius:999px; border:1px solid var(--hairline); background:var(--surface); color:var(--ink-soft); font-size:11px; font-weight:600; cursor:pointer; font-family:var(--sans); }
+  #commPushToggle.active{ border-color:var(--good); color:var(--good); background:var(--surface-strong); }
+  .comm-users{ display:flex; flex-direction:column; gap:2px; padding:8px 10px; border-bottom:1px solid var(--hairline); max-height:150px; overflow:auto; }
+  .comm-user-row{ display:flex; align-items:center; gap:6px; padding:6px 6px; border-radius:8px; }
+  .comm-user-row:hover{ background:var(--surface); }
+  .comm-empty{ font-size:12px; color:var(--ink-soft); padding:6px; }
+  .comm-user-name{ flex:1; font-size:12.5px; color:var(--ink); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .comm-call-btn{ width:28px; height:28px; padding:0; border-radius:50%; border:1px solid var(--hairline); background:var(--surface); cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; }
+  .comm-user-row.active-chat-target{ background:var(--accent-tint); }
+  .comm-chat-target{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 14px; font-size:11.5px; font-weight:600; color:var(--ink-soft); border-bottom:1px solid var(--hairline); }
+  .comm-chat-target-clear{ background:none; border:none; color:var(--ink-soft); font-size:12px; cursor:pointer; padding:2px 6px; }
+  .comm-chat{ flex:1; overflow:auto; padding:10px 14px; display:flex; flex-direction:column; gap:8px; min-height:120px; }
+  .comm-msg{ max-width:80%; align-self:flex-start; }
+  .comm-msg.self{ align-self:flex-end; text-align:right; }
+  .comm-msg-meta{ font-size:10px; color:var(--ink-soft); margin-bottom:2px; }
+  .comm-msg-text{ font-size:13px; background:var(--surface); border-radius:10px; padding:6px 10px; display:inline-block; color:var(--ink); }
+  .comm-msg.self .comm-msg-text{ background:var(--accent-tint); }
+  .comm-msg-system{ font-size:11px; color:var(--ink-soft); text-align:center; font-style:italic; }
+  .comm-composer{ display:flex; gap:6px; padding:10px 14px; border-top:1px solid var(--hairline); }
+  .comm-composer input{ flex:1; padding:8px 10px; border-radius:999px; border:1px solid var(--hairline); background:var(--surface); color:var(--ink); font-size:13px; font-family:var(--sans); }
+  .comm-composer button{ border-radius:999px; border:1px solid var(--accent-strong); background:var(--accent-tint); color:var(--accent-strong); padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; }
+
+  .comm-call-overlay{ position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.75); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:#fff; }
+  .comm-call-name{ font-size:22px; font-weight:700; }
+  .comm-call-state{ font-size:14px; opacity:.85; }
+  .comm-call-overlay video{ max-width:min(80vw, 500px); border-radius:16px; background:#000; }
+  #commLocalVideo{ position:fixed; bottom:110px; right:24px; width:120px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+  .comm-call-actions{ display:flex; gap:16px; margin-top:10px; }
+  .comm-call-action{ padding:12px 24px; border-radius:999px; border:none; font-size:14px; font-weight:700; cursor:pointer; }
+  .comm-call-action.accept{ background:var(--good); color:#fff; }
+  .comm-call-action.decline{ background:var(--bad); color:#fff; }
   .sky-card{ background:var(--card-bg); backdrop-filter:blur(20px) saturate(1.6); -webkit-backdrop-filter:blur(20px) saturate(1.6); border:1px solid var(--card-border); border-radius:16px; box-shadow:var(--card-shadow); padding:14px 12px; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; }
   .sky-card[data-on="1"]{ box-shadow:var(--card-shadow), 0 0 0 2px var(--accent-tint); }
   .sky-card.offline{ opacity:.55; cursor:default; }
@@ -79,11 +156,49 @@
   <main class="sky-main">
     <div class="sky-topbar">
       <div class="sky-title">Oak</div>
+      <button class="topbtn" id="sizeBtn" type="button" title="Card size">M</button>
+      <button class="topbtn" id="themeBtn" type="button" title="Theme">☀️</button>
+      <button class="topbtn" id="soundBtn" type="button" title="Feedback sound">🎵</button>
+      <button class="topbtn" id="langBtn" type="button" title="Language">EN</button>
+      <button class="topbtn" id="commBtn" type="button" title="Chat &amp; calls">💬<span class="comm-unread-dot" id="commUnreadDot"></span></button>
       <div id="conn"><span id="dot"></span><span id="connlabel">connecting</span></div>
     </div>
     <div class="sky-grid" id="skyGrid"></div>
   </main>
 </div>
+
+<div id="cmdFeedback"></div>
+<button class="topbtn" id="cmdBtn" type="button" title="Voice command">🎤</button>
+
+<div class="comm-panel sky-hidden" id="commPanel">
+  <div class="comm-panel-head">
+    <span class="comm-panel-title">Chat &amp; Calls</span>
+    <button class="comm-panel-close" id="commPanelClose" type="button">✕</button>
+  </div>
+  <div class="comm-name-row">
+    <input type="text" id="commNameInput" placeholder="Your name" maxlength="40" />
+    <button id="commPushToggle" class="sky-hidden" type="button">🔕 Enable notifications</button>
+  </div>
+  <div class="comm-users" id="commUsers"></div>
+  <div class="comm-chat-target" id="commChatTarget">
+    <span>💬 <span id="commChatTargetLabel">Everyone</span></span>
+    <button class="comm-chat-target-clear sky-hidden" id="commChatTargetClear">✕</button>
+  </div>
+  <div class="comm-chat" id="commChat"></div>
+  <div class="comm-composer">
+    <input type="text" id="commChatInput" placeholder="Message everyone…" maxlength="2000" />
+    <button id="commChatSend" type="button">Send</button>
+  </div>
+</div>
+
+<div class="comm-call-overlay sky-hidden" id="commCallOverlay">
+  <div class="comm-call-name" id="commCallName"></div>
+  <div class="comm-call-state" id="commCallState"></div>
+  <video id="commRemoteVideo" autoplay playsinline class="sky-hidden"></video>
+  <video id="commLocalVideo" autoplay playsinline muted class="sky-hidden"></video>
+  <div class="comm-call-actions" id="commCallActions"></div>
+</div>
+
 <script type="module" src="live.js"></script>
 </body>
 </html>
