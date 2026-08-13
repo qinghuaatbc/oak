@@ -3,8 +3,10 @@
 // stays on the admin side, same split QTI draws between its admin and
 // live surfaces.
 import { listInstances, getManifest, getState, callAction } from "./api.js";
+import { connectLiveSocket } from "./live-socket.js";
 
-const POLL_MS = 2000;
+const FALLBACK_POLL_MS = 10000;
+const REFRESH_DEBOUNCE_MS = 150;
 const root = document.getElementById("instances");
 let manifests = new Map();
 
@@ -70,5 +72,12 @@ function wireTiles() {
   });
 }
 
+let refreshTimer = null;
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(refresh, REFRESH_DEBOUNCE_MS);
+}
+
 refresh();
-setInterval(refresh, POLL_MS);
+connectLiveSocket(() => scheduleRefresh());
+setInterval(refresh, FALLBACK_POLL_MS);

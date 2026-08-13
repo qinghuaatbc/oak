@@ -20,3 +20,18 @@ export async function callAction(id, actionId, params) {
   });
   return res.json();
 }
+export async function listDrivers() {
+  return (await fetch("/api/drivers")).json();
+}
+export async function addInstance(id, driver, connection, settings) {
+  const res = await fetch("/api/instances", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, driver, connection, settings }),
+  });
+  return res.json();
+}
+export async function deleteInstance(id) {
+  const res = await fetch(`/api/instances/${id}`, { method: "DELETE" });
+  return res.json();
+}
