@@ -4,7 +4,34 @@ import { connectLiveSocket } from "./live-socket.js";
 const FALLBACK_POLL_MS = 10000; // safety net if the WS connection is down
 const REFRESH_DEBOUNCE_MS = 150;
 const root = document.getElementById("instances");
+const wsPill = document.getElementById("wsPill");
 let manifests = new Map(); // id -> manifest, fetched once per instance
+
+// A checkbox-driven switch, same markup shared.js's buildToggleSwitch
+// produces in QTI - only rendered when a boolean state has an obviously
+// matching on/off action pair to drive it (e.g. relay.on + turnOn/turnOff).
+function toggleSwitchHtml(instanceId, onActionId, offActionId, checked) {
+  return `<label class="switch" onclick="event.stopPropagation()">
+    <input type="checkbox" ${checked ? "checked" : ""} data-instance="${instanceId}" data-on-action="${onActionId}" data-off-action="${offActionId}" />
+    <span class="slider-track"></span>
+  </label>`;
+}
+
+// Only turnOn/turnOff is a real boolean toggle - armStay/disarm LOOKED
+// like a pair by action-id matching alone, but DSC's partition.status is a
+// string ("armed"/"disarmed"/"alarm"), not boolean, so there's no state to
+// drive a switch with. That mismatch produced a real bug: a tile whose
+// only actions were folded into a "toggle" that never got a switch (no
+// boolean state) AND never got its own submit button (suppressed because
+// isToggleAction was true) - armStay became completely unreachable. Fixed
+// by only trusting a pair match when a boolean state is actually present
+// (see the caller's `useToggle` check) - a false-positive pair now just
+// falls through to ordinary per-action tiles instead of going dead.
+function findTogglePair(manifest) {
+  const ids = new Set(manifest.actions.map((a) => a.id));
+  const pairs = [["turnOn", "turnOff"]];
+  return pairs.find(([on, off]) => ids.has(on) && ids.has(off));
+}
 
 function fieldInputs(action) {
   return (action.params || [])
@@ -12,24 +39,43 @@ function fieldInputs(action) {
       (p) =>
         `<input name="${p.key}" type="${p.type === "number" ? "number" : "text"}" placeholder="${p.key}${
           p.default !== undefined ? " = " + p.default : ""
-        }" />`
+        }" onclick="event.stopPropagation()" />`
     )
     .join("");
 }
 
+function formatValue(v) {
+  if (typeof v === "boolean") return `<span class="status-pill ${v ? "on" : "off"}">${v ? "on" : "off"}</span>`;
+  return String(v);
+}
+
 function renderInstancePanel(id, manifest, state, events) {
+  const togglePair = findTogglePair(manifest);
+  const boolStateEntry = Object.entries(state).find(([, v]) => typeof v === "boolean");
+  // A matched pair only actually renders as a toggle if there's a real
+  // boolean state to show/drive - otherwise every action, pair or not,
+  // falls through to a normal tile with its own submit button.
+  const useToggle = Boolean(togglePair && boolStateEntry);
+
   const stateRows = Object.entries(state)
     .map(([key, value]) => `<tr><td>${key}</td><td>${formatValue(value)}</td></tr>`)
     .join("");
 
-  const actionForms = manifest.actions
-    .map(
-      (a) => `
-      <form data-instance="${id}" data-action="${a.id}">
-        <button type="submit">${a.label}</button>
+  const actionTiles = manifest.actions
+    .map((a) => {
+      const isToggleAction = useToggle && (a.id === togglePair[0] || a.id === togglePair[1]);
+      if (isToggleAction && a.id !== togglePair[0]) return ""; // toggle pair renders as one tile, not two
+      const switchHtml = isToggleAction ? toggleSwitchHtml(id, togglePair[0], togglePair[1], boolStateEntry[1]) : "";
+      return `
+      <form class="tile" data-instance="${id}" data-action="${isToggleAction ? "" : a.id}">
+        <div class="row">
+          <span class="tname">${isToggleAction ? manifest.displayName : a.label}</span>
+          ${switchHtml}
+        </div>
+        ${isToggleAction ? "" : `<button class="btn small" type="submit">${a.label}</button>`}
         ${fieldInputs(a)}
-      </form>`
-    )
+      </form>`;
+    })
     .join("");
 
   const eventLines = events
@@ -39,22 +85,15 @@ function renderInstancePanel(id, manifest, state, events) {
     .join("");
 
   return `
-    <section class="panel" data-panel="${id}">
+    <section class="card" data-panel="${id}">
       <h2>${manifest.displayName}
-        <button type="button" class="delete-instance" data-instance="${id}" style="float:right">Remove</button>
+        <button type="button" class="btn small danger delete-instance" data-instance="${id}">Remove</button>
       </h2>
-      <p class="sub">instance "${id}" · driver ${manifest.id}</p>
-      <table><thead><tr><th>state</th><th>value</th></tr></thead><tbody>${
-        stateRows || `<tr><td colspan="2" class="sub">no state yet</td></tr>`
-      }</tbody></table>
-      <div class="actions">${actionForms}</div>
+      <div class="sub">instance "${id}" · driver ${manifest.id}</div>
+      <table><tbody>${stateRows || `<tr><td class="sub">no state yet</td></tr>`}</tbody></table>
+      <div class="tile-grid">${actionTiles}</div>
       <div class="events">${eventLines || `<div class="sub">no events yet</div>`}</div>
     </section>`;
-}
-
-function formatValue(v) {
-  if (typeof v === "boolean") return `<span class="pill ${v ? "on" : "off"}">${v ? "on" : "off"}</span>`;
-  return String(v);
 }
 
 async function refresh() {
@@ -67,7 +106,7 @@ async function refresh() {
       return renderInstancePanel(summary.id, manifest, state, events);
     })
   );
-  root.innerHTML = panels.join("") || `<p class="sub">No instances configured.</p>`;
+  root.innerHTML = panels.join("") || `<p class="empty-hint">No instances configured.</p>`;
   wireForms();
 }
 
@@ -75,15 +114,31 @@ function wireForms() {
   root.querySelectorAll("form[data-instance]").forEach((form) => {
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      const instanceId = form.dataset.instance;
-      const actionId = form.dataset.action;
+      if (!form.dataset.action) return; // the toggle-pair tile has no submit action of its own
       const params = {};
-      form.querySelectorAll("input").forEach((input) => {
+      form.querySelectorAll("input:not([type=checkbox])").forEach((input) => {
         if (input.value === "") return;
         params[input.name] = input.type === "number" ? Number(input.value) : input.value;
       });
       try {
-        await callAction(instanceId, actionId, params);
+        await callAction(form.dataset.instance, form.dataset.action, params);
+      } catch (err) {
+        console.error("action failed", err);
+      }
+      refresh();
+    });
+    // The whole tile is clickable (not just its button), matching QTI's
+    // light-tile convention - but only for tiles that resolve to exactly
+    // one action already (a real submit button), not the multi-field ones.
+    if (form.dataset.action && form.querySelectorAll("input:not([type=checkbox])").length === 0) {
+      form.addEventListener("click", () => form.requestSubmit());
+    }
+  });
+  root.querySelectorAll('input[type=checkbox][data-on-action]').forEach((input) => {
+    input.addEventListener("change", async () => {
+      const action = input.checked ? input.dataset.onAction : input.dataset.offAction;
+      try {
+        await callAction(input.dataset.instance, action, {});
       } catch (err) {
         console.error("action failed", err);
       }
@@ -91,7 +146,8 @@ function wireForms() {
     });
   });
   root.querySelectorAll(".delete-instance").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
       if (!confirm(`Remove instance "${btn.dataset.instance}"?`)) return;
       await deleteInstance(btn.dataset.instance);
       manifests.delete(btn.dataset.instance);
@@ -125,7 +181,7 @@ async function setupAddInstanceForm() {
       <input name="id" placeholder="instance id (e.g. relay2)" required />
       ${connFields}
       ${settingFields}
-      <button type="submit">Add</button>`;
+      <button class="btn small primary" type="submit">Add</button>`;
   }
 
   const driverPicker = document.createElement("select");
@@ -167,5 +223,11 @@ function scheduleRefresh() {
 
 refresh();
 setupAddInstanceForm();
-connectLiveSocket(() => scheduleRefresh());
+connectLiveSocket(
+  () => scheduleRefresh(),
+  (connected) => {
+    wsPill.textContent = connected ? "connected" : "disconnected";
+    wsPill.className = "status-pill " + (connected ? "on" : "off");
+  }
+);
 setInterval(refresh, FALLBACK_POLL_MS);

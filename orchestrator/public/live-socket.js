@@ -1,9 +1,10 @@
 // Shared WS client for admin.js/live.js - browser-native WebSocket, no
 // library needed. Reconnects with a fixed 2s backoff on drop.
-export function connectLiveSocket(onMessage) {
+export function connectLiveSocket(onMessage, onStatus) {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   function connect() {
     const ws = new WebSocket(`${proto}//${location.host}/ws`);
+    ws.onopen = () => onStatus && onStatus(true);
     ws.onmessage = (ev) => {
       try {
         onMessage(JSON.parse(ev.data));
@@ -11,7 +12,10 @@ export function connectLiveSocket(onMessage) {
         console.error("bad WS message", err);
       }
     };
-    ws.onclose = () => setTimeout(connect, 2000);
+    ws.onclose = () => {
+      onStatus && onStatus(false);
+      setTimeout(connect, 2000);
+    };
     ws.onerror = () => ws.close();
   }
   connect();

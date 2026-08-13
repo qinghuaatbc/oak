@@ -3,22 +3,28 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Oak — Admin</title>
+<title>Oak Admin</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 <header>
-  <h1>Oak · Admin</h1>
-  <nav><a href="live.html">Live view →</a></nav>
+  <div>
+    <h1>Oak Admin</h1>
+    <div class="sub">driver instances, live state, and actions</div>
+  </div>
+  <div class="row">
+    <span class="status-pill off" id="wsPill">disconnected</span>
+    <nav><a href="live.html" target="_blank" rel="noopener">Open Live View ↗</a></nav>
+  </div>
 </header>
 <main>
-  <section class="panel" id="add-instance">
+  <section class="card" id="add-instance">
     <h2>Add instance</h2>
     <form id="add-instance-form">
-      <div class="actions" id="add-instance-fields"></div>
+      <div class="row" id="add-instance-fields"></div>
     </form>
   </section>
-  <div id="instances"><p class="sub">Loading instances…</p></div>
+  <div id="instances"><p class="empty-hint">Loading instances…</p></div>
 </main>
 <script type="module" src="admin.js"></script>
 </body>

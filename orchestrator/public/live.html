@@ -3,15 +3,85 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Oak — Live</title>
-<link rel="stylesheet" href="style.css" />
+<title>Oak Live</title>
+<style>
+  /* Palette + card/sidebar language ported directly from qti/public/
+     live.html's own :root tokens - QTI is this project's own code, so this
+     is reusing its actual design system, not approximating it. Trimmed to
+     what Oak needs: no camera/3D/comm-calling rules. */
+  :root{
+    --page-bg: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.5) 0%, transparent 55%),
+               radial-gradient(ellipse at 75% 70%, rgba(140,220,255,0.35) 0%, transparent 55%),
+               linear-gradient(135deg, #a8c8f0 0%, #9bbfe8 50%, #a4c4ee 100%);
+    --ink:#6b4400; --ink-soft:#8a6a30;
+    --sidebar-bg:rgba(255,255,255,0.72); --sidebar-border:rgba(255,255,255,0.9);
+    --cat-active-bg:rgba(255,190,80,0.35);
+    --card-bg:rgba(210,220,240,0.52); --card-border:rgba(255,255,255,0.96);
+    --card-shadow:0 2px 12px rgba(80,100,140,0.14), inset 0 1px 0 rgba(255,255,255,1);
+    --accent:#dcb15c; --accent-strong:#a5793a; --accent-tint:rgba(255,190,80,0.25);
+    --surface:rgba(255,255,255,0.5); --surface-strong:rgba(255,255,255,0.8);
+    --hairline:rgba(0,0,0,0.08);
+    --good:#2f9563; --bad:#d9634e;
+    --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono: ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --page-bg: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.04) 0%, transparent 55%),
+                 radial-gradient(ellipse at 75% 70%, rgba(80,140,200,0.25) 0%, transparent 55%),
+                 linear-gradient(135deg, #0f1720 0%, #141d27 50%, #101820 100%);
+      --ink:#f0ead9; --ink-soft:#c9b98f;
+      --sidebar-bg:rgba(20,26,32,0.72); --sidebar-border:rgba(255,255,255,0.08);
+      --cat-active-bg:rgba(255,190,80,0.22);
+      --card-bg:rgba(30,38,46,0.65); --card-border:rgba(255,255,255,0.08);
+      --card-shadow:0 2px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+      --accent:#e8c273; --accent-strong:#c99a4e; --accent-tint:rgba(255,190,80,0.16);
+      --surface:rgba(255,255,255,0.06); --surface-strong:rgba(255,255,255,0.10);
+      --hairline:rgba(255,255,255,0.10);
+      --good:#58c993; --bad:#ef8a82;
+    }
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:var(--sans); color:var(--ink); background:var(--page-bg); transition:background .3s; }
+
+  .sky-wrap{ display:flex; min-height:100vh; width:100%; }
+  .sky-sidebar{ width:84px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:4px; padding:18px 6px; background:var(--sidebar-bg); border-right:1px solid var(--sidebar-border); }
+  .sky-cat{ width:100%; background:none; border:none; border-radius:12px; padding:10px 4px; display:flex; flex-direction:column; align-items:center; gap:4px; font-size:20px; cursor:pointer; color:var(--ink); opacity:.55; }
+  .sky-cat span{ font-size:10px; font-weight:600; }
+  .sky-cat.active{ opacity:1; background:var(--cat-active-bg); }
+
+  .sky-main{ position:relative; flex:1; padding:24px 28px; overflow:auto; display:flex; flex-direction:column; }
+  .sky-topbar{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .sky-title{ font-size:1.1rem; font-weight:700; }
+  #conn{ display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:.72rem; color:var(--ink); padding:5px 10px; border-radius:999px; background:var(--sidebar-bg); border:1px solid var(--sidebar-border); white-space:nowrap; }
+  #dot{ width:8px; height:8px; border-radius:50%; background:var(--bad); transition:background .3s; flex:none; display:inline-block; }
+  #conn.connected #dot{ background:var(--good); }
+
+  .sky-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:16px; }
+  .sky-hidden{ display:none !important; }
+  .sky-card{ background:var(--card-bg); backdrop-filter:blur(20px) saturate(1.6); -webkit-backdrop-filter:blur(20px) saturate(1.6); border:1px solid var(--card-border); border-radius:16px; box-shadow:var(--card-shadow); padding:14px 12px; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; }
+  .sky-card[data-on="1"]{ box-shadow:var(--card-shadow), 0 0 0 2px var(--accent-tint); }
+  .sky-icon{ font-size:32px; }
+  .sky-value{ font-size:13px; color:var(--ink); font-weight:600; }
+  .sky-label{ font-size:12px; font-weight:600; color:var(--ink); text-align:center; }
+  .sky-actions{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+  .sky-action-btn{ padding:4px 10px; border-radius:999px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid var(--hairline); background:var(--surface); color:var(--ink); }
+  .sky-action-btn:hover{ background:var(--surface-strong); }
+  .sky-action-btn.primary{ border-color:var(--accent-strong); background:var(--accent-tint); color:var(--accent-strong); }
+  .empty{ color:var(--ink); font-size:14px; }
+</style>
 </head>
 <body>
-<header>
-  <h1>Oak · Live</h1>
-  <nav><a href="admin.html">← Admin</a></nav>
-</header>
-<main id="instances"><p class="sub">Loading…</p></main>
+<div class="sky-wrap">
+  <nav class="sky-sidebar" id="skySidebar"></nav>
+  <main class="sky-main">
+    <div class="sky-topbar">
+      <div class="sky-title">Oak</div>
+      <div id="conn"><span id="dot"></span><span id="connlabel">connecting</span></div>
+    </div>
+    <div class="sky-grid" id="skyGrid"></div>
+  </main>
+</div>
 <script type="module" src="live.js"></script>
 </body>
 </html>

@@ -1,76 +1,84 @@
-:root {
-  --bg: #f6f5f2;
-  --panel: #ffffff;
-  --border: #e0ddd6;
-  --text: #2a2621;
-  --muted: #7a746a;
-  --accent: #5b6b4f;
-  --accent-ink: #ffffff;
-  --pill-on: #5b6b4f;
-  --pill-off: #b6afa3;
-  --danger: #a3462f;
+/* Ported directly from qti/public/index.html's own :root/@media tokens and
+   header/nav.maintabs/.card/.tile-grid conventions - QTI is this project's
+   own code, so reusing its actual design system (not just "something in
+   the same spirit") is exactly the point here. Trimmed to what Oak's
+   simpler admin surface actually needs (no camera/3D/layout-builder rules). */
+:root{
+  --serif: "Iowan Old Style","Palatino Linotype","Book Antiqua",Georgia,serif;
+  --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono: ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --bg:#f6f4ee; --raised:#ffffff; --ink:#1d2321; --soft:#4b544f; --faint:#8a8f8a;
+  --line:#dcd6c8; --accent:#0e7c86; --accent-ink:#fff; --accent-tint:#e3f0ee;
+  --good:#1f7a52; --good-tint:#e3f3e9; --bad:#b3403a; --bad-tint:#fbe9e6;
 }
-
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: var(--bg);
-  color: var(--text);
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14181a; --raised:#1c2224; --ink:#eef1ee; --soft:#b6bdb8; --faint:#78827c;
+    --line:#2c3436; --accent:#4fd1c8; --accent-ink:#0a1f1e; --accent-tint:#16302f;
+    --good:#58c993; --good-tint:#133227; --bad:#ef8a82; --bad-tint:#3a1c1a;
+  }
 }
-header {
-  display: flex;
-  align-items: baseline;
-  gap: 1.5rem;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
+*{ box-sizing:border-box; }
+body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); }
+
+header{ padding:14px 24px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; position:sticky; top:0; background:var(--bg); z-index:10; }
+header h1{ font-family:var(--serif); font-size:1.2rem; margin:0; }
+header .sub{ font-family:var(--mono); font-size:.7rem; color:var(--faint); }
+header nav a{ color:var(--accent); text-decoration:none; font-size:.86rem; font-weight:600; }
+header nav a:hover{ text-decoration:underline; }
+
+.status-pill{ font-family:var(--mono); font-size:.72rem; padding:4px 10px; border-radius:99px; border:1px solid var(--line); white-space:nowrap; }
+.status-pill.on{ background:var(--good-tint); color:var(--good); border-color:var(--good); }
+.status-pill.off{ color:var(--faint); }
+
+main{ max-width:1100px; margin:0 auto; padding:20px 24px 60px; display:flex; flex-direction:column; gap:16px; }
+#instances{ display:flex; flex-direction:column; gap:16px; }
+
+.card{ background:var(--raised); border:1px solid var(--line); border-radius:12px; padding:18px 20px; }
+.card h2{ font-family:var(--serif); font-size:1.02rem; margin:0 0 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.card .sub{ font-family:var(--mono); font-size:.72rem; color:var(--faint); margin:-8px 0 12px; }
+
+select, input[type=text], input[type=number]{
+  padding:7px 9px; border:1px solid var(--line); border-radius:7px;
+  background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:.86rem;
 }
-header h1 { font-size: 1.1rem; margin: 0; letter-spacing: 0.02em; }
-header nav a { color: var(--accent); text-decoration: none; font-size: 0.9rem; }
-header nav a:hover { text-decoration: underline; }
+.row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 
-main { padding: 1.5rem; max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
-#instances { display: flex; flex-direction: column; gap: 1.25rem; }
-
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1rem 1.25rem;
+button.btn{
+  font-family:var(--sans); font-weight:600; font-size:.85rem; cursor:pointer;
+  border-radius:8px; padding:8px 14px; border:1px solid var(--line); background:var(--raised); color:var(--ink);
 }
-.panel h2 { font-size: 1rem; margin: 0 0 0.75rem; }
-.panel .sub { color: var(--muted); font-size: 0.8rem; margin: -0.5rem 0 0.75rem; }
+button.btn:hover{ border-color:var(--accent); color:var(--accent); }
+button.btn.primary{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+button.btn.primary:hover{ opacity:.9; color:var(--accent-ink); }
+button.btn.danger:hover{ border-color:var(--bad); color:var(--bad); }
+button.btn.small{ padding:5px 10px; font-size:.76rem; }
 
-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-table td, table th { text-align: left; padding: 0.25rem 0.5rem; border-bottom: 1px solid var(--border); }
-table th { color: var(--muted); font-weight: 500; }
+table{ width:100%; border-collapse:collapse; font-family:var(--mono); font-size:.8rem; }
+table td, table th{ text-align:left; padding:5px 8px; border-bottom:1px dashed var(--line); }
+table th{ color:var(--faint); font-weight:500; }
 
-.pill { display: inline-block; padding: 0.1rem 0.55rem; border-radius: 999px; font-size: 0.75rem; color: var(--accent-ink); }
-.pill.on { background: var(--pill-on); }
-.pill.off { background: var(--pill-off); }
+.tile-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px; margin-top:6px; }
+.tile{ border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--raised); cursor:pointer; user-select:none; transition:box-shadow .15s; }
+.tile:hover{ box-shadow:0 4px 14px -6px rgba(0,0,0,.25); }
+.tile .row{ justify-content:space-between; flex-wrap:nowrap; margin-bottom:8px; }
+.tile .tname{ font-weight:600; font-size:.92rem; }
+.tile .tstate{ font-family:var(--mono); font-size:.72rem; color:var(--faint); }
+.tile input[type=number],.tile input[type=text]{ width:100%; margin-top:6px; font-size:.78rem; }
 
-.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
-.actions form { display: flex; align-items: center; gap: 0.35rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem 0.5rem; }
-.actions input { width: 4.5rem; font-size: 0.8rem; padding: 0.15rem 0.3rem; border: 1px solid var(--border); border-radius: 4px; }
-.actions button {
-  background: var(--accent); color: var(--accent-ink); border: none; border-radius: 6px;
-  padding: 0.3rem 0.7rem; font-size: 0.8rem; cursor: pointer;
-}
-.actions button:hover { opacity: 0.9; }
+/* buildToggleSwitch's markup (label.switch > input[type=checkbox] +
+   span.slider-track) is used as-is in QTI's own shared.js, but QTI itself
+   never actually shipped CSS for these two classes (confirmed by grep -
+   they render as a bare unstyled checkbox there today). Styled properly
+   here rather than reproducing that gap. */
+.switch{ position:relative; display:inline-block; width:38px; height:22px; flex:none; }
+.switch input{ opacity:0; width:0; height:0; }
+.slider-track{ position:absolute; inset:0; background:var(--line); border-radius:999px; cursor:pointer; transition:background .15s; }
+.slider-track::before{ content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; background:var(--raised); border-radius:50%; transition:transform .15s; }
+.switch input:checked + .slider-track{ background:var(--accent); }
+.switch input:checked + .slider-track::before{ transform:translateX(16px); }
 
-.events { font-size: 0.78rem; color: var(--muted); max-height: 8rem; overflow-y: auto; margin-top: 0.5rem; }
-.events div { padding: 0.15rem 0; border-bottom: 1px dashed var(--border); }
+.events{ font-size:.76rem; color:var(--faint); max-height:8rem; overflow-y:auto; margin-top:10px; font-family:var(--mono); }
+.events div{ padding:.15rem 0; border-bottom:1px dashed var(--line); }
 
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem; }
-.tile {
-  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-  padding: 0.9rem; cursor: pointer; text-align: center; transition: transform 0.1s ease, box-shadow 0.1s ease;
-}
-.tile:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.tile:active { transform: translateY(0); }
-.tile .label { font-size: 0.9rem; font-weight: 500; }
-.tile .instance { font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem; }
-.tile .state { margin-top: 0.5rem; }
-
-.error { color: var(--danger); font-size: 0.8rem; }
+.empty-hint{ color:var(--faint); font-size:.84rem; padding:16px 0; text-align:center; }
