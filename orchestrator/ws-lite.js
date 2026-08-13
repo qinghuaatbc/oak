@@ -10,20 +10,22 @@ const { EventEmitter } = require("events");
 
 const WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-function encodeFrame(payload) {
-  const data = Buffer.from(payload, "utf8");
+// opcode 0x1 = text (JSON control channel), 0x2 = binary (camera-ws's raw
+// fragmented-MP4 video bytes) - same header shape either way.
+function encodeFrame(opcode, payload) {
+  const data = Buffer.isBuffer(payload) ? payload : Buffer.from(payload, "utf8");
   const len = data.length;
   let header;
   if (len < 126) {
-    header = Buffer.from([0x81, len]);
+    header = Buffer.from([0x80 | opcode, len]);
   } else if (len < 65536) {
     header = Buffer.alloc(4);
-    header[0] = 0x81;
+    header[0] = 0x80 | opcode;
     header[1] = 126;
     header.writeUInt16BE(len, 2);
   } else {
     header = Buffer.alloc(10);
-    header[0] = 0x81;
+    header[0] = 0x80 | opcode;
     header[1] = 127;
     header.writeBigUInt64BE(BigInt(len), 2);
   }
@@ -93,7 +95,10 @@ class WSConnection extends EventEmitter {
     }
   }
   send(payload) {
-    if (!this.socket.destroyed) this.socket.write(encodeFrame(payload));
+    if (!this.socket.destroyed) this.socket.write(encodeFrame(0x1, payload));
+  }
+  sendBinary(buffer) {
+    if (!this.socket.destroyed) this.socket.write(encodeFrame(0x2, buffer));
   }
   close() {
     this.socket.end();

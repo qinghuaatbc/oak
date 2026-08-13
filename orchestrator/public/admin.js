@@ -1,8 +1,12 @@
 import {
   listInstances, getManifest, getState, callAction, listDrivers, addInstance, deleteInstance,
   getConfig, editInstance, stopInstance, startInstance,
+  getHealth, listMacros, saveMacro, deleteMacro, runMacro,
+  listCameras, addCamera, deleteCamera, listGlbModels, uploadGlb,
 } from "./api.js";
 import { connectLiveSocket } from "./live-socket.js";
+import { attachCameraPlayer } from "./camera-player.js";
+import { create3DViewer } from "./viewer3d.js";
 
 const FALLBACK_POLL_MS = 10000;
 const REFRESH_DEBOUNCE_MS = 150;
@@ -369,6 +373,298 @@ document.querySelectorAll(".subtabs .st").forEach((tab) => {
 });
 instanceFilter.addEventListener("change", renderActivePanel);
 
+// --- Main tabs (Driver/Dashboard/Camera/Automation/Macro/Scenes/Trends/3D/
+// Layout/Templates/Health/Customers), same lazy-render-on-click pattern as
+// the Driver tab's own State/Actions/Events/Config subtabs. Only Dashboard/
+// Camera/Macro/Health have real content behind them right now - the rest
+// are visible-but-inert placeholder pages, not fake functionality.
+// Deep-linkable via #page - also just a plain useful feature (bookmark/
+// share a direct link to the Health tab), not only a testing convenience. ---
+function activateMainTab(page) {
+  const tab = document.querySelector(`nav.maintabs .mt[data-page="${page}"]`);
+  if (!tab) return;
+  document.querySelectorAll("nav.maintabs .mt").forEach((t) => t.classList.remove("active"));
+  document.querySelectorAll("main .page").forEach((p) => p.classList.remove("active"));
+  tab.classList.add("active");
+  document.getElementById(`page-${page}`).classList.add("active");
+  if (page === "dashboard") renderDashboard();
+  else if (page === "macro") renderMacrosTab();
+  else if (page === "health") renderHealthTab();
+  else if (page === "camera") renderCameraTab();
+  else if (page === "3d" && !viewer3dInited) initViewer3DWithRetry();
+}
+document.querySelectorAll("nav.maintabs .mt").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    location.hash = tab.dataset.page;
+  });
+});
+window.addEventListener("hashchange", () => activateMainTab(location.hash.slice(1)));
+
+function activeMainTab() {
+  return document.querySelector("nav.maintabs .mt.active").dataset.page;
+}
+
+// --- Dashboard: every instance's primary state + actions in one grid,
+// reusing the same toggle/tile logic as the Driver tab's Actions subpanel
+// but always showing every instance (no filter) - the point of a dashboard
+// is the whole-system glance the Driver tab's per-instance drill-down
+// deliberately isn't. ---
+function renderDashboard() {
+  const grid = document.getElementById("dashboardGrid");
+  grid.innerHTML = "";
+  if (!instanceIds.length) {
+    grid.innerHTML = `<p class="empty-hint">No instances configured.</p>`;
+    return;
+  }
+  instanceIds.forEach((id) => {
+    const manifest = manifests.get(id);
+    const running = runningByInstance.get(id);
+    const state = statesByInstance.get(id) || {};
+    const wrap = document.createElement("div");
+    wrap.className = "tile";
+    if (!running) {
+      wrap.innerHTML = `<div class="tname">${manifest.displayName}</div><div class="tstate">stopped</div>`;
+      grid.appendChild(wrap);
+      return;
+    }
+    const togglePair = findTogglePair(manifest);
+    const boolEntry = Object.entries(state).find(([, v]) => typeof v === "boolean");
+    const useToggle = Boolean(togglePair && boolEntry);
+    const switchHtml = useToggle
+      ? `<label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${
+          boolEntry[1] ? "checked" : ""
+        } data-instance="${id}" data-on-action="${togglePair[0]}" data-off-action="${togglePair[1]}" /><span class="slider-track"></span></label>`
+      : "";
+    const stateText = Object.entries(state)
+      .map(([k, v]) => (typeof v === "boolean" ? (v ? "ON" : "OFF") : String(v)))
+      .join(" · ");
+    wrap.innerHTML = `
+      <div class="row">
+        <span class="tname">${manifest.displayName}</span>
+        ${switchHtml}
+      </div>
+      <div class="tstate">${stateText || "—"}</div>`;
+    grid.appendChild(wrap);
+  });
+  grid.querySelectorAll("input[type=checkbox][data-on-action]").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const action = input.checked ? input.dataset.onAction : input.dataset.offAction;
+      try {
+        await callAction(input.dataset.instance, action, {});
+      } catch (err) {
+        console.error("action failed", err);
+      }
+    });
+  });
+}
+
+// --- Health: per-instance running/error status + orchestrator uptime,
+// ported in spirit from QTI's getHealthSnapshot/refreshHealthPanel. ---
+async function renderHealthTab() {
+  const listEl = document.getElementById("healthList");
+  let data;
+  try {
+    data = await getHealth();
+  } catch (err) {
+    listEl.innerHTML = `<p class="empty-hint">Failed to load health: ${err.message}</p>`;
+    return;
+  }
+  const uptimeMin = Math.floor(data.uptimeMs / 60000);
+  const uptimeText = uptimeMin < 1 ? "just started" : `${uptimeMin} minute${uptimeMin === 1 ? "" : "s"} uptime`;
+  listEl.innerHTML = `<p class="sub">orchestrator: ${uptimeText}</p>`;
+  if (!data.health.length) {
+    listEl.innerHTML += `<p class="empty-hint">No driver instances yet.</p>`;
+    return;
+  }
+  const grid = document.createElement("div");
+  grid.className = "tile-grid";
+  data.health.forEach((h) => {
+    const div = document.createElement("div");
+    div.className = "tile";
+    div.innerHTML = `
+      <div class="tname">${h.running ? "🟢" : "🔴"} ${h.label}</div>
+      <div class="tstate">${h.driverKey} · ${h.id}</div>
+      ${h.lastError ? `<div style="margin-top:6px; font-size:.78rem; color:var(--bad);">${h.lastError}</div>` : ""}`;
+    grid.appendChild(div);
+  });
+  listEl.appendChild(grid);
+}
+document.getElementById("healthRefreshBtn").addEventListener("click", (ev) => {
+  ev.stopPropagation();
+  renderHealthTab();
+});
+
+// --- Macro: named sequences of {instanceId, actionId, params}, run
+// sequentially server-side. Step-picker UI walks the same manifest/action
+// data already loaded for the Driver tab. ---
+async function renderMacrosTab() {
+  const listEl = document.getElementById("macrosList");
+  const macros = await listMacros();
+  if (!macros.length) {
+    listEl.innerHTML = `<p class="empty-hint">No macros yet.</p>`;
+  } else {
+    listEl.innerHTML = "";
+    macros.forEach((m) => {
+      const row = document.createElement("div");
+      row.className = "instance-row";
+      row.innerHTML = `<div><div class="iname">${m.name}</div><div class="ikey">${m.steps.length} step${m.steps.length === 1 ? "" : "s"}</div></div>`;
+      const btnRow = document.createElement("div");
+      btnRow.className = "row";
+      const runBtn = document.createElement("button");
+      runBtn.className = "btn small primary";
+      runBtn.textContent = "Run";
+      runBtn.addEventListener("click", () => runMacro(m.id));
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn small danger";
+      delBtn.textContent = "Delete";
+      delBtn.addEventListener("click", async () => {
+        if (!confirm(`Delete macro "${m.name}"?`)) return;
+        await deleteMacro(m.id);
+        renderMacrosTab();
+      });
+      btnRow.append(runBtn, delBtn);
+      row.appendChild(btnRow);
+      listEl.appendChild(row);
+    });
+  }
+}
+
+function addMacroStepRow() {
+  const stepsRoot = document.getElementById("macroSteps");
+  const row = document.createElement("div");
+  row.className = "row";
+  row.style.marginBottom = "6px";
+  const instSel = document.createElement("select");
+  instSel.innerHTML = instanceIds.map((id) => `<option value="${id}">${manifests.get(id).displayName} (${id})</option>`).join("");
+  const actionSel = document.createElement("select");
+  function renderActions() {
+    const manifest = manifests.get(instSel.value);
+    actionSel.innerHTML = manifest.actions.map((a) => `<option value="${a.id}">${a.label}</option>`).join("");
+  }
+  instSel.addEventListener("change", renderActions);
+  renderActions();
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "btn small danger";
+  removeBtn.textContent = "×";
+  removeBtn.addEventListener("click", () => row.remove());
+  row.append(instSel, actionSel, removeBtn);
+  stepsRoot.appendChild(row);
+}
+document.getElementById("addMacroStepBtn").addEventListener("click", (ev) => {
+  ev.stopPropagation();
+  addMacroStepRow();
+});
+document.getElementById("add-macro-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const name = document.getElementById("macroName").value.trim();
+  if (!name) return;
+  const steps = [...document.getElementById("macroSteps").children].map((row) => {
+    const [instSel, actionSel] = row.querySelectorAll("select");
+    return { instanceId: instSel.value, actionId: actionSel.value, params: {} };
+  });
+  if (!steps.length) {
+    alert("Add at least one step");
+    return;
+  }
+  const result = await saveMacro({ name, steps });
+  if (result.error) {
+    alert(result.error);
+    return;
+  }
+  document.getElementById("macroName").value = "";
+  document.getElementById("macroSteps").innerHTML = "";
+  renderMacrosTab();
+});
+
+// --- Camera: RTSP -> ffmpeg -> WS -> MSE, see camera-player.js and
+// server.js's startCameraFfmpeg (ported directly from QTI). ---
+let activePlayers = new Map(); // cameraId -> {stop()}
+async function renderCameraTab() {
+  const grid = document.getElementById("cameraGrid");
+  activePlayers.forEach((p) => p.stop());
+  activePlayers.clear();
+  grid.innerHTML = "";
+  const cams = await listCameras();
+  if (!cams.length) {
+    grid.innerHTML = `<p class="empty-hint">No cameras added yet.</p>`;
+    return;
+  }
+  cams.forEach((cam) => {
+    const wrap = document.createElement("div");
+    wrap.className = "tile";
+    wrap.style.cursor = "default";
+    wrap.innerHTML = `
+      <div class="row" style="justify-content:space-between;">
+        <span class="tname">${cam.name}</span>
+        <button class="btn small danger" type="button">Remove</button>
+      </div>
+      <video autoplay muted playsinline style="width:100%; aspect-ratio:16/9; background:#000; border-radius:8px; margin-top:6px; object-fit:contain;"></video>`;
+    wrap.querySelector("button").addEventListener("click", async () => {
+      if (!confirm(`Remove camera "${cam.name}"?`)) return;
+      await deleteCamera(cam.id);
+      renderCameraTab();
+    });
+    grid.appendChild(wrap);
+    activePlayers.set(cam.id, attachCameraPlayer(wrap.querySelector("video"), cam.rtspUrl));
+  });
+}
+document.getElementById("add-camera-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const name = document.getElementById("cameraName").value.trim();
+  const rtspUrl = document.getElementById("cameraRtspUrl").value.trim();
+  if (!name || !rtspUrl) return;
+  const result = await addCamera(name, rtspUrl);
+  if (result.error) {
+    alert(result.error);
+    return;
+  }
+  document.getElementById("cameraName").value = "";
+  document.getElementById("cameraRtspUrl").value = "";
+  renderCameraTab();
+});
+
+// --- 3D: upload-and-view only (see viewer3d.js for what's deliberately
+// not ported from QTI's version - no device-mesh binding). Retried with
+// backoff on init failure - a transient CDN hiccup fetching three.js
+// shouldn't leave the tab permanently stuck with no explanation, the exact
+// failure mode QTI's own initViewer3DWithRetry comment documents hitting. ---
+const viewer3d = create3DViewer();
+let viewer3dInited = false;
+async function initViewer3DWithRetry(attempt) {
+  attempt = attempt || 0;
+  try {
+    await viewer3d.init();
+    viewer3dInited = true;
+    const models = await listGlbModels();
+    if (models.length) {
+      document.getElementById("glbHint").style.display = "none";
+      viewer3d.loadGLB(models[0].url);
+    }
+  } catch (e) {
+    console.error(`3D viewer init failed (attempt ${attempt + 1}):`, e);
+    if (attempt < 3) setTimeout(() => initViewer3DWithRetry(attempt + 1), 1500 * (attempt + 1));
+  }
+}
+document.getElementById("glbUploadBtn").addEventListener("click", async () => {
+  const input = document.getElementById("glbUploadInput");
+  const file = input.files[0];
+  if (!file) {
+    alert("Pick a .glb file first");
+    return;
+  }
+  const buf = await file.arrayBuffer();
+  const dataBase64 = btoa(new Uint8Array(buf).reduce((s, b) => s + String.fromCharCode(b), ""));
+  const result = await uploadGlb(file.name, dataBase64);
+  if (result.error) {
+    alert(result.error);
+    return;
+  }
+  document.getElementById("glbHint").style.display = "none";
+  if (!viewer3dInited) await initViewer3DWithRetry();
+  viewer3d.loadGLB(result.url);
+});
+
 async function fullRefresh() {
   const list = await listInstances();
   instanceIds = list.map((s) => s.id);
@@ -382,6 +678,9 @@ async function fullRefresh() {
   updateCountPill();
   renderInstancesList();
   renderActivePanel();
+  const mainTab = activeMainTab();
+  if (mainTab === "dashboard") renderDashboard();
+  else if (mainTab === "health") renderHealthTab();
 }
 
 async function setupAddInstanceForm() {
@@ -458,3 +757,5 @@ connectLiveSocket((msg) => {
   scheduleRefresh();
 });
 setInterval(fullRefresh, FALLBACK_POLL_MS);
+
+if (location.hash.slice(1)) activateMainTab(location.hash.slice(1));

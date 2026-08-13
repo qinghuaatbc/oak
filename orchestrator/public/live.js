@@ -29,7 +29,7 @@ function findTogglePair(manifest) {
   return pairs.find(([on, off]) => ids.has(on) && ids.has(off));
 }
 
-function buildCard(instanceId, manifest, state) {
+function buildCard(instanceId, manifest, state, running) {
   const icon = DRIVER_ICONS[manifest.id] || DRIVER_ICON_FALLBACK;
   const togglePair = findTogglePair(manifest);
   const boolEntry = Object.entries(state).find(([, v]) => typeof v === "boolean");
@@ -37,7 +37,7 @@ function buildCard(instanceId, manifest, state) {
   const on = boolEntry ? boolEntry[1] : false;
 
   const card = document.createElement("div");
-  card.className = "sky-card";
+  card.className = "sky-card" + (running ? "" : " offline");
   card.dataset.category = manifest.id;
   card.dataset.on = on ? "1" : "0";
 
@@ -47,6 +47,9 @@ function buildCard(instanceId, manifest, state) {
 
   const valueEl = document.createElement("div");
   valueEl.className = "sky-value";
+  // A stopped instance's state is a last-known snapshot from before it was
+  // stopped (see server.js's lastState) - still shown, but the "offline"
+  // badge below makes clear it's not live right now.
   valueEl.textContent = Object.keys(state).length
     ? Object.entries(state)
         .map(([k, v]) => (typeof v === "boolean" ? (v ? "ON" : "OFF") : String(v)))
@@ -56,6 +59,14 @@ function buildCard(instanceId, manifest, state) {
   const labelEl = document.createElement("div");
   labelEl.className = "sky-label";
   labelEl.textContent = manifest.displayName;
+
+  if (!running) {
+    const offlineEl = document.createElement("div");
+    offlineEl.className = "sky-offline-badge";
+    offlineEl.textContent = "offline";
+    card.append(iconEl, valueEl, labelEl, offlineEl);
+    return card;
+  }
 
   const actionsEl = document.createElement("div");
   actionsEl.className = "sky-actions";
@@ -117,7 +128,7 @@ async function refresh() {
       if (!manifests.has(summary.id)) manifests.set(summary.id, await getManifest(summary.id));
       const manifest = manifests.get(summary.id);
       const state = await getState(summary.id);
-      return { instanceId: summary.id, manifest, state };
+      return { instanceId: summary.id, manifest, state, running: summary.running };
     })
   );
 
@@ -129,7 +140,7 @@ async function refresh() {
     grid.innerHTML = `<p class="empty">No instances to show.</p>`;
     return;
   }
-  visible.forEach(({ instanceId, manifest, state }) => grid.appendChild(buildCard(instanceId, manifest, state)));
+  visible.forEach(({ instanceId, manifest, state, running }) => grid.appendChild(buildCard(instanceId, manifest, state, running)));
 }
 
 let refreshTimer = null;

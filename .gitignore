@@ -1,4 +1,7 @@
 node_modules/
 orchestrator/config.json
+orchestrator/macros.json
+orchestrator/cameras.json
+orchestrator/models/
 *.log
 .DS_Store

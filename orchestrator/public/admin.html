@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Oak Admin</title>
 <link rel="stylesheet" href="style.css" />
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
 <header>
@@ -17,47 +18,149 @@
     <nav><a href="live.html" target="_blank" rel="noopener">Open Live View ↗</a></nav>
   </div>
 </header>
-<main>
-  <div class="driver-layout">
-    <div>
-      <div class="card">
-        <h2>Running instances</h2>
-        <div id="instancesList"><p class="empty-hint">Loading…</p></div>
-      </div>
-      <div class="card" data-default-collapsed="true">
-        <h2>Add instance</h2>
-        <form id="add-instance-form">
-          <div class="row" id="add-instance-fields"></div>
-        </form>
-      </div>
-    </div>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between;">
-        <div class="subtabs">
-          <div class="st active" data-panel="stateSubPanel">State</div>
-          <div class="st" data-panel="actionsSubPanel">Actions</div>
-          <div class="st" data-panel="eventsSubPanel">Events</div>
-          <div class="st" data-panel="configSubPanel">Config</div>
+<nav class="maintabs">
+  <div class="mt active" data-page="driver">Driver</div>
+  <div class="mt" data-page="dashboard">Dashboard</div>
+  <div class="mt" data-page="camera">Camera</div>
+  <div class="mt" data-page="automation">Automation</div>
+  <div class="mt" data-page="macro">Macro</div>
+  <div class="mt" data-page="scenes">Scenes</div>
+  <div class="mt" data-page="trends">Trends</div>
+  <div class="mt" data-page="3d">3D</div>
+  <div class="mt" data-page="layout">Layout</div>
+  <div class="mt" data-page="templates">Templates</div>
+  <div class="mt" data-page="health">Health</div>
+  <div class="mt" data-page="customers">Customers</div>
+</nav>
+
+<main>
+  <section class="page active" id="page-driver">
+    <div class="driver-layout">
+      <div>
+        <div class="card">
+          <h2>Running instances</h2>
+          <div id="instancesList"><p class="empty-hint">Loading…</p></div>
         </div>
-        <select id="instanceFilter"></select>
+        <div class="card" data-default-collapsed="true">
+          <h2>Add instance</h2>
+          <form id="add-instance-form">
+            <div class="row" id="add-instance-fields"></div>
+          </form>
+        </div>
       </div>
-      <div style="margin-top:12px;">
-        <div class="subpanel active" id="stateSubPanel">
-          <table class="oak-table"><thead><tr><th>instance</th><th>state</th><th>value</th></tr></thead><tbody id="stateBody"></tbody></table>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between;">
+          <div class="subtabs">
+            <div class="st active" data-panel="stateSubPanel">State</div>
+            <div class="st" data-panel="actionsSubPanel">Actions</div>
+            <div class="st" data-panel="eventsSubPanel">Events</div>
+            <div class="st" data-panel="configSubPanel">Config</div>
+          </div>
+          <select id="instanceFilter"></select>
         </div>
-        <div class="subpanel" id="actionsSubPanel">
-          <div class="tile-grid" id="actionsGrid"></div>
-        </div>
-        <div class="subpanel" id="eventsSubPanel">
-          <div class="log-panel" id="eventsLog"></div>
-        </div>
-        <div class="subpanel" id="configSubPanel">
-          <div id="configPanel"></div>
+        <div style="margin-top:12px;">
+          <div class="subpanel active" id="stateSubPanel">
+            <table class="oak-table"><thead><tr><th>instance</th><th>state</th><th>value</th></tr></thead><tbody id="stateBody"></tbody></table>
+          </div>
+          <div class="subpanel" id="actionsSubPanel">
+            <div class="tile-grid" id="actionsGrid"></div>
+          </div>
+          <div class="subpanel" id="eventsSubPanel">
+            <div class="log-panel" id="eventsLog"></div>
+          </div>
+          <div class="subpanel" id="configSubPanel">
+            <div id="configPanel"></div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  </section>
+
+  <section class="page" id="page-dashboard">
+    <div class="card">
+      <h2>Dashboard</h2>
+      <div class="sub">every instance's primary state and actions, at a glance</div>
+      <div class="tile-grid" id="dashboardGrid"></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-camera">
+    <div class="card">
+      <h2>Cameras</h2>
+      <form id="add-camera-form" class="row">
+        <input type="text" id="cameraName" placeholder="Name (e.g. Front Door)" />
+        <input type="text" id="cameraRtspUrl" placeholder="rtsp://user:pass@host:554/stream" style="min-width:280px;" />
+        <button class="btn small primary" type="submit">Add camera</button>
+      </form>
+      <div class="tile-grid" id="cameraGrid" style="margin-top:16px;"></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-automation">
+    <div class="card"><h2>Automation</h2><p class="empty-hint">Coming soon - time/condition-triggered macros aren't built yet.</p></div>
+  </section>
+
+  <section class="page" id="page-macro">
+    <div class="card">
+      <h2>Macros</h2>
+      <div class="sub">a named sequence of actions across any instances, run as one</div>
+      <div id="macrosList"></div>
+    </div>
+    <div class="card" data-default-collapsed="true">
+      <h2>Add macro</h2>
+      <form id="add-macro-form">
+        <input type="text" id="macroName" placeholder="Macro name" style="margin-bottom:10px;" />
+        <div id="macroSteps"></div>
+        <div class="row" style="margin-top:8px;">
+          <button type="button" class="btn small" id="addMacroStepBtn">+ Add step</button>
+          <button type="submit" class="btn small primary">Save macro</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="page" id="page-scenes">
+    <div class="card"><h2>Scenes</h2><p class="empty-hint">Coming soon - captured-state snapshots aren't built yet.</p></div>
+  </section>
+
+  <section class="page" id="page-trends">
+    <div class="card"><h2>Trends</h2><p class="empty-hint">Coming soon - numeric state history/charts aren't built yet.</p></div>
+  </section>
+
+  <section class="page" id="page-3d">
+    <div class="card">
+      <h2>3D</h2>
+      <div class="sub">upload a .glb model to view it - no device-position binding yet, just the viewer</div>
+      <div class="row">
+        <input type="file" id="glbUploadInput" accept=".glb" />
+        <button class="btn small primary" id="glbUploadBtn">Upload</button>
+      </div>
+      <div id="canvas3dWrap" style="position:relative; width:100%; height:70vh; border-radius:16px; overflow:hidden; margin-top:12px; background:linear-gradient(180deg, var(--bg), var(--raised)); border:1px solid var(--line);">
+        <div id="glbHint" class="empty-hint" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">Upload a .glb to get started</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="page-layout">
+    <div class="card"><h2>Layout</h2><p class="empty-hint">Coming soon - the drag-drop page builder isn't built yet.</p></div>
+  </section>
+
+  <section class="page" id="page-templates">
+    <div class="card"><h2>Templates</h2><p class="empty-hint">Coming soon - pre-built dashboard templates aren't built yet.</p></div>
+  </section>
+
+  <section class="page" id="page-health">
+    <div class="card">
+      <h2>Health <button class="btn small" id="healthRefreshBtn" style="margin-left:auto;">Refresh</button></h2>
+      <div id="healthList"></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-customers">
+    <div class="card"><h2>Customers</h2><p class="empty-hint">Coming soon - Oak is single-tenant today, no per-customer isolation yet.</p></div>
+  </section>
 </main>
 <script type="module" src="admin.js"></script>
 </body>

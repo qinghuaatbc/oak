@@ -31,7 +31,13 @@ header nav a:hover{ text-decoration:underline; }
 .status-pill.on{ background:var(--good-tint); color:var(--good); border-color:var(--good); }
 .status-pill.off{ color:var(--faint); }
 
+nav.maintabs{ display:flex; gap:4px; padding:0 24px; border-bottom:1px solid var(--line); overflow-x:auto; position:sticky; top:57px; z-index:9; background:var(--bg); }
+nav.maintabs .mt{ font-family:var(--sans); font-weight:600; font-size:.86rem; padding:10px 16px; cursor:pointer; color:var(--faint); border-bottom:2px solid transparent; white-space:nowrap; flex:none; }
+nav.maintabs .mt.active{ color:var(--accent); border-bottom-color:var(--accent); }
+
 main{ max-width:1400px; margin:0 auto; padding:20px 24px 60px; }
+.page{ display:none; }
+.page.active{ display:block; }
 
 .driver-layout{ display:grid; grid-template-columns:360px 1fr; gap:20px; align-items:start; }
 @media (max-width:900px){ .driver-layout{ grid-template-columns:1fr; } }

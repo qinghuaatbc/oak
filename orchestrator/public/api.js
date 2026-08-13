@@ -54,3 +54,55 @@ export async function startInstance(id) {
   const res = await fetch(`/api/instances/${id}/start`, { method: "POST" });
   return res.json();
 }
+
+export async function getHealth() {
+  return (await fetch("/api/health")).json();
+}
+
+export async function listMacros() {
+  return (await fetch("/api/macros")).json();
+}
+export async function saveMacro(macro) {
+  const res = await fetch("/api/macros", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(macro),
+  });
+  return res.json();
+}
+export async function deleteMacro(id) {
+  const res = await fetch(`/api/macros/${id}`, { method: "DELETE" });
+  return res.json();
+}
+export async function runMacro(id) {
+  const res = await fetch(`/api/macros/${id}/run`, { method: "POST" });
+  return res.json();
+}
+
+export async function listCameras() {
+  return (await fetch("/api/cameras")).json();
+}
+export async function addCamera(name, rtspUrl) {
+  const res = await fetch("/api/cameras", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, rtspUrl }),
+  });
+  return res.json();
+}
+export async function deleteCamera(id) {
+  const res = await fetch(`/api/cameras/${id}`, { method: "DELETE" });
+  return res.json();
+}
+
+export async function listGlbModels() {
+  return (await fetch("/api/glb")).json();
+}
+export async function uploadGlb(filename, dataBase64) {
+  const res = await fetch("/api/glb-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename, dataBase64 }),
+  });
+  return res.json();
+}

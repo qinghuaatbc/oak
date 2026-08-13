@@ -61,6 +61,8 @@
   .sky-hidden{ display:none !important; }
   .sky-card{ background:var(--card-bg); backdrop-filter:blur(20px) saturate(1.6); -webkit-backdrop-filter:blur(20px) saturate(1.6); border:1px solid var(--card-border); border-radius:16px; box-shadow:var(--card-shadow); padding:14px 12px; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; }
   .sky-card[data-on="1"]{ box-shadow:var(--card-shadow), 0 0 0 2px var(--accent-tint); }
+  .sky-card.offline{ opacity:.55; cursor:default; }
+  .sky-offline-badge{ font-size:11px; font-weight:600; color:var(--bad); text-transform:uppercase; letter-spacing:.04em; }
   .sky-icon{ font-size:32px; }
   .sky-value{ font-size:13px; color:var(--ink); font-weight:600; }
   .sky-label{ font-size:12px; font-weight:600; color:var(--ink); text-align:center; }
