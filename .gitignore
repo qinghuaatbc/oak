@@ -1,0 +1,4 @@
+node_modules/
+orchestrator/config.json
+*.log
+.DS_Store

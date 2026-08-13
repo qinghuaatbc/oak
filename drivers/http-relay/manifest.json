@@ -1,0 +1,33 @@
+{
+  "id": "http-relay",
+  "displayName": "Generic HTTP Relay",
+  "version": "0.1.0",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "http",
+        "label": "HTTP",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 80 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 5000 }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "params": [{ "key": "relay", "type": "number", "default": 0 }] },
+    { "id": "turnOff", "label": "Turn Off", "params": [{ "key": "relay", "type": "number", "default": 0 }] },
+    { "id": "toggle", "label": "Toggle", "params": [{ "key": "relay", "type": "number", "default": 0 }] }
+  ],
+  "events": [
+    { "id": "stateChanged", "label": "Relay State Changed", "params": ["relay", "on"] }
+  ],
+  "states": [
+    { "id": "relay.on", "type": "boolean", "perInstance": "relay" }
+  ]
+}

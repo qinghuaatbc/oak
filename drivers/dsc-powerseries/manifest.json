@@ -1,0 +1,64 @@
+{
+  "id": "dsc-powerseries",
+  "displayName": "DSC PowerSeries (Envisalink)",
+  "version": "0.1.0",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "envisalink",
+        "label": "Envisalink (network)",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Envisalink IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 4025 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "password", "type": "password", "label": "TPI Password", "default": "user" },
+    { "key": "accessCode", "type": "password", "label": "Default Access Code" }
+  ],
+  "actions": [
+    {
+      "id": "armAway",
+      "label": "Arm (Away)",
+      "params": [{ "key": "partition", "type": "number", "default": 1 }]
+    },
+    {
+      "id": "armStay",
+      "label": "Arm (Stay)",
+      "params": [{ "key": "partition", "type": "number", "default": 1 }]
+    },
+    {
+      "id": "disarm",
+      "label": "Disarm",
+      "params": [
+        { "key": "partition", "type": "number", "default": 1 },
+        { "key": "code", "type": "string" }
+      ]
+    },
+    {
+      "id": "sendKeys",
+      "label": "Send Keystrokes",
+      "params": [
+        { "key": "partition", "type": "number", "default": 1 },
+        { "key": "keys", "type": "string" }
+      ]
+    }
+  ],
+  "events": [
+    { "id": "connected", "label": "Panel Logged In", "params": [] },
+    { "id": "disconnected", "label": "Disconnected", "params": [] },
+    { "id": "zoneOpen", "label": "Zone Opened", "params": ["zone"] },
+    { "id": "zoneRestore", "label": "Zone Restored", "params": ["zone"] },
+    { "id": "partitionArmed", "label": "Partition Armed", "params": ["partition", "mode"] },
+    { "id": "partitionDisarmed", "label": "Partition Disarmed", "params": ["partition"] },
+    { "id": "alarm", "label": "Alarm", "params": ["partition"] }
+  ],
+  "states": [
+    { "id": "zone.open", "type": "boolean", "perInstance": "zone" },
+    { "id": "partition.status", "type": "string", "perInstance": "partition" }
+  ]
+}
