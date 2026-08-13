@@ -18,7 +18,9 @@ const { loadDriver } = require("../runtime/loader");
 const PORT = parseInt(process.env.PORT || "8090", 10);
 const CONFIG_PATH = process.env.OAK_CONFIG || path.join(__dirname, "config.json");
 const DRIVERS_DIR = path.join(__dirname, "..", "drivers");
+const PUBLIC_DIR = path.join(__dirname, "public");
 const MAX_RECENT_EVENTS = 50;
+const STATIC_TYPES = { ".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
 
 if (!fs.existsSync(CONFIG_PATH)) {
   console.error(`Config not found at ${CONFIG_PATH} - copy config.example.json to config.json (or set OAK_CONFIG) first.`);
@@ -68,11 +70,31 @@ function readJsonBody(req) {
   });
 }
 
+function serveStatic(req, res) {
+  let reqPath = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
+  if (reqPath === "/") reqPath = "/admin.html";
+  const filePath = path.join(PUBLIC_DIR, reqPath);
+  if (!filePath.startsWith(PUBLIC_DIR)) {
+    res.writeHead(403);
+    return res.end("Forbidden");
+  }
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      return res.end("Not found");
+    }
+    const type = STATIC_TYPES[path.extname(filePath)] || "application/octet-stream";
+    res.writeHead(200, { "Content-Type": type });
+    res.end(data);
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   const parts = url.pathname.split("/").filter(Boolean);
 
   if (parts[0] !== "api" || parts[1] !== "instances") {
+    if (req.method === "GET") return serveStatic(req, res);
     res.writeHead(404);
     return res.end("Not found");
   }
@@ -90,6 +112,10 @@ const server = http.createServer(async (req, res) => {
 
   const entry = instances.get(parts[2]);
   if (!entry) return sendJson(res, 404, { error: "No such instance" });
+
+  if (parts[3] === "manifest" && req.method === "GET") {
+    return sendJson(res, 200, entry.manifest);
+  }
 
   if (parts[3] === "state" && req.method === "GET") {
     return sendJson(res, 200, entry.driverInstance.getAllState());
