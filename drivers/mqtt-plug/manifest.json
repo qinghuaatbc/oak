@@ -1,0 +1,35 @@
+{
+  "id": "mqtt-plug",
+  "displayName": "Generic MQTT Plug/Sensor",
+  "version": "0.1.0",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "mqtt",
+        "label": "MQTT Broker",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Broker host" },
+          { "key": "port", "type": "number", "label": "Port", "default": 1883 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "baseTopic", "type": "string", "label": "Base topic (e.g. home/plug1)", "default": "home/plug1" },
+    { "key": "clientId", "type": "string", "label": "MQTT client id", "default": "oak-mqtt-plug" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "params": [] }
+  ],
+  "events": [
+    { "id": "connected", "label": "Broker Connected", "params": [] },
+    { "id": "disconnected", "label": "Disconnected", "params": [] },
+    { "id": "stateChanged", "label": "State Changed", "params": ["on"] }
+  ],
+  "states": [
+    { "id": "plug.on", "type": "boolean" }
+  ]
+}

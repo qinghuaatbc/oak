@@ -103,8 +103,11 @@ function create(ctx) {
       loggedIn = false;
       ctx.emitEvent("disconnected", {});
     },
-    onData(text) {
-      rxBuffer += text;
+    onData(chunk) {
+      // TPI is pure ASCII, so decoding the whole chunk as UTF-8 up front
+      // is lossless here - see runtime/loader.js's Connection for why the
+      // runtime hands drivers the raw Buffer instead of doing this itself.
+      rxBuffer += chunk.toString("utf8");
       let idx;
       while ((idx = rxBuffer.indexOf("\r\n")) !== -1) {
         const line = rxBuffer.slice(0, idx);

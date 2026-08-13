@@ -32,6 +32,7 @@ function loadDriverModule(driverDir) {
     require: Module.createRequire(filePath),
     console,
     fetch, // standard Web API, available as a Node global since Node 18 - not from any driver SDK
+    Buffer, // needed by any driver speaking a binary protocol (e.g. MQTT) - core Node global
   };
   vm.createContext(sandbox);
   const wrapped = `(function (module, exports, require) {\n${source}\n})`;
@@ -60,15 +61,23 @@ class Connection extends EventEmitter {
       this.connected = true;
       this.emit("open");
     });
-    this.socket.on("data", (chunk) => this.emit("data", chunk.toString("utf8")));
+    // Raw Buffer, deliberately not pre-decoded as UTF-8 text here - a
+    // binary protocol (e.g. MQTT) fed through .toString("utf8") gets bytes
+    // that aren't valid UTF-8 silently replaced/corrupted, and there's no
+    // way to recover the original bytes afterward. A text-protocol driver
+    // (e.g. DSC's pure-ASCII TPI) just calls chunk.toString("utf8") itself
+    // on the first line of its own onData - one cheap call, and it keeps
+    // the choice of interpretation where it belongs: with the driver that
+    // knows what protocol it's actually speaking.
+    this.socket.on("data", (chunk) => this.emit("data", chunk));
     this.socket.on("close", () => {
       this.connected = false;
       this.emit("close");
     });
     this.socket.on("error", (err) => this.emit("error", err));
   }
-  send(text) {
-    if (this.socket && this.connected) this.socket.write(text);
+  send(data) {
+    if (this.socket && this.connected) this.socket.write(data);
   }
   close() {
     if (this.socket) this.socket.destroy();
@@ -132,7 +141,7 @@ class DriverInstance extends EventEmitter {
     if (this.connection) {
       this.connection.on("open", () => this._guarded("onConnect", () => this.impl.onConnect && this.impl.onConnect()));
       this.connection.on("close", () => this._guarded("onDisconnect", () => this.impl.onDisconnect && this.impl.onDisconnect()));
-      this.connection.on("data", (text) => this._guarded("onData", () => this.impl.onData && this.impl.onData(text)));
+      this.connection.on("data", (chunk) => this._guarded("onData", () => this.impl.onData && this.impl.onData(chunk)));
     }
   }
 

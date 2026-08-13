@@ -50,7 +50,11 @@ with optional `onConnect`, `onDisconnect`, `onData` lifecycle hooks. `ctx`
 is passed in explicitly (no implicit globals):
 
 - `ctx.connection` — a `Connection` (`EventEmitter`) wrapping the active
-  transport. `.send(text)`, `.close()`, events `"open"`/`"close"`/`"data"`/`"error"`.
+  transport. `.send(data)`, `.close()`, events `"open"`/`"close"`/`"data"`/`"error"`.
+  `"data"` carries the raw `Buffer` from the socket, not a pre-decoded
+  string - a binary protocol driver (MQTT, etc.) needs the original bytes;
+  a text-protocol driver just calls `chunk.toString("utf8")` itself as the
+  first line of its own `onData`.
 - `ctx.clock` — `.every(ms, fn)` / `.after(ms, fn)`, both return `{cancel()}`.
   Every callback registered here is expected to just keep doing its job on
   each tick; there is no self-rearm footgun to remember, unlike a
