@@ -1,36 +1,138 @@
-import { listInstances, getManifest, getState, getEvents, callAction, listDrivers, addInstance, deleteInstance } from "./api.js";
+import { listInstances, getManifest, getState, callAction, listDrivers, addInstance, deleteInstance } from "./api.js";
 import { connectLiveSocket } from "./live-socket.js";
 
-const FALLBACK_POLL_MS = 10000; // safety net if the WS connection is down
+const FALLBACK_POLL_MS = 10000;
 const REFRESH_DEBOUNCE_MS = 150;
-const root = document.getElementById("instances");
-const wsPill = document.getElementById("wsPill");
-let manifests = new Map(); // id -> manifest, fetched once per instance
+const MAX_LOG_LINES = 1000;
 
-// A checkbox-driven switch, same markup shared.js's buildToggleSwitch
-// produces in QTI - only rendered when a boolean state has an obviously
-// matching on/off action pair to drive it (e.g. relay.on + turnOn/turnOff).
-function toggleSwitchHtml(instanceId, onActionId, offActionId, checked) {
-  return `<label class="switch" onclick="event.stopPropagation()">
-    <input type="checkbox" ${checked ? "checked" : ""} data-instance="${instanceId}" data-on-action="${onActionId}" data-off-action="${offActionId}" />
-    <span class="slider-track"></span>
-  </label>`;
+let manifests = new Map(); // id -> manifest
+let instanceIds = [];
+let statesByInstance = new Map(); // id -> {key: value}
+const logBuffer = []; // {instanceId, label, text} - fed live by WS "event" messages
+
+const countPill = document.getElementById("countPill");
+const instancesListEl = document.getElementById("instancesList");
+const instanceFilter = document.getElementById("instanceFilter");
+const stateBody = document.getElementById("stateBody");
+const actionsGrid = document.getElementById("actionsGrid");
+const eventsLog = document.getElementById("eventsLog");
+
+// --- Collapsible cards, ported from QTI's own app.js makeCardsCollapsible()
+// (same localStorage-keyed-by-title persistence, same data-default-collapsed
+// opt-in) - reused as-is since it's this project's own generic mechanism,
+// not QTI-specific. ---
+function makeCardsCollapsible() {
+  document.querySelectorAll(".card").forEach((card) => {
+    const header = card.firstElementChild;
+    if (!header) return;
+    const h2 = header.tagName === "H2" ? header : header.querySelector("h2");
+    if (!h2) return;
+    const key = "oak_card_collapsed_" + h2.textContent.trim().toLowerCase().replace(/\s+/g, "_");
+    const chev = document.createElement("span");
+    chev.className = "card-chev";
+    h2.insertBefore(chev, h2.firstChild);
+    header.style.cursor = "pointer";
+    function applyState(collapsed) {
+      Array.from(card.children).forEach((child) => {
+        if (child === header) return;
+        child.style.display = collapsed ? "none" : "";
+      });
+      chev.textContent = collapsed ? "▸" : "▾";
+    }
+    const saved = localStorage.getItem(key);
+    let collapsed = saved !== null ? saved === "1" : card.dataset.defaultCollapsed === "true";
+    applyState(collapsed);
+    card.__setCollapsed = (c) => {
+      collapsed = c;
+      applyState(collapsed);
+      localStorage.setItem(key, collapsed ? "1" : "0");
+    };
+    header.addEventListener("click", (ev) => {
+      if (["BUTTON", "INPUT", "SELECT"].includes(ev.target.tagName)) return;
+      card.__setCollapsed(!collapsed);
+    });
+  });
 }
 
-// Only turnOn/turnOff is a real boolean toggle - armStay/disarm LOOKED
-// like a pair by action-id matching alone, but DSC's partition.status is a
-// string ("armed"/"disarmed"/"alarm"), not boolean, so there's no state to
-// drive a switch with. That mismatch produced a real bug: a tile whose
-// only actions were folded into a "toggle" that never got a switch (no
-// boolean state) AND never got its own submit button (suppressed because
-// isToggleAction was true) - armStay became completely unreachable. Fixed
-// by only trusting a pair match when a boolean state is actually present
-// (see the caller's `useToggle` check) - a false-positive pair now just
-// falls through to ordinary per-action tiles instead of going dead.
 function findTogglePair(manifest) {
   const ids = new Set(manifest.actions.map((a) => a.id));
-  const pairs = [["turnOn", "turnOff"]];
+  const pairs = [["turnOn", "turnOff"]]; // see live.js for why armStay/disarm is deliberately not here
   return pairs.find(([on, off]) => ids.has(on) && ids.has(off));
+}
+
+function updateCountPill() {
+  const n = instanceIds.length;
+  countPill.textContent = n === 0 ? "no instances running" : n + " instance" + (n === 1 ? "" : "s") + " running";
+  countPill.className = "status-pill " + (n === 0 ? "off" : "on");
+}
+
+function renderInstancesList() {
+  instancesListEl.innerHTML = "";
+  if (!instanceIds.length) {
+    instancesListEl.innerHTML = `<p class="empty-hint">No driver instances yet.</p>`;
+    return;
+  }
+  instanceIds.forEach((id) => {
+    const manifest = manifests.get(id);
+    const row = document.createElement("div");
+    row.className = "instance-row";
+    row.title = "Click to filter State/Actions/Events to this instance";
+    row.innerHTML = `<div><div class="iname">${manifest.displayName}</div><div class="ikey">${manifest.id} · ${id}</div></div>`;
+    row.addEventListener("click", () => {
+      instanceFilter.value = id;
+      renderActivePanel();
+    });
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn small danger";
+    delBtn.textContent = "Remove";
+    delBtn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      if (!confirm(`Remove instance "${id}"?`)) return;
+      await deleteInstance(id);
+      manifests.delete(id);
+      statesByInstance.delete(id);
+      fullRefresh();
+    });
+    row.appendChild(delBtn);
+    instancesListEl.appendChild(row);
+  });
+}
+
+function renderInstanceFilter() {
+  const prev = instanceFilter.value;
+  instanceFilter.innerHTML = "";
+  const all = document.createElement("option");
+  all.value = "";
+  all.textContent = "All instances";
+  instanceFilter.appendChild(all);
+  instanceIds.forEach((id) => {
+    const o = document.createElement("option");
+    o.value = id;
+    o.textContent = manifests.get(id).displayName + " (" + id + ")";
+    instanceFilter.appendChild(o);
+  });
+  instanceFilter.value = [...instanceFilter.options].some((o) => o.value === prev) ? prev : "";
+}
+
+function renderStatePanel() {
+  const filter = instanceFilter.value;
+  stateBody.innerHTML = "";
+  const rows = [];
+  instanceIds.forEach((id) => {
+    if (filter && id !== filter) return;
+    const state = statesByInstance.get(id) || {};
+    Object.entries(state).forEach(([key, value]) => rows.push({ id, key, value }));
+  });
+  if (!rows.length) {
+    stateBody.innerHTML = `<tr><td colspan="3" class="empty-hint">no state yet</td></tr>`;
+    return;
+  }
+  rows.forEach(({ id, key, value }) => {
+    const tr = document.createElement("tr");
+    const valueHtml = typeof value === "boolean" ? `<span class="status-pill ${value ? "on" : "off"}">${value ? "on" : "off"}</span>` : String(value);
+    tr.innerHTML = `<td>${manifests.get(id).displayName}</td><td>${key}</td><td>${valueHtml}</td>`;
+    stateBody.appendChild(tr);
+  });
 }
 
 function fieldInputs(action) {
@@ -44,77 +146,51 @@ function fieldInputs(action) {
     .join("");
 }
 
-function formatValue(v) {
-  if (typeof v === "boolean") return `<span class="status-pill ${v ? "on" : "off"}">${v ? "on" : "off"}</span>`;
-  return String(v);
-}
+function renderActionsPanel() {
+  const filter = instanceFilter.value;
+  actionsGrid.innerHTML = "";
+  const visible = filter ? [filter] : instanceIds;
+  if (!visible.length) {
+    actionsGrid.innerHTML = `<p class="empty-hint">No instances to show.</p>`;
+    return;
+  }
+  visible.forEach((id) => {
+    const manifest = manifests.get(id);
+    const state = statesByInstance.get(id) || {};
+    const togglePair = findTogglePair(manifest);
+    const boolEntry = Object.entries(state).find(([, v]) => typeof v === "boolean");
+    const useToggle = Boolean(togglePair && boolEntry);
 
-function renderInstancePanel(id, manifest, state, events) {
-  const togglePair = findTogglePair(manifest);
-  const boolStateEntry = Object.entries(state).find(([, v]) => typeof v === "boolean");
-  // A matched pair only actually renders as a toggle if there's a real
-  // boolean state to show/drive - otherwise every action, pair or not,
-  // falls through to a normal tile with its own submit button.
-  const useToggle = Boolean(togglePair && boolStateEntry);
-
-  const stateRows = Object.entries(state)
-    .map(([key, value]) => `<tr><td>${key}</td><td>${formatValue(value)}</td></tr>`)
-    .join("");
-
-  const actionTiles = manifest.actions
-    .map((a) => {
+    manifest.actions.forEach((a) => {
       const isToggleAction = useToggle && (a.id === togglePair[0] || a.id === togglePair[1]);
-      if (isToggleAction && a.id !== togglePair[0]) return ""; // toggle pair renders as one tile, not two
-      const switchHtml = isToggleAction ? toggleSwitchHtml(id, togglePair[0], togglePair[1], boolStateEntry[1]) : "";
-      return `
-      <form class="tile" data-instance="${id}" data-action="${isToggleAction ? "" : a.id}">
+      if (isToggleAction && a.id !== togglePair[0]) return;
+      const form = document.createElement("form");
+      form.className = "tile";
+      form.dataset.instance = id;
+      if (!isToggleAction) form.dataset.action = a.id;
+      const switchHtml = isToggleAction
+        ? `<label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${
+            boolEntry[1] ? "checked" : ""
+          } data-instance="${id}" data-on-action="${togglePair[0]}" data-off-action="${togglePair[1]}" /><span class="slider-track"></span></label>`
+        : "";
+      form.innerHTML = `
         <div class="row">
           <span class="tname">${isToggleAction ? manifest.displayName : a.label}</span>
           ${switchHtml}
         </div>
         ${isToggleAction ? "" : `<button class="btn small" type="submit">${a.label}</button>`}
         ${fieldInputs(a)}
-      </form>`;
-    })
-    .join("");
-
-  const eventLines = events
-    .slice()
-    .reverse()
-    .map((e) => `<div>${new Date(e.t).toLocaleTimeString()} — ${e.id} ${JSON.stringify(e.params)}</div>`)
-    .join("");
-
-  return `
-    <section class="card" data-panel="${id}">
-      <h2>${manifest.displayName}
-        <button type="button" class="btn small danger delete-instance" data-instance="${id}">Remove</button>
-      </h2>
-      <div class="sub">instance "${id}" · driver ${manifest.id}</div>
-      <table><tbody>${stateRows || `<tr><td class="sub">no state yet</td></tr>`}</tbody></table>
-      <div class="tile-grid">${actionTiles}</div>
-      <div class="events">${eventLines || `<div class="sub">no events yet</div>`}</div>
-    </section>`;
+        <div class="tstate">${manifest.displayName} · ${id}</div>`;
+      actionsGrid.appendChild(form);
+    });
+  });
+  wireActionForms();
 }
 
-async function refresh() {
-  const list = await listInstances();
-  const panels = await Promise.all(
-    list.map(async (summary) => {
-      if (!manifests.has(summary.id)) manifests.set(summary.id, await getManifest(summary.id));
-      const manifest = manifests.get(summary.id);
-      const [state, events] = await Promise.all([getState(summary.id), getEvents(summary.id)]);
-      return renderInstancePanel(summary.id, manifest, state, events);
-    })
-  );
-  root.innerHTML = panels.join("") || `<p class="empty-hint">No instances configured.</p>`;
-  wireForms();
-}
-
-function wireForms() {
-  root.querySelectorAll("form[data-instance]").forEach((form) => {
+function wireActionForms() {
+  actionsGrid.querySelectorAll("form[data-action]").forEach((form) => {
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      if (!form.dataset.action) return; // the toggle-pair tile has no submit action of its own
       const params = {};
       form.querySelectorAll("input:not([type=checkbox])").forEach((input) => {
         if (input.value === "") return;
@@ -125,16 +201,12 @@ function wireForms() {
       } catch (err) {
         console.error("action failed", err);
       }
-      refresh();
     });
-    // The whole tile is clickable (not just its button), matching QTI's
-    // light-tile convention - but only for tiles that resolve to exactly
-    // one action already (a real submit button), not the multi-field ones.
-    if (form.dataset.action && form.querySelectorAll("input:not([type=checkbox])").length === 0) {
+    if (form.querySelectorAll("input:not([type=checkbox])").length === 0) {
       form.addEventListener("click", () => form.requestSubmit());
     }
   });
-  root.querySelectorAll('input[type=checkbox][data-on-action]').forEach((input) => {
+  actionsGrid.querySelectorAll("input[type=checkbox][data-on-action]").forEach((input) => {
     input.addEventListener("change", async () => {
       const action = input.checked ? input.dataset.onAction : input.dataset.offAction;
       try {
@@ -142,23 +214,72 @@ function wireForms() {
       } catch (err) {
         console.error("action failed", err);
       }
-      refresh();
-    });
-  });
-  root.querySelectorAll(".delete-instance").forEach((btn) => {
-    btn.addEventListener("click", async (ev) => {
-      ev.stopPropagation();
-      if (!confirm(`Remove instance "${btn.dataset.instance}"?`)) return;
-      await deleteInstance(btn.dataset.instance);
-      manifests.delete(btn.dataset.instance);
-      refresh();
     });
   });
 }
 
-// --- Add-instance form: rendered once at startup (not on every poll/WS
-// refresh, so in-progress typing in the id/connection fields never gets
-// wiped out from under the user) ---
+// Ported from QTI's app.js logPanel/logLine/renderLogPanel: keep every
+// line in a buffer (not just appended straight to the DOM) so the instance
+// filter can re-slice without losing history from instances not currently
+// selected, and only auto-scroll to a new line if the user was already
+// near the bottom - otherwise a chatty driver yanks the view back down
+// mid-read.
+function logLine(instanceId, text) {
+  const label = manifests.has(instanceId) ? manifests.get(instanceId).displayName : instanceId;
+  logBuffer.push({ instanceId, label, text });
+  if (logBuffer.length > MAX_LOG_LINES) logBuffer.shift();
+  if (document.getElementById("eventsSubPanel").classList.contains("active")) renderEventsPanel();
+}
+
+function renderEventsPanel() {
+  const wasNearBottom = eventsLog.scrollHeight - eventsLog.scrollTop - eventsLog.clientHeight < 40;
+  const filter = instanceFilter.value;
+  eventsLog.innerHTML = "";
+  logBuffer
+    .filter((e) => !filter || e.instanceId === filter)
+    .forEach((e) => {
+      const div = document.createElement("div");
+      div.className = "line";
+      div.textContent = `[${e.label}] ${e.text}`;
+      eventsLog.appendChild(div);
+    });
+  if (wasNearBottom) eventsLog.scrollTop = eventsLog.scrollHeight;
+  if (!logBuffer.length) eventsLog.innerHTML = `<p class="empty-hint">no events yet</p>`;
+}
+
+function renderActivePanel() {
+  renderInstanceFilter();
+  const activePanel = document.querySelector(".subtabs .st.active").dataset.panel;
+  if (activePanel === "stateSubPanel") renderStatePanel();
+  else if (activePanel === "actionsSubPanel") renderActionsPanel();
+  else renderEventsPanel();
+}
+
+document.querySelectorAll(".subtabs .st").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".subtabs .st").forEach((t) => t.classList.remove("active"));
+    document.querySelectorAll(".subpanel").forEach((p) => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById(tab.dataset.panel).classList.add("active");
+    renderActivePanel();
+  });
+});
+instanceFilter.addEventListener("change", renderActivePanel);
+
+async function fullRefresh() {
+  const list = await listInstances();
+  instanceIds = list.map((s) => s.id);
+  await Promise.all(
+    list.map(async (summary) => {
+      if (!manifests.has(summary.id)) manifests.set(summary.id, await getManifest(summary.id));
+      statesByInstance.set(summary.id, await getState(summary.id));
+    })
+  );
+  updateCountPill();
+  renderInstancesList();
+  renderActivePanel();
+}
+
 async function setupAddInstanceForm() {
   const drivers = await listDrivers();
   const fieldsRoot = document.getElementById("add-instance-fields");
@@ -168,7 +289,6 @@ async function setupAddInstanceForm() {
       f.default !== undefined ? " (" + f.default + ")" : ""
     }" />`;
   }
-
   function renderFieldsFor(driverId) {
     const manifest = drivers.find((d) => d.id === driverId);
     if (!manifest) {
@@ -211,23 +331,26 @@ async function setupAddInstanceForm() {
       return;
     }
     form.querySelectorAll("input").forEach((input) => (input.value = ""));
-    refresh();
+    document.querySelector('.card[data-default-collapsed] h2')?.closest(".card").__setCollapsed(true);
+    fullRefresh();
   });
 }
 
 let refreshTimer = null;
 function scheduleRefresh() {
   clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(refresh, REFRESH_DEBOUNCE_MS);
+  refreshTimer = setTimeout(fullRefresh, REFRESH_DEBOUNCE_MS);
 }
 
-refresh();
+makeCardsCollapsible();
+fullRefresh();
 setupAddInstanceForm();
-connectLiveSocket(
-  () => scheduleRefresh(),
-  (connected) => {
-    wsPill.textContent = connected ? "connected" : "disconnected";
-    wsPill.className = "status-pill " + (connected ? "on" : "off");
+connectLiveSocket((msg) => {
+  if (msg.type === "event") {
+    logLine(msg.instanceId, `[event] ${msg.event.id} ${JSON.stringify(msg.event.params)}`);
+  } else if (msg.type === "state") {
+    logLine(msg.instanceId, `[state] ${msg.state.id}${msg.state.instanceKey !== undefined ? "#" + msg.state.instanceKey : ""} = ${msg.state.value}`);
   }
-);
-setInterval(refresh, FALLBACK_POLL_MS);
+  scheduleRefresh();
+});
+setInterval(fullRefresh, FALLBACK_POLL_MS);

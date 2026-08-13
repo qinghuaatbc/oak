@@ -13,18 +13,47 @@
     <div class="sub">driver instances, live state, and actions</div>
   </div>
   <div class="row">
-    <span class="status-pill off" id="wsPill">disconnected</span>
+    <span class="status-pill off" id="countPill">no instances running</span>
     <nav><a href="live.html" target="_blank" rel="noopener">Open Live View ↗</a></nav>
   </div>
 </header>
 <main>
-  <section class="card" id="add-instance">
-    <h2>Add instance</h2>
-    <form id="add-instance-form">
-      <div class="row" id="add-instance-fields"></div>
-    </form>
-  </section>
-  <div id="instances"><p class="empty-hint">Loading instances…</p></div>
+  <div class="driver-layout">
+    <div>
+      <div class="card">
+        <h2>Running instances</h2>
+        <div id="instancesList"><p class="empty-hint">Loading…</p></div>
+      </div>
+      <div class="card" data-default-collapsed="true">
+        <h2>Add instance</h2>
+        <form id="add-instance-form">
+          <div class="row" id="add-instance-fields"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div class="subtabs">
+          <div class="st active" data-panel="stateSubPanel">State</div>
+          <div class="st" data-panel="actionsSubPanel">Actions</div>
+          <div class="st" data-panel="eventsSubPanel">Events</div>
+        </div>
+        <select id="instanceFilter"></select>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="subpanel active" id="stateSubPanel">
+          <table class="oak-table"><thead><tr><th>instance</th><th>state</th><th>value</th></tr></thead><tbody id="stateBody"></tbody></table>
+        </div>
+        <div class="subpanel" id="actionsSubPanel">
+          <div class="tile-grid" id="actionsGrid"></div>
+        </div>
+        <div class="subpanel" id="eventsSubPanel">
+          <div class="log-panel" id="eventsLog"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </main>
 <script type="module" src="admin.js"></script>
 </body>

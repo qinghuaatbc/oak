@@ -31,12 +31,32 @@ header nav a:hover{ text-decoration:underline; }
 .status-pill.on{ background:var(--good-tint); color:var(--good); border-color:var(--good); }
 .status-pill.off{ color:var(--faint); }
 
-main{ max-width:1100px; margin:0 auto; padding:20px 24px 60px; display:flex; flex-direction:column; gap:16px; }
-#instances{ display:flex; flex-direction:column; gap:16px; }
+main{ max-width:1400px; margin:0 auto; padding:20px 24px 60px; }
 
-.card{ background:var(--raised); border:1px solid var(--line); border-radius:12px; padding:18px 20px; }
-.card h2{ font-family:var(--serif); font-size:1.02rem; margin:0 0 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.driver-layout{ display:grid; grid-template-columns:360px 1fr; gap:20px; align-items:start; }
+@media (max-width:900px){ .driver-layout{ grid-template-columns:1fr; } }
+.driver-layout > div:first-child{ display:flex; flex-direction:column; gap:16px; }
+
+.card{ background:var(--raised); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:0; }
+.card h2{ font-family:var(--serif); font-size:1.02rem; margin:0 0 12px; display:flex; align-items:center; gap:8px; }
 .card .sub{ font-family:var(--mono); font-size:.72rem; color:var(--faint); margin:-8px 0 12px; }
+.card-chev{ display:inline-block; color:var(--faint); font-size:.8rem; width:0.7em; }
+
+.instance-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin-bottom:8px; cursor:pointer; }
+.instance-row:last-child{ margin-bottom:0; }
+.instance-row .iname{ font-weight:600; font-size:.88rem; }
+.instance-row .ikey{ font-family:var(--mono); font-size:.7rem; color:var(--faint); }
+
+.subtabs{ display:flex; gap:4px; }
+.subtabs .st{ font-family:var(--sans); font-weight:600; font-size:.8rem; padding:6px 12px; cursor:pointer; color:var(--faint); border-radius:7px 7px 0 0; border:1px solid transparent; }
+.subtabs .st.active{ color:var(--accent); border-color:var(--line); border-bottom-color:var(--raised); background:var(--raised); }
+.subpanel{ display:none; }
+.subpanel.active{ display:block; }
+
+.log-panel{ font-family:var(--mono); font-size:.76rem; padding:12px 14px; white-space:pre-wrap; word-break:break-word; height:50vh; overflow:auto; border:1px solid var(--line); border-radius:9px; background:var(--raised); }
+.log-panel .line{ padding:2px 0; border-bottom:1px dashed var(--line); }
+table.oak-table{ height:50vh; display:block; overflow:auto; border:1px solid var(--line); border-radius:9px; background:var(--raised); }
+table.oak-table thead{ position:sticky; top:0; background:var(--raised); }
 
 select, input[type=text], input[type=number]{
   padding:7px 9px; border:1px solid var(--line); border-radius:7px;

@@ -86,7 +86,7 @@ function renderSidebar(categories) {
   sidebar.innerHTML = "";
   const allBtn = document.createElement("button");
   allBtn.className = "sky-cat" + (activeCat === "__all__" ? " active" : "");
-  allBtn.innerHTML = `<span style="font-size:20px">🏠</span><span>All</span>`;
+  allBtn.innerHTML = `<span>☰</span><span>All</span>`;
   allBtn.addEventListener("click", () => setActiveCategory("__all__"));
   sidebar.appendChild(allBtn);
   cats.forEach((driverId) => {
@@ -99,7 +99,7 @@ function renderSidebar(categories) {
       .split("-")
       .map((w) => w[0].toUpperCase() + w.slice(1))
       .join(" ");
-    btn.innerHTML = `<span style="font-size:20px">${DRIVER_ICONS[driverId] || DRIVER_ICON_FALLBACK}</span><span>${label}</span>`;
+    btn.innerHTML = `<span>${DRIVER_ICONS[driverId] || DRIVER_ICON_FALLBACK}</span><span>${label}</span>`;
     btn.addEventListener("click", () => setActiveCategory(driverId));
     sidebar.appendChild(btn);
   });
