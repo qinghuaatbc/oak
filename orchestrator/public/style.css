@@ -46,6 +46,11 @@ main{ max-width:1400px; margin:0 auto; padding:20px 24px 60px; }
 .instance-row:last-child{ margin-bottom:0; }
 .instance-row .iname{ font-weight:600; font-size:.88rem; }
 .instance-row .ikey{ font-family:var(--mono); font-size:.7rem; color:var(--faint); }
+.instance-row.stopped{ opacity:.65; border-style:dashed; }
+.instance-row .istatus{ font-family:var(--mono); font-size:.68rem; color:var(--faint); font-weight:400; }
+.instance-row .row{ gap:6px; }
+.config-form label{ display:block; margin-bottom:10px; }
+.config-form label .lbl{ display:block; font-size:.76rem; color:var(--soft); margin-bottom:3px; }
 
 .subtabs{ display:flex; gap:4px; }
 .subtabs .st{ font-family:var(--sans); font-weight:600; font-size:.8rem; padding:6px 12px; cursor:pointer; color:var(--faint); border-radius:7px 7px 0 0; border:1px solid transparent; }

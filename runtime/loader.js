@@ -172,6 +172,21 @@ class DriverInstance extends EventEmitter {
     }
   }
 
+  // Symmetric with start(): a TCP-backed instance tears down through the
+  // same "close" event onDisconnect already listens on; an HTTP-backed one
+  // (no persistent Connection to close) gets onDisconnect invoked directly,
+  // same as start()'s "no connection to open" branch calls onConnect
+  // directly. Callers (the orchestrator's stop/edit/remove instance
+  // handlers) are expected to drop this DriverInstance afterward rather
+  // than reuse it - there's no restart-in-place, just create a fresh one.
+  stop() {
+    if (this.connection) {
+      this.connection.close();
+    } else {
+      this._guarded("onDisconnect", () => this.impl.onDisconnect && this.impl.onDisconnect());
+    }
+  }
+
   action(actionId, params) {
     const handler = this.actionHandlers.get(actionId);
     if (!handler) throw new Error(`Unknown action: ${actionId}`);

@@ -35,3 +35,22 @@ export async function deleteInstance(id) {
   const res = await fetch(`/api/instances/${id}`, { method: "DELETE" });
   return res.json();
 }
+export async function getConfig(id) {
+  return (await fetch(`/api/instances/${id}/config`)).json();
+}
+export async function editInstance(id, connection, settings) {
+  const res = await fetch(`/api/instances/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ connection, settings }),
+  });
+  return res.json();
+}
+export async function stopInstance(id) {
+  const res = await fetch(`/api/instances/${id}/stop`, { method: "POST" });
+  return res.json();
+}
+export async function startInstance(id) {
+  const res = await fetch(`/api/instances/${id}/start`, { method: "POST" });
+  return res.json();
+}

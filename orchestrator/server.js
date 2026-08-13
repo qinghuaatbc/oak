@@ -37,7 +37,13 @@ if (!fs.existsSync(CONFIG_PATH)) {
 }
 const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
 
-const instances = new Map(); // id -> { driverInstance, manifest, driverId, recentEvents }
+// id -> { spec: {driver,connection,settings}, manifest, driverInstance,
+// running, recentEvents, lastState }. `spec` is the source of truth for
+// persistence and survives a stop (driverInstance is null while stopped) -
+// this is what makes stop/start/edit possible without losing config, the
+// same "spec outlives the running instance" split QTI's own
+// instanceSpecs/instances pairing uses.
+const instances = new Map();
 const wsClients = new Set();
 
 function broadcast(msg) {
@@ -45,47 +51,85 @@ function broadcast(msg) {
   for (const client of wsClients) client.send(json);
 }
 
-function addInstance(id, inst) {
-  const driverDir = path.join(DRIVERS_DIR, inst.driver);
-  const manifest = JSON.parse(fs.readFileSync(path.join(driverDir, "manifest.json"), "utf8"));
-  const driverInstance = loadDriver(driverDir, { connection: inst.connection, settings: inst.settings || {} });
-  const entry = { driverInstance, manifest, driverId: inst.driver, recentEvents: [] };
-
-  driverInstance.on("event", (ev) => {
+function wireInstanceEvents(id, entry) {
+  entry.driverInstance.on("event", (ev) => {
     entry.recentEvents.push({ ...ev, t: Date.now() });
     if (entry.recentEvents.length > MAX_RECENT_EVENTS) entry.recentEvents.shift();
     broadcast({ type: "event", instanceId: id, event: ev });
   });
-  driverInstance.on("state", (s) => broadcast({ type: "state", instanceId: id, state: s }));
-  driverInstance.on("error", (e) => console.error(`[${id}] error in ${e.where}:`, e.error.message));
+  entry.driverInstance.on("state", (s) => broadcast({ type: "state", instanceId: id, state: s }));
+  entry.driverInstance.on("error", (e) => console.error(`[${id}] error in ${e.where}:`, e.error.message));
+}
 
+function startRuntime(id, entry) {
+  const driverDir = path.join(DRIVERS_DIR, entry.spec.driver);
+  entry.driverInstance = loadDriver(driverDir, { connection: entry.spec.connection, settings: entry.spec.settings || {} });
+  wireInstanceEvents(id, entry);
+  entry.driverInstance.start();
+  entry.running = true;
+  console.log(`Started instance "${id}" (${entry.spec.driver})`);
+}
+
+function addInstance(id, spec) {
+  const driverDir = path.join(DRIVERS_DIR, spec.driver);
+  const manifest = JSON.parse(fs.readFileSync(path.join(driverDir, "manifest.json"), "utf8"));
+  const entry = { spec, manifest, driverInstance: null, running: false, recentEvents: [], lastState: {} };
   instances.set(id, entry);
-  driverInstance.start();
-  console.log(`Started instance "${id}" (${inst.driver})`);
+  startRuntime(id, entry);
   return entry;
 }
 
-for (const inst of config.instances) addInstance(inst.id, inst);
+for (const inst of config.instances) addInstance(inst.id, { driver: inst.driver, connection: inst.connection, settings: inst.settings });
+
+function stopInstance(id) {
+  const entry = instances.get(id);
+  if (!entry || !entry.running) return false;
+  entry.lastState = entry.driverInstance.getAllState();
+  entry.driverInstance.stop();
+  entry.driverInstance = null;
+  entry.running = false;
+  return true;
+}
+
+function startExistingInstance(id) {
+  const entry = instances.get(id);
+  if (!entry || entry.running) return false;
+  startRuntime(id, entry);
+  return true;
+}
 
 function removeInstance(id) {
   const entry = instances.get(id);
   if (!entry) return false;
-  if (entry.driverInstance.connection) entry.driverInstance.connection.close();
+  if (entry.running) entry.driverInstance.stop();
   instances.delete(id);
   return true;
 }
 
+// Editing a live connection's config out from under it isn't safe (e.g. a
+// TCP socket already open to the OLD host/port) - requiring stop-first
+// keeps this simple and correct instead of trying to hot-reconfigure a
+// running driver.
+function editInstance(id, updates) {
+  const entry = instances.get(id);
+  if (!entry) return { error: "No such instance" };
+  if (entry.running) return { error: "Stop the instance before editing its config" };
+  if (updates.connection) entry.spec.connection = { ...entry.spec.connection, ...updates.connection };
+  if (updates.settings) entry.spec.settings = { ...entry.spec.settings, ...updates.settings };
+  return { ok: true };
+}
+
 // Round-trips through the live instances map (not a separately-tracked
 // "pending edits" list) so config.json always reflects exactly what's
-// actually running, including anything added/removed since the process
-// started - single source of truth, no drift possible between the two.
+// actually configured, running or not - single source of truth, no drift
+// possible between the two.
 function persistConfig() {
   const data = {
     instances: [...instances.entries()].map(([id, entry]) => ({
       id,
-      driver: entry.driverId,
-      connection: entry.driverInstance.config.connection,
-      settings: entry.driverInstance.config.settings,
+      driver: entry.spec.driver,
+      connection: entry.spec.connection,
+      settings: entry.spec.settings,
     })),
   };
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(data, null, 2));
@@ -160,8 +204,9 @@ const server = http.createServer(async (req, res) => {
   if (parts.length === 2 && req.method === "GET") {
     const list = [...instances.entries()].map(([id, entry]) => ({
       id,
-      driver: entry.driverId,
+      driver: entry.spec.driver,
       displayName: entry.manifest.displayName,
+      running: entry.running,
       actions: entry.manifest.actions.map((a) => a.id),
       events: entry.manifest.events.map((e) => e.id),
     }));
@@ -190,6 +235,33 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, { ok: true });
   }
 
+  if (parts.length === 3 && req.method === "PUT") {
+    try {
+      const body = await readJsonBody(req);
+      const result = editInstance(parts[2], body);
+      if (result.error) return sendJson(res, 400, result);
+      persistConfig();
+      broadcast({ type: "instanceEdited", instanceId: parts[2] });
+      return sendJson(res, 200, { ok: true });
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
+  }
+
+  if (parts.length === 4 && parts[3] === "stop" && req.method === "POST") {
+    if (!stopInstance(parts[2])) return sendJson(res, 400, { error: "Instance not running, or doesn't exist" });
+    persistConfig();
+    broadcast({ type: "instanceStopped", instanceId: parts[2] });
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (parts.length === 4 && parts[3] === "start" && req.method === "POST") {
+    if (!startExistingInstance(parts[2])) return sendJson(res, 400, { error: "Instance already running, or doesn't exist" });
+    persistConfig();
+    broadcast({ type: "instanceStarted", instanceId: parts[2] });
+    return sendJson(res, 200, { ok: true });
+  }
+
   const entry = instances.get(parts[2]);
   if (!entry) return sendJson(res, 404, { error: "No such instance" });
 
@@ -197,8 +269,14 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, entry.manifest);
   }
 
+  if (parts[3] === "config" && req.method === "GET") {
+    return sendJson(res, 200, { connection: entry.spec.connection, settings: entry.spec.settings, running: entry.running });
+  }
+
   if (parts[3] === "state" && req.method === "GET") {
-    return sendJson(res, 200, entry.driverInstance.getAllState());
+    // A stopped instance has no live driver to ask - the snapshot taken
+    // right before stop() is the best available answer, not an empty {}.
+    return sendJson(res, 200, entry.running ? entry.driverInstance.getAllState() : entry.lastState);
   }
 
   if (parts[3] === "events" && req.method === "GET") {
@@ -206,6 +284,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (parts[3] === "action" && parts[4] && req.method === "POST") {
+    if (!entry.running) return sendJson(res, 400, { error: "Instance is stopped" });
     try {
       const params = await readJsonBody(req);
       entry.driverInstance.action(parts[4], params);
@@ -232,7 +311,7 @@ server.on("upgrade", (req, socket) => {
   // have to wait for the next real change to know current state - same
   // reasoning as QTI's own /ws handshake.
   for (const [id, entry] of instances) {
-    ws.send(JSON.stringify({ type: "instance", instanceId: id, state: entry.driverInstance.getAllState() }));
+    ws.send(JSON.stringify({ type: "instance", instanceId: id, state: entry.running ? entry.driverInstance.getAllState() : entry.lastState }));
   }
 
   ws.on("close", () => wsClients.delete(ws));

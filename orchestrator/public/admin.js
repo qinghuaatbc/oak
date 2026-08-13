@@ -1,4 +1,7 @@
-import { listInstances, getManifest, getState, callAction, listDrivers, addInstance, deleteInstance } from "./api.js";
+import {
+  listInstances, getManifest, getState, callAction, listDrivers, addInstance, deleteInstance,
+  getConfig, editInstance, stopInstance, startInstance,
+} from "./api.js";
 import { connectLiveSocket } from "./live-socket.js";
 
 const FALLBACK_POLL_MS = 10000;
@@ -7,6 +10,7 @@ const MAX_LOG_LINES = 1000;
 
 let manifests = new Map(); // id -> manifest
 let instanceIds = [];
+let runningByInstance = new Map(); // id -> boolean
 let statesByInstance = new Map(); // id -> {key: value}
 const logBuffer = []; // {instanceId, label, text} - fed live by WS "event" messages
 
@@ -61,7 +65,7 @@ function findTogglePair(manifest) {
 }
 
 function updateCountPill() {
-  const n = instanceIds.length;
+  const n = [...runningByInstance.values()].filter(Boolean).length;
   countPill.textContent = n === 0 ? "no instances running" : n + " instance" + (n === 1 ? "" : "s") + " running";
   countPill.className = "status-pill " + (n === 0 ? "off" : "on");
 }
@@ -74,14 +78,31 @@ function renderInstancesList() {
   }
   instanceIds.forEach((id) => {
     const manifest = manifests.get(id);
+    const running = runningByInstance.get(id);
     const row = document.createElement("div");
-    row.className = "instance-row";
-    row.title = "Click to filter State/Actions/Events to this instance";
-    row.innerHTML = `<div><div class="iname">${manifest.displayName}</div><div class="ikey">${manifest.id} · ${id}</div></div>`;
+    row.className = "instance-row" + (running ? "" : " stopped");
+    row.title = "Click to view/edit this instance in State/Actions/Events/Config";
+    row.innerHTML = `<div><div class="iname">${manifest.displayName}${
+      running ? "" : ' <span class="istatus">stopped</span>'
+    }</div><div class="ikey">${manifest.id} · ${id}</div></div>`;
     row.addEventListener("click", () => {
       instanceFilter.value = id;
       renderActivePanel();
     });
+    const btnRow = document.createElement("div");
+    btnRow.className = "row";
+
+    const toggleRunBtn = document.createElement("button");
+    toggleRunBtn.className = "btn small" + (running ? " danger" : "");
+    toggleRunBtn.textContent = running ? "Stop" : "Start";
+    toggleRunBtn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      const result = running ? await stopInstance(id) : await startInstance(id);
+      if (result.error) alert(result.error);
+      fullRefresh();
+    });
+    btnRow.appendChild(toggleRunBtn);
+
     const delBtn = document.createElement("button");
     delBtn.className = "btn small danger";
     delBtn.textContent = "Remove";
@@ -91,9 +112,12 @@ function renderInstancesList() {
       await deleteInstance(id);
       manifests.delete(id);
       statesByInstance.delete(id);
+      runningByInstance.delete(id);
       fullRefresh();
     });
-    row.appendChild(delBtn);
+    btnRow.appendChild(delBtn);
+
+    row.appendChild(btnRow);
     instancesListEl.appendChild(row);
   });
 }
@@ -155,6 +179,13 @@ function renderActionsPanel() {
     return;
   }
   visible.forEach((id) => {
+    if (!runningByInstance.get(id)) {
+      const notice = document.createElement("p");
+      notice.className = "empty-hint";
+      notice.textContent = `${manifests.get(id).displayName} is stopped - start it (Running instances, or the Config tab) to use its actions.`;
+      actionsGrid.appendChild(notice);
+      return;
+    }
     const manifest = manifests.get(id);
     const state = statesByInstance.get(id) || {};
     const togglePair = findTogglePair(manifest);
@@ -247,11 +278,83 @@ function renderEventsPanel() {
   if (!logBuffer.length) eventsLog.innerHTML = `<p class="empty-hint">no events yet</p>`;
 }
 
+// Config only makes sense for exactly one instance at a time - editing
+// several instances' connection/settings at once through one form isn't a
+// coherent operation the way "show all their states in one table" is.
+async function renderConfigPanel() {
+  const configPanel = document.getElementById("configPanel");
+  const id = instanceFilter.value;
+  if (!id) {
+    configPanel.innerHTML = `<p class="empty-hint">Pick a specific instance above to view or edit its config.</p>`;
+    return;
+  }
+  const manifest = manifests.get(id);
+  const running = runningByInstance.get(id);
+  const cfg = await getConfig(id);
+  const driverManifests = await listDrivers();
+  const driverManifest = driverManifests.find((d) => d.id === manifest.id);
+
+  function fieldInput(prefix, f, currentValue) {
+    const value = currentValue !== undefined ? currentValue : f.default;
+    return `<label><span class="lbl">${f.label}</span><input name="${prefix}.${f.key}" type="${
+      f.type === "number" ? "number" : "text"
+    }" value="${value !== undefined ? value : ""}" ${running ? "disabled" : ""} /></label>`;
+  }
+
+  const connFields = (driverManifest.connection.options[0].fields || [])
+    .map((f) => fieldInput("connection", f, cfg.connection[f.key]))
+    .join("");
+  const settingFields = (driverManifest.settings || []).map((f) => fieldInput("settings", f, cfg.settings[f.key])).join("");
+
+  configPanel.innerHTML = `
+    <p class="sub">instance "${id}" · driver ${manifest.id} · ${running ? "running" : "stopped"}</p>
+    ${
+      running
+        ? `<p class="empty-hint">Stop this instance before editing its connection/settings - editing a live connection out from under it isn't safe.</p>`
+        : ""
+    }
+    <form id="editInstanceForm" class="config-form">
+      ${connFields}
+      ${settingFields}
+      <button class="btn small primary" type="submit" ${running ? "disabled" : ""}>Save</button>
+    </form>
+    <div class="row" style="margin-top:12px;">
+      <button class="btn small${running ? " danger" : ""}" id="configToggleRunBtn">${running ? "Stop" : "Start"}</button>
+    </div>`;
+
+  document.getElementById("configToggleRunBtn").addEventListener("click", async () => {
+    const result = running ? await stopInstance(id) : await startInstance(id);
+    if (result.error) alert(result.error);
+    fullRefresh();
+  });
+
+  if (!running) {
+    document.getElementById("editInstanceForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const connection = {};
+      const settings = {};
+      ev.target.querySelectorAll("input").forEach((input) => {
+        const [group, key] = input.name.split(".");
+        const value = input.type === "number" ? Number(input.value) : input.value;
+        if (group === "connection") connection[key] = value;
+        else settings[key] = value;
+      });
+      const result = await editInstance(id, connection, settings);
+      if (result.error) {
+        alert(result.error);
+        return;
+      }
+      fullRefresh();
+    });
+  }
+}
+
 function renderActivePanel() {
   renderInstanceFilter();
   const activePanel = document.querySelector(".subtabs .st.active").dataset.panel;
   if (activePanel === "stateSubPanel") renderStatePanel();
   else if (activePanel === "actionsSubPanel") renderActionsPanel();
+  else if (activePanel === "configSubPanel") renderConfigPanel();
   else renderEventsPanel();
 }
 
@@ -272,6 +375,7 @@ async function fullRefresh() {
   await Promise.all(
     list.map(async (summary) => {
       if (!manifests.has(summary.id)) manifests.set(summary.id, await getManifest(summary.id));
+      runningByInstance.set(summary.id, summary.running);
       statesByInstance.set(summary.id, await getState(summary.id));
     })
   );
