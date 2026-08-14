@@ -1,0 +1,61 @@
+{
+  "id": "eisy",
+  "displayName": "Universal Devices ISY994/eisy",
+  "version": "0.1.0",
+  "category": ["light", "climate"],
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "http",
+        "label": "HTTP",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "ISY/eisy IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 80 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Admin username" },
+    { "key": "password", "type": "string", "label": "Admin password" },
+    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 5000 }
+  ],
+  "actions": [
+    { "id": "nodeOn", "label": "Node On", "role": "on", "params": [{ "key": "address", "type": "string", "label": "Node address (e.g. 18 22 4B 1)" }] },
+    { "id": "nodeOff", "label": "Node Off", "role": "off", "params": [{ "key": "address", "type": "string", "label": "Node address (e.g. 18 22 4B 1)" }] },
+    {
+      "id": "nodeSetLevel",
+      "label": "Node Set Level",
+      "role": "level",
+      "params": [
+        { "key": "address", "type": "string", "label": "Node address (e.g. 18 22 4B 1)" },
+        { "key": "level", "type": "number", "label": "Level (0-100)", "default": 100 }
+      ]
+    },
+    {
+      "id": "climateSetHeatSetpoint",
+      "label": "Climate Set Heat Setpoint",
+      "params": [
+        { "key": "address", "type": "string", "label": "Thermostat node address" },
+        { "key": "setpoint", "type": "number", "label": "Heat setpoint (°F)", "default": 68 }
+      ]
+    },
+    {
+      "id": "climateSetCoolSetpoint",
+      "label": "Climate Set Cool Setpoint",
+      "params": [
+        { "key": "address", "type": "string", "label": "Thermostat node address" },
+        { "key": "setpoint", "type": "number", "label": "Cool setpoint (°F)", "default": 76 }
+      ]
+    }
+  ],
+  "events": [{ "id": "stateChanged", "label": "State Changed", "params": ["address", "property", "value"] }],
+  "states": [
+    { "id": "node.on", "type": "boolean", "role": "on", "perInstance": "address" },
+    { "id": "node.level", "type": "number", "role": "level", "perInstance": "address" },
+    { "id": "climate.heatSetpoint", "type": "number", "perInstance": "address" },
+    { "id": "climate.coolSetpoint", "type": "number", "perInstance": "address" }
+  ]
+}

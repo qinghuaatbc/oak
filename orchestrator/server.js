@@ -695,7 +695,7 @@ function startCameraFfmpeg(rtspUrl, ws) {
 // upload UI (a driver folder living outside DRIVERS_DIR entirely would be
 // a bigger change; blocking deletion of the ones this repo ships is the
 // simple, correct guard for now).
-const BUILTIN_DRIVERS = new Set(["dsc-powerseries", "http-relay", "mqtt-plug", "generic-dimmer"]);
+const BUILTIN_DRIVERS = new Set(["dsc-powerseries", "http-relay", "mqtt-plug", "generic-dimmer", "zone-hub", "eisy"]);
 
 function listDriverManifests() {
   return fs
