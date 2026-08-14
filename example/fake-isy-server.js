@@ -13,11 +13,27 @@ const WebSocketServer = require("ws").Server;
 
 const PORT = parseInt(process.argv[2] || "8084", 10);
 
+const NAMES = {
+  "18 22 4B 1": "Living Room",
+  "19 33 5C 1": "Kitchen",
+  "20 44 6D 1": "Thermostat",
+};
 const nodes = {
   "18 22 4B 1": { ST: 0 }, // living room light, Insteon-native 0-255
   "19 33 5C 1": { ST: 0 }, // kitchen light
   "20 44 6D 1": { CLISPH: 680, CLISPC: 760 }, // thermostat, x10 degrees F
 };
+
+function nodeListXml() {
+  // Real hardware always puts attributes (flag, nodeDefId, ...) on the
+  // opening <node> tag - deliberately replicated here (not simplified to
+  // a bare <node>) since a bare tag doesn't exercise the same parsing
+  // path the driver's regex has to handle against a real unit.
+  const body = Object.keys(nodes)
+    .map((address) => `<node flag="128" nodeDefId="DimmerLampSwitch_ADV"><address>${address}</address><name>${NAMES[address] || address}</name></node>`)
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8"?><nodes>${body}</nodes>`;
+}
 
 function statusXml() {
   const body = Object.entries(nodes)
@@ -57,6 +73,9 @@ const server = http.createServer((req, res) => {
 
   if (pathname === "/rest/status") {
     return res.end(statusXml());
+  }
+  if (pathname === "/rest/nodes") {
+    return res.end(nodeListXml());
   }
 
   // /rest/nodes/<address>/cmd/<control>[/<value>]

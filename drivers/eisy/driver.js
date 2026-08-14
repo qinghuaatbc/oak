@@ -51,6 +51,27 @@ function parseNodes(xml) {
   return nodes;
 }
 
+// /rest/nodes lists every actual device (skip <group> elements - those
+// are scenes, not individually addressable devices) with its own
+// <address>/<name> pair, confirmed against a real eisy unit. Used only by
+// the discoverNodes action - a one-shot "here's what's out there" read,
+// not part of the normal connect/poll/event path.
+function parseNodeList(xml) {
+  const nodes = [];
+  // \b (not a literal space) so this matches both a real unit's
+  // <node flag="..." nodeDefId="...">...</node> and a bare <node>...
+  // </node> - real hardware always has attributes here, but there's no
+  // reason to assume that's the only valid shape UDI could ever send.
+  const nodeRe = /<node\b[^>]*>([\s\S]*?)<\/node>/g;
+  let m;
+  while ((m = nodeRe.exec(xml))) {
+    const address = (m[1].match(/<address>([^<]*)<\/address>/) || [])[1];
+    const name = (m[1].match(/<name>([^<]*)<\/name>/) || [])[1];
+    if (address) nodes.push({ address, name: name || address });
+  }
+  return nodes;
+}
+
 // The real-time event stream's message shape: <Event seqnum="..."
 // sid="..." timestamp="..."><control>ST</control><action uom="100"
 // prec="0">255</action><node>18 22 4B 1</node><eventInfo/></Event> - note
@@ -100,6 +121,12 @@ function create(ctx) {
     } else if (propId === "CLISPC") {
       ctx.setState("climate.coolSetpoint", Math.round(Number(rawValue) / 10), address);
       ctx.emitEvent("stateChanged", { address, property: "CLISPC", value: Number(rawValue) / 10 });
+    } else if (propId === "ERR") {
+      // 0 = responding normally, non-zero = a communication error with
+      // this device - confirmed against a real unit's own property name
+      // attribute ("Responding") on this exact property id.
+      ctx.setState("node.error", Number(rawValue) > 0, address);
+      ctx.emitEvent("stateChanged", { address, property: "ERR", value: Number(rawValue) });
     }
   }
 
@@ -127,7 +154,7 @@ function create(ctx) {
       const xml = data.toString();
       const { control, node, action } = parseEvent(xml);
       if (!control || !node || action === undefined) return; // heartbeat or non-node message
-      if (control === "ST" || control === "CLISPH" || control === "CLISPC") applyNodeProp(node, control, action);
+      if (control === "ST" || control === "CLISPH" || control === "CLISPC" || control === "ERR") applyNodeProp(node, control, action);
     });
     ws.on("close", () => {
       if (stopped) return;
@@ -149,6 +176,52 @@ function create(ctx) {
   ctx.onAction("nodeSetLevel", ({ address, level = 100 }) => sendCommand(address, "DON", Math.round((Math.max(0, Math.min(100, level)) / 100) * 255)));
   ctx.onAction("climateSetHeatSetpoint", ({ address, setpoint = 68 }) => sendCommand(address, "CLISPH", Math.round(setpoint * 10)));
   ctx.onAction("climateSetCoolSetpoint", ({ address, setpoint = 76 }) => sendCommand(address, "CLISPC", Math.round(setpoint * 10)));
+
+  // Escape hatch for any Insteon/Z-Wave command UDI supports that isn't
+  // one of the specific actions above (locks, fans, ramp rate, beep,
+  // etc.) - deliberately not enumerated as named actions, since guessing
+  // at device-type-specific command codes without real hardware of that
+  // type to verify against is exactly the mistake this project's own
+  // established practice (verify against real hardware, don't guess) is
+  // meant to avoid. UDI's own command vocabulary, entered by whoever
+  // knows their specific device's codes.
+  ctx.onAction("sendRawCommand", ({ address, control, value }) => sendCommand(address, control, value));
+
+  // A real ISY/eisy dynamically discovers however many nodes exist - this
+  // reads that list once on request and reports it as a state (JSON
+  // array of {address, name}) rather than a return value, since actions
+  // are fire-and-forget from the HTTP caller's side (see server.js's
+  // action route, which doesn't await/forward a handler's result). The
+  // admin UI reads this state back and offers to import it into the
+  // deviceNames setting.
+  ctx.onAction("discoverNodes", async () => {
+    try {
+      const res = await fetch(`${baseUrl}/rest/nodes`, { headers: { Authorization: authHeader } });
+      const xml = await res.text();
+      const nodes = parseNodeList(xml);
+      ctx.setState("discovery.nodes", JSON.stringify(nodes));
+      ctx.emitEvent("nodesDiscovered", { count: nodes.length });
+    } catch (err) {
+      ctx.log("node discovery failed:", err.message);
+    }
+  });
+
+  // Programs (/rest/programs/<id>/<command>) and variables
+  // (/rest/vars/set/<type>/<id>/<value>) - UDI's own real REST paths,
+  // confirmed against a real eisy unit (both endpoints respond correctly
+  // even with none of either actually configured on this particular
+  // unit). No Dashboard-slot binding surface for these yet (they don't
+  // fit the on/off/level model), reachable via the Driver tab's raw
+  // Actions panel or a macro in the meantime.
+  async function programCmd(programId, command) {
+    await fetch(`${baseUrl}/rest/programs/${encodeURIComponent(programId)}/${command}`, { headers: { Authorization: authHeader } });
+  }
+  ctx.onAction("runProgram", ({ programId, clause = "run" }) => programCmd(programId, clause));
+  ctx.onAction("enableProgram", ({ programId }) => programCmd(programId, "enable"));
+  ctx.onAction("disableProgram", ({ programId }) => programCmd(programId, "disable"));
+  ctx.onAction("setVariable", async ({ varType = 2, varId, value }) => {
+    await fetch(`${baseUrl}/rest/vars/set/${varType}/${varId}/${value}`, { headers: { Authorization: authHeader } });
+  });
 
   return {
     async onConnect() {

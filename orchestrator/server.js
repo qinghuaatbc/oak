@@ -374,24 +374,39 @@ function removeInstance(id) {
 // keeps this simple and correct instead of trying to hot-reconfigure a
 // running driver. Dashboard presentation (which category a slot lives in,
 // which function is on/off/level) lives entirely in bindings.json now,
-// not on the instance spec. `label` is the one exception, kept on the
+// not on the instance spec. `label` is one exception, kept on the
 // instance itself rather than in bindings.json - it identifies WHICH
 // PHYSICAL DEVICE this instance is (matching QTI's own generic, driver-
 // independent "Label (optional, to tell instances apart)" field, e.g.
 // telling two eisy instances apart) rather than how it's presented on a
-// Dashboard slot, so it belongs with the instance, not a binding. Pure
-// presentation metadata with no runtime impact - editable regardless of
-// running state, unlike connection/settings.
+// Dashboard slot, so it belongs with the instance, not a binding.
+//
+// A `type: "keyvalue"` setting (deviceNames, zoneNames, ...) is the other
+// exception: the driver itself never reads it, it exists purely so the
+// admin UI can show friendly names instead of raw addresses - so it's
+// safe to edit live too, unlike a real connection/settings change. This
+// specifically unblocks the discoverNodes -> "import into deviceNames"
+// flow, which is only possible WHILE the instance is running (you need a
+// live connection to discover anything) - requiring a stop first would
+// make that flow impossible, not just inconvenient. Only allowed while
+// running when EVERY key in updates.settings is keyvalue-typed on the
+// driver's own manifest; a settings update that also touches a normal
+// field still requires stopping first, same as before.
 function editInstance(id, updates) {
   const entry = instances.get(id);
   if (!entry) return { error: "No such instance" };
   if (updates.label !== undefined) {
     entry.spec.label = updates.label ? String(updates.label).slice(0, 80) : undefined;
   }
-  if (updates.connection || updates.settings) {
-    if (entry.running) return { error: "Stop the instance before editing its connection/settings" };
-    if (updates.connection) entry.spec.connection = { ...entry.spec.connection, ...updates.connection };
-    if (updates.settings) entry.spec.settings = { ...entry.spec.settings, ...updates.settings };
+  if (updates.connection) {
+    if (entry.running) return { error: "Stop the instance before editing its connection" };
+    entry.spec.connection = { ...entry.spec.connection, ...updates.connection };
+  }
+  if (updates.settings) {
+    const keyvalueKeys = new Set((entry.manifest.settings || []).filter((s) => s.type === "keyvalue").map((s) => s.key));
+    const onlyKeyvalue = Object.keys(updates.settings).every((k) => keyvalueKeys.has(k));
+    if (entry.running && !onlyKeyvalue) return { error: "Stop the instance before editing its settings" };
+    entry.spec.settings = { ...entry.spec.settings, ...updates.settings };
   }
   return { ok: true };
 }

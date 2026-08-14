@@ -370,18 +370,41 @@ async function renderConfigPanel() {
   const driverManifests = await listDrivers();
   const driverManifest = driverManifests.find((d) => d.id === manifest.id);
 
+  // keyvalue fields (deviceNames, zoneNames, ...) live in their own,
+  // always-enabled form - the driver never reads them itself (pure
+  // display metadata), so server.js's editInstance already allows saving
+  // them regardless of running state. Splitting them out of
+  // editInstanceForm (which stays gated on !running, since THAT one can
+  // touch a real connection/setting) is what makes that possible - a
+  // single form can't be "half disabled" cleanly.
   function fieldInput(prefix, f, currentValue) {
-    if (f.type === "keyvalue") return keyValueFieldPlaceholder(prefix, f);
     const value = currentValue !== undefined ? currentValue : f.default;
     return `<label><span class="lbl">${f.label}</span><input name="${prefix}.${f.key}" type="${
       f.type === "number" ? "number" : "text"
     }" value="${value !== undefined ? value : ""}" ${running ? "disabled" : ""} /></label>`;
   }
-
-  const connFields = (driverManifest.connection.options[0].fields || [])
+  const connFieldDefs = driverManifest.connection.options[0].fields || [];
+  const settingFieldDefs = driverManifest.settings || [];
+  const connFields = connFieldDefs
+    .filter((f) => f.type !== "keyvalue")
     .map((f) => fieldInput("connection", f, cfg.connection[f.key]))
     .join("");
-  const settingFields = (driverManifest.settings || []).map((f) => fieldInput("settings", f, cfg.settings[f.key])).join("");
+  const settingFields = settingFieldDefs
+    .filter((f) => f.type !== "keyvalue")
+    .map((f) => fieldInput("settings", f, cfg.settings[f.key]))
+    .join("");
+  const kvFieldDefs = [
+    ...connFieldDefs.filter((f) => f.type === "keyvalue").map((f) => ({ prefix: "connection", f })),
+    ...settingFieldDefs.filter((f) => f.type === "keyvalue").map((f) => ({ prefix: "settings", f })),
+  ];
+  const kvFields = kvFieldDefs.map(({ prefix, f }) => keyValueFieldPlaceholder(prefix, f)).join("");
+
+  // A driver that declares BOTH a "discoverNodes" action and a
+  // "discovery.nodes" state gets a "Discover devices" button for free -
+  // a naming convention (documented in SPEC.md), not something special-
+  // cased to eisy specifically, so any future driver author can opt in
+  // the same way.
+  const hasDiscovery = driverManifest.actions.some((a) => a.id === "discoverNodes") && driverManifest.states.some((s) => s.id === "discovery.nodes");
 
   configPanel.innerHTML = `
     <p class="sub">instance "${id}" · driver ${manifest.id} · ${running ? "running" : "stopped"}</p>
@@ -391,6 +414,19 @@ async function renderConfigPanel() {
         <input name="label" type="text" value="${cfg.label || ""}" /></label>
       <button class="btn small primary" type="submit">Save label</button>
     </form>
+    ${
+      hasDiscovery
+        ? `<div class="config-form">
+             <button class="btn small" type="button" id="discoverBtn" ${running ? "" : "disabled"}>${running ? "🔍 Discover devices" : "🔍 Discover devices (start the instance first)"}</button>
+             <div id="discoverResults"></div>
+           </div>`
+        : ""
+    }
+    ${
+      kvFieldDefs.length
+        ? `<form id="editKeyValueForm" class="config-form">${kvFields}<button class="btn small primary" type="submit">Save names</button></form>`
+        : ""
+    }
     ${
       running
         ? `<p class="empty-hint">Stop this instance before editing its connection/settings - editing a live connection out from under it isn't safe.</p>`
@@ -405,10 +441,70 @@ async function renderConfigPanel() {
       <button class="btn small${running ? " danger" : ""}" id="configToggleRunBtn">${running ? "Stop" : "Start"}</button>
     </div>`;
 
-  const editInstanceFormEl = document.getElementById("editInstanceForm");
-  (driverManifest.connection.options[0].fields || []).forEach((f) => f.type === "keyvalue" && wireKeyValueField(editInstanceFormEl, "connection", f, cfg.connection[f.key]));
-  (driverManifest.settings || []).forEach((f) => f.type === "keyvalue" && wireKeyValueField(editInstanceFormEl, "settings", f, cfg.settings[f.key]));
-  if (running) editInstanceFormEl.querySelectorAll(".kv-key, .kv-val, [data-keyvalue-add]").forEach((el) => (el.disabled = true));
+  if (kvFieldDefs.length) {
+    const kvFormEl = document.getElementById("editKeyValueForm");
+    kvFieldDefs.forEach(({ prefix, f }) => wireKeyValueField(kvFormEl, prefix, f, cfg[prefix][f.key]));
+    kvFormEl.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const connection = {};
+      const settings = {};
+      collectKeyValueFields(ev.target, connection, settings);
+      const result = await editInstance(id, { connection, settings });
+      if (result.error) {
+        alert(result.error);
+        return;
+      }
+      fullRefresh();
+    });
+  }
+
+  if (hasDiscovery) {
+    document.getElementById("discoverBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("discoverBtn");
+      btn.disabled = true;
+      btn.textContent = "Discovering…";
+      try {
+        await callAction(id, "discoverNodes", {});
+        await new Promise((r) => setTimeout(r, 1200)); // action is fire-and-forget; give it a moment to finish and setState
+        const state = await getState(id);
+        const nodes = JSON.parse(state["discovery.nodes"] || "[]");
+        const resultsEl = document.getElementById("discoverResults");
+        if (!nodes.length) {
+          resultsEl.innerHTML = `<p class="empty-hint">No devices found.</p>`;
+        } else {
+          resultsEl.innerHTML =
+            nodes
+              .map(
+                (n, i) =>
+                  `<label style="display:flex; align-items:center; gap:6px; margin:4px 0;"><input type="checkbox" checked data-discover-idx="${i}" /> <span class="ikey">${n.address}</span> → ${n.name}</label>`
+              )
+              .join("") + `<button class="btn small primary" type="button" id="importDiscoveredBtn" style="margin-top:8px;">Import checked into Device Names</button>`;
+          document.getElementById("importDiscoveredBtn").addEventListener("click", async () => {
+            if (!kvFieldDefs.length) {
+              alert("This driver has no Device Names field to import into.");
+              return;
+            }
+            const checked = [...resultsEl.querySelectorAll("input[type=checkbox]:checked")].map((c) => nodes[Number(c.dataset.discoverIdx)]);
+            const { prefix, f } = kvFieldDefs[0];
+            const merged = { ...cfg[prefix][f.key] };
+            checked.forEach((n) => (merged[n.address] = n.name));
+            const update = prefix === "connection" ? { connection: { [f.key]: merged } } : { settings: { [f.key]: merged } };
+            const result = await editInstance(id, update);
+            if (result.error) {
+              alert(result.error);
+              return;
+            }
+            renderConfigPanel();
+          });
+        }
+      } catch (err) {
+        document.getElementById("discoverResults").innerHTML = `<p class="empty-hint">Discovery failed: ${err.message}</p>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "🔍 Discover devices";
+      }
+    });
+  }
 
   document.getElementById("configToggleRunBtn").addEventListener("click", async () => {
     const result = running ? await stopInstance(id) : await startInstance(id);
@@ -433,13 +529,11 @@ async function renderConfigPanel() {
       const connection = {};
       const settings = {};
       ev.target.querySelectorAll("input").forEach((input) => {
-        if (input.closest("[data-keyvalue-field]")) return;
         const [group, key] = input.name.split(".");
         const value = input.type === "number" ? Number(input.value) : input.value;
         if (group === "connection") connection[key] = value;
         else settings[key] = value;
       });
-      collectKeyValueFields(ev.target, connection, settings);
       const result = await editInstance(id, { connection, settings });
       if (result.error) {
         alert(result.error);
@@ -711,6 +805,20 @@ function buildFnEditor(container, label, slot, fnKey, allowMacro, onChanged) {
   updateVisibility();
 
   return {
+    // Only re-renders this editor's own params box from the CURRENT
+    // (already-set) instance/action selection - never touches
+    // instSel/actSel/macroSel's value. This is what onSlotChanged calls
+    // on every OTHER editor when one of them changes the shared
+    // fixedArgs - a full refresh() there would re-derive instSel.value
+    // from slot[fnKey], which is a real, confirmed bug when THIS same
+    // editor is mid-selection (an instance picked but no action yet
+    // means slot[fnKey] is still undefined, since currentValue()
+    // requires both) - refresh() would reset the instance picker back to
+    // empty the instant you picked it, before you ever got to choose a
+    // function.
+    refreshParams() {
+      renderFnParams(paramsBox, slot, instSel.value, actSel.value);
+    },
     refresh() {
       populateInstances();
       populateActions();
@@ -836,7 +944,7 @@ function buildSlotRow(cat, slot, onDelete, startExpanded) {
   // (QTI's actual layout) rather than one shared section.
   const fnEditors = [];
   function onSlotChanged() {
-    fnEditors.forEach((e) => e.refresh());
+    fnEditors.forEach((e) => e.refreshParams());
     const keys = fixedParamKeysForSlot(slot);
     suffixWrap.style.display = keys.length === 1 ? "none" : "";
     if (keys.length === 1 && slot.fixedArgs && slot.fixedArgs[keys[0]]) {

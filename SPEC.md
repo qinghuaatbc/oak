@@ -49,6 +49,19 @@ One JSON file per driver, next to a `driver.js`. Top-level fields:
     already identifies "which physical device is this").
 - `actions` — things a user/automation can trigger. Each has an `id`,
   `label`, and typed `params`.
+  - **A driver whose device can enumerate its own sub-devices** (a hub
+    dynamically listing however many nodes/zones/relays exist, the way a
+    real ISY/eisy does) should declare an action literally named
+    `discoverNodes` (no params) alongside a `type: "string"` state named
+    `discovery.nodes` (a JSON-encoded array of `{address, name}`) and a
+    `type: "keyvalue"` settings field to import into. This is a naming
+    convention the admin UI recognizes generically (any driver that
+    declares both gets a "Discover devices" button in its Config panel
+    for free, not something special-cased per driver) - see
+    `drivers/eisy/driver.js`'s `discoverNodes` handler for a worked
+    example. Actions are fire-and-forget from the HTTP caller's side (the
+    server doesn't await/forward a handler's return value), which is why
+    the result is reported via a state, not a return value.
 - `events` — things the driver can report happened. Each has an `id`,
   `label`, and a list of param names it carries.
 - `states` — named values a driver exposes for querying/display. A state
