@@ -439,21 +439,38 @@ function saveBindings() {
 // Sanitizes a client-submitted bindings object the same defensive,
 // field-by-field way QTI's own saveBindings handler does (server.js:
 // 1802-1821 in QTI) rather than trusting the body shape wholesale.
+// A function ref is either {kind:"action", instanceId, actionId} or
+// {kind:"macro", macroId} - On/Off get both kinds (a macro has no live
+// value, but on/off don't need one), Level is action-only (pass
+// allowMacro=false) since a macro can't receive the live drag value a
+// ring widget sends.
+function sanitizeFn(f, allowMacro) {
+  if (!f || typeof f !== "object") return undefined;
+  if (allowMacro && f.kind === "macro") {
+    return typeof f.macroId === "string" && f.macroId ? { kind: "macro", macroId: f.macroId } : undefined;
+  }
+  if (typeof f.instanceId === "string" && typeof f.actionId === "string") {
+    return { kind: "action", instanceId: f.instanceId, actionId: f.actionId };
+  }
+  return undefined;
+}
+function sanitizeStateRef(s) {
+  if (!s || typeof s !== "object") return undefined;
+  return typeof s.instanceId === "string" && typeof s.stateId === "string" ? { instanceId: s.instanceId, stateId: s.stateId } : undefined;
+}
 function sanitizeSlot(s) {
   if (!s || typeof s !== "object") return null;
-  const slot = {
+  return {
     id: typeof s.id === "string" && s.id ? s.id : crypto.randomBytes(4).toString("hex"),
     name: typeof s.name === "string" ? s.name.slice(0, 60) : "Untitled",
-    instanceId: typeof s.instanceId === "string" ? s.instanceId : undefined,
-    onActionId: typeof s.onActionId === "string" ? s.onActionId : undefined,
-    offActionId: typeof s.offActionId === "string" ? s.offActionId : undefined,
-    levelActionId: typeof s.levelActionId === "string" ? s.levelActionId : undefined,
-    onStateId: typeof s.onStateId === "string" ? s.onStateId : undefined,
-    levelStateId: typeof s.levelStateId === "string" ? s.levelStateId : undefined,
+    onFn: sanitizeFn(s.onFn, true),
+    offFn: sanitizeFn(s.offFn, true),
+    levelFn: sanitizeFn(s.levelFn, false),
+    onState: sanitizeStateRef(s.onState),
+    levelState: sanitizeStateRef(s.levelState),
     fixedArgs: s.fixedArgs && typeof s.fixedArgs === "object" ? s.fixedArgs : {},
     stateSuffix: typeof s.stateSuffix === "string" && s.stateSuffix ? s.stateSuffix : undefined,
   };
-  return slot;
 }
 function sanitizeBindings(raw) {
   const out = bindingsDefaults();
@@ -510,6 +527,30 @@ function roleStatesForCategory(manifest, cat) {
   }
   return { onState: manifest.states.find((s) => s.role === "on"), levelState: manifest.states.find((s) => s.role === "level") };
 }
+// A `perInstance` state (see SPEC.md) is ALWAYS reported suffixed
+// ("<stateId>#<instanceKey>"), even for a driver with only one relay/
+// zone/partition - http-relay's driver.js calls
+// ctx.setState("relay.on", value, "0") unconditionally, there's no bare
+// "relay.on" key to fall back to. A default (un-zoned) auto-generated
+// slot needs SOME suffix to ever read that state back, so this peeks at
+// the instance's actual live state (only possible while it's running) to
+// find one - if there's exactly one distinct suffix in use for that
+// state id, that's an unambiguous, safe guess; if there are several
+// (a real multi-zone device already reporting more than one), guessing
+// would silently pick the wrong one, so this deliberately backs off and
+// leaves stateSuffix unset - same "don't guess when it's genuinely
+// ambiguous" call roleActionsForCategory makes for climate.
+function detectSingleSuffix(entry, stateId) {
+  if (!stateId || !entry.running || !entry.driverInstance) return undefined;
+  const state = entry.driverInstance.getAllState();
+  if (stateId in state) return undefined; // bare key exists - no suffix needed at all
+  const prefix = `${stateId}#`;
+  const suffixes = new Set();
+  for (const key of Object.keys(state)) {
+    if (key.startsWith(prefix)) suffixes.add(key.slice(prefix.length));
+  }
+  return suffixes.size === 1 ? [...suffixes][0] : undefined;
+}
 function autoGenerateBindings() {
   let added = 0;
   for (const [id, entry] of instances) {
@@ -517,21 +558,30 @@ function autoGenerateBindings() {
     const cats = Array.isArray(manifest.category) ? manifest.category : [manifest.category || "generic"];
     for (const cat of cats) {
       if (!BINDING_CATEGORIES.includes(cat)) continue;
-      const hasDefault = bindings[cat].some((s) => s.instanceId === id && (!s.fixedArgs || Object.keys(s.fixedArgs).length === 0));
+      // "Already has a default for this instance" means an un-zoned slot
+      // whose On/Off/Level (whichever are action-kind) point at this
+      // instance - a macro-bound function has no instanceId of its own,
+      // so it never counts toward this check either way.
+      const hasDefault = bindings[cat].some(
+        (s) =>
+          (!s.fixedArgs || Object.keys(s.fixedArgs).length === 0) &&
+          [s.onFn, s.offFn, s.levelFn].some((f) => f && f.kind === "action" && f.instanceId === id)
+      );
       if (hasDefault) continue;
       const { onAction, offAction, levelAction } = roleActionsForCategory(manifest, cat);
       if (!onAction && !offAction && !levelAction) continue;
       const { onState, levelState } = roleStatesForCategory(manifest, cat);
+      const stateSuffix = detectSingleSuffix(entry, onState && onState.id) || detectSingleSuffix(entry, levelState && levelState.id);
       bindings[cat].push({
         id: crypto.randomBytes(4).toString("hex"),
         name: manifest.displayName,
-        instanceId: id,
-        onActionId: onAction ? onAction.id : undefined,
-        offActionId: offAction ? offAction.id : undefined,
-        levelActionId: levelAction ? levelAction.id : undefined,
-        onStateId: onState ? onState.id : undefined,
-        levelStateId: levelState ? levelState.id : undefined,
+        onFn: onAction ? { kind: "action", instanceId: id, actionId: onAction.id } : undefined,
+        offFn: offAction ? { kind: "action", instanceId: id, actionId: offAction.id } : undefined,
+        levelFn: levelAction ? { instanceId: id, actionId: levelAction.id } : undefined,
+        onState: onState ? { instanceId: id, stateId: onState.id } : undefined,
+        levelState: levelState ? { instanceId: id, stateId: levelState.id } : undefined,
         fixedArgs: {},
+        stateSuffix,
       });
       added++;
     }

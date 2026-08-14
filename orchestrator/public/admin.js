@@ -20,6 +20,7 @@ let instanceIds = [];
 let runningByInstance = new Map(); // id -> boolean
 let statesByInstance = new Map(); // id -> {key: value}
 let bindingsCache = null; // {light:[], switch:[], ...} - loaded when the Dashboard tab is opened
+let macrosCache = []; // loaded alongside bindingsCache - macros are a valid On/Off function target
 const logBuffer = []; // {instanceId, label, text} - fed live by WS "event" messages
 
 const countPill = document.getElementById("countPill");
@@ -406,101 +407,200 @@ function activeMainTab() {
 
 // --- Dashboard: QTI's own binding-editor model, ported directly rather
 // than Oak's earlier (now removed) 1-tile-per-instance approach. A
-// "slot" names a device (e.g. "kitchen light") and picks ONE instance
-// plus which of that instance's actions is its On/Off/Level function -
-// this is what lets a single hub-style instance (e.g. a real multi-zone
-// controller) back MANY slots, each with its own fixed call arguments
-// (e.g. {zone:"kitchen"}) - "kitchen light" and "living room light" can
-// both point at the same instance's same lightOn/lightOff/lightSetLevel
-// actions, just with a different fixed zone value. This tab is purely an
-// editor - live state/toggling happens on live.html, same split QTI
-// itself has between its admin bindings editor and its live pages.
-//
-// Simplification vs QTI: a slot's On/Off/Level functions all reference
-// the SAME instance (QTI allows each to reference an independent
-// instance+function) - every Oak driver built so far only ever needs one
-// instance per slot, so this isn't a real limitation yet, just an honest
-// scope note.
+// "slot" names a device (e.g. "kitchen light") - see roles.js's header
+// comment for the full shape. On/Off/Level EACH independently pick their
+// own instance+action (not one shared instance for the whole slot, the
+// way an earlier version of this simplified it) - this is what lets a
+// real QTI-style binding express "On also runs a macro" or "On calls hub
+// A but Off calls hub B", matching QTI's actual screenshot (On function
+// and Off function each have their own "Function -> instance -> action"
+// picker). On/Off additionally choose "Call a function" vs "Run a macro"
+// (Level stays action-only - a macro has no way to carry a live drag
+// value). This tab is purely an editor - live state/toggling happens on
+// live.html, same split QTI itself has between its admin bindings editor
+// and its live pages.
 //
 // Convention: a param literally named "level" on an action is the LIVE
 // value (set by a drag/slider), never a fixed argument - every other
-// param on the slot's chosen on/off/level actions (e.g. "zone") is
-// editable as a fixed argument in the "Fixed arguments" box.
+// param across the slot's chosen action-kind functions (e.g. "zone") is
+// editable as a fixed argument in the "Fixed arguments" box, shared
+// across On/Off/Level since Oak's own driver convention already
+// standardizes on one param name ("zone") for this rather than QTI's
+// pattern of re-entering the same value independently per function.
 function actionParams(manifest, actionId) {
   const action = manifest && manifest.actions.find((a) => a.id === actionId);
   return action ? action.params || [] : [];
 }
-function fixedParamKeysForSlot(manifest, slot) {
+function fixedParamKeysForSlot(slot) {
   const keys = new Set();
-  [slot.onActionId, slot.offActionId, slot.levelActionId].forEach((actionId) => {
-    actionParams(manifest, actionId).forEach((p) => {
+  [slot.onFn, slot.offFn, slot.levelFn].forEach((f) => {
+    if (!f || f.kind === "macro") return;
+    actionParams(manifests.get(f.instanceId), f.actionId).forEach((p) => {
       if (p.key !== "level") keys.add(p.key);
     });
   });
   return [...keys];
 }
 
-function buildFnSelect(container, label, slot, fieldKey, onChanged) {
+// Builds one On/Off/Level function editor: a "Call a function" vs "Run a
+// macro" choice (allowMacro only), an Instance+Action pair for action
+// mode, or a Macro picker for macro mode - both sub-blocks stay in the
+// DOM and just toggle visibility rather than being destroyed/rebuilt on
+// every kind switch, so listeners only get wired once.
+function buildFnEditor(container, label, slot, fnKey, allowMacro, onChanged) {
   const wrap = document.createElement("div");
   wrap.className = "slot-fn-group";
   const labelEl = document.createElement("div");
   labelEl.className = "lbl";
   labelEl.textContent = label;
+  wrap.appendChild(labelEl);
+
+  let kindSel = null;
+  if (allowMacro) {
+    kindSel = document.createElement("select");
+    kindSel.innerHTML = `<option value="action">Call a function</option><option value="macro">Run a macro</option>`;
+    wrap.appendChild(kindSel);
+  }
+
+  const actionBox = document.createElement("div");
+  const instSel = document.createElement("select");
   const actSel = document.createElement("select");
-  wrap.append(labelEl, actSel);
+  actionBox.append(instSel, actSel);
+
+  const macroBox = document.createElement("div");
+  const macroSel = document.createElement("select");
+  macroBox.append(macroSel);
+
+  wrap.append(actionBox, macroBox);
   container.appendChild(wrap);
 
-  function populate() {
-    const manifest = manifests.get(slot.instanceId);
-    actSel.innerHTML =
-      `<option value="">— none —</option>` + (manifest ? manifest.actions.map((a) => `<option value="${a.id}">${a.label} (${a.id})</option>`).join("") : "");
-    actSel.value = slot[fieldKey] || "";
+  function currentValue() {
+    const kind = kindSel ? kindSel.value : "action";
+    if (kind === "macro") return macroSel.value ? { kind: "macro", macroId: macroSel.value } : undefined;
+    return instSel.value && actSel.value ? { kind: "action", instanceId: instSel.value, actionId: actSel.value } : undefined;
   }
-  actSel.addEventListener("change", () => {
-    slot[fieldKey] = actSel.value || undefined;
+  function populateInstances() {
+    const f = slot[fnKey];
+    instSel.innerHTML =
+      `<option value="">— instance —</option>` +
+      instanceIds.map((id) => `<option value="${id}">${(manifests.get(id) || {}).displayName || id} (${id})</option>`).join("");
+    instSel.value = (f && f.kind !== "macro" && f.instanceId) || "";
+  }
+  function populateActions() {
+    const manifest = manifests.get(instSel.value);
+    const f = slot[fnKey];
+    actSel.innerHTML =
+      `<option value="">— function —</option>` + (manifest ? manifest.actions.map((a) => `<option value="${a.id}">${a.label} (${a.id})</option>`).join("") : "");
+    actSel.value = (f && f.kind !== "macro" && f.actionId) || "";
+  }
+  function populateMacros() {
+    const f = slot[fnKey];
+    macroSel.innerHTML = `<option value="">— macro —</option>` + macrosCache.map((m) => `<option value="${m.id}">${m.name}</option>`).join("");
+    macroSel.value = (f && f.kind === "macro" && f.macroId) || "";
+  }
+  function updateVisibility() {
+    const kind = kindSel ? kindSel.value : "action";
+    actionBox.style.display = kind === "macro" ? "none" : "";
+    macroBox.style.display = kind === "macro" ? "" : "none";
+  }
+
+  if (kindSel) {
+    kindSel.value = slot[fnKey] && slot[fnKey].kind === "macro" ? "macro" : "action";
+    kindSel.addEventListener("change", () => {
+      slot[fnKey] = currentValue();
+      updateVisibility();
+      onChanged();
+    });
+  }
+  instSel.addEventListener("change", () => {
+    populateActions();
+    slot[fnKey] = currentValue();
     onChanged();
   });
-  populate();
-  return { populate };
+  actSel.addEventListener("change", () => {
+    slot[fnKey] = currentValue();
+    onChanged();
+  });
+  macroSel.addEventListener("change", () => {
+    slot[fnKey] = currentValue();
+    onChanged();
+  });
+
+  populateInstances();
+  populateActions();
+  populateMacros();
+  updateVisibility();
+
+  return {
+    refresh() {
+      populateInstances();
+      populateActions();
+      populateMacros();
+      updateVisibility();
+    },
+  };
 }
 
-// Same pattern as buildFnSelect but over manifest.states, for the
-// slot's onStateId/levelStateId - kept explicit (not inferred from the
-// chosen action) for the same reason server.js's roleStatesForCategory
-// exists: a hub manifest can have two states plausibly matching the same
-// role (zone-hub's light.level vs its unrated climate.target), so the
-// slot must say which one it actually means.
-function buildStateSelect(container, label, slot, fieldKey, onChanged) {
+// Same idea as buildFnEditor's action mode but for the slot's onState/
+// levelState - independent Instance+State pickers (not tied to the
+// matching function's instance), since which instance reports a state
+// back doesn't have to be the same one a macro-bound On/Off actually
+// calls. Kept explicit rather than inferred from a role tag for the same
+// reason server.js's roleStatesForCategory exists: a hub manifest can
+// have two states plausibly matching the same role (zone-hub's
+// light.level vs its unrated climate.target).
+function buildStateEditor(container, label, slot, stateKey, onChanged) {
   const wrap = document.createElement("div");
   wrap.className = "slot-fn-group";
   const labelEl = document.createElement("div");
   labelEl.className = "lbl";
   labelEl.textContent = label;
-  const sel = document.createElement("select");
-  wrap.append(labelEl, sel);
+  const instSel = document.createElement("select");
+  const stateSel = document.createElement("select");
+  wrap.append(labelEl, instSel, stateSel);
   container.appendChild(wrap);
 
-  function populate() {
-    const manifest = manifests.get(slot.instanceId);
-    sel.innerHTML =
-      `<option value="">— none —</option>` + (manifest ? manifest.states.map((s) => `<option value="${s.id}">${s.id} (${s.type})</option>`).join("") : "");
-    sel.value = slot[fieldKey] || "";
+  function currentValue() {
+    return instSel.value && stateSel.value ? { instanceId: instSel.value, stateId: stateSel.value } : undefined;
   }
-  sel.addEventListener("change", () => {
-    slot[fieldKey] = sel.value || undefined;
+  function populateInstances() {
+    const ref = slot[stateKey];
+    instSel.innerHTML =
+      `<option value="">— instance —</option>` +
+      instanceIds.map((id) => `<option value="${id}">${(manifests.get(id) || {}).displayName || id} (${id})</option>`).join("");
+    instSel.value = (ref && ref.instanceId) || "";
+  }
+  function populateStates() {
+    const manifest = manifests.get(instSel.value);
+    const ref = slot[stateKey];
+    stateSel.innerHTML = `<option value="">— state —</option>` + (manifest ? manifest.states.map((s) => `<option value="${s.id}">${s.id} (${s.type})</option>`).join("") : "");
+    stateSel.value = (ref && ref.stateId) || "";
+  }
+  instSel.addEventListener("change", () => {
+    populateStates();
+    slot[stateKey] = currentValue();
     onChanged();
   });
-  populate();
-  return { populate };
+  stateSel.addEventListener("change", () => {
+    slot[stateKey] = currentValue();
+    onChanged();
+  });
+  populateInstances();
+  populateStates();
+  return {
+    refresh() {
+      populateInstances();
+      populateStates();
+    },
+  };
 }
 
-// Builds one slot's expandable editor: Name, an instance picker shared by
-// all three functions, On/Off/Level function pickers (each scoped to
-// that one instance's actions), and a "Fixed arguments" box covering
-// every non-"level" param any of the three chosen actions declare (the
-// zone/name selector for a hub driver). Mutates `slot` in place; the
-// caller is responsible for persisting bindingsCache after a change.
-function buildSlotRow(cat, slot, onDelete) {
+// Builds one slot's expandable editor: Name, On/Off (function-or-macro)
+// and Level (function-only) editors, On/Level state editors, a "Fixed
+// arguments" box covering every non-"level" param across the slot's
+// action-kind functions, and a zone/state-suffix field. Mutates `slot`
+// in place; the caller persists bindingsCache after each change.
+function buildSlotRow(cat, slot, onDelete, startExpanded) {
   const row = document.createElement("div");
   row.className = "slot-row";
 
@@ -516,10 +616,10 @@ function buildSlotRow(cat, slot, onDelete) {
     persistBindings();
   });
   const body = document.createElement("div");
-  body.className = "slot-row-body hidden";
+  body.className = startExpanded ? "slot-row-body" : "slot-row-body hidden";
   const editBtn = document.createElement("button");
   editBtn.className = "btn small";
-  editBtn.textContent = "Edit";
+  editBtn.textContent = startExpanded ? "Close" : "Edit";
   editBtn.addEventListener("click", (ev) => {
     ev.stopPropagation();
     body.classList.toggle("hidden");
@@ -534,11 +634,6 @@ function buildSlotRow(cat, slot, onDelete) {
   });
   header.append(nameInput, editBtn, delBtn);
 
-  const instWrap = document.createElement("label");
-  instWrap.innerHTML = `<span class="lbl">Instance</span>`;
-  const instSel = document.createElement("select");
-  instWrap.appendChild(instSel);
-
   const argsWrap = document.createElement("div");
   argsWrap.className = "slot-fn-group";
   const argsLabel = document.createElement("div");
@@ -548,8 +643,8 @@ function buildSlotRow(cat, slot, onDelete) {
 
   function renderArgs() {
     [...argsWrap.querySelectorAll("input")].forEach((el) => el.remove());
-    const manifest = manifests.get(slot.instanceId);
-    const keys = fixedParamKeysForSlot(manifest, slot);
+    const keys = fixedParamKeysForSlot(slot);
+    argsWrap.querySelector("[data-hint]")?.remove();
     if (!keys.length) {
       const hint = document.createElement("span");
       hint.className = "sub";
@@ -558,10 +653,10 @@ function buildSlotRow(cat, slot, onDelete) {
       argsWrap.appendChild(hint);
       return;
     }
-    argsWrap.querySelector("[data-hint]")?.remove();
     keys.forEach((key) => {
-      const paramMeta = [slot.onActionId, slot.offActionId, slot.levelActionId]
-        .flatMap((aid) => actionParams(manifest, aid))
+      const paramMeta = [slot.onFn, slot.offFn, slot.levelFn]
+        .filter((f) => f && f.kind !== "macro")
+        .flatMap((f) => actionParams(manifests.get(f.instanceId), f.actionId))
         .find((p) => p.key === key);
       const input = document.createElement("input");
       input.placeholder = (paramMeta && paramMeta.label) || key;
@@ -580,11 +675,11 @@ function buildSlotRow(cat, slot, onDelete) {
     persistBindings();
   }
 
-  const onGroup = buildFnSelect(body, "On function", slot, "onActionId", onFnChanged);
-  const offGroup = buildFnSelect(body, "Off function", slot, "offActionId", onFnChanged);
-  const levelGroup = buildFnSelect(body, "Level function", slot, "levelActionId", onFnChanged);
-  const onStateGroup = buildStateSelect(body, "On state (for reading current on/off back)", slot, "onStateId", persistBindings);
-  const levelStateGroup = buildStateSelect(body, "Level state (for reading the current level back)", slot, "levelStateId", persistBindings);
+  buildFnEditor(body, "On function", slot, "onFn", true, onFnChanged);
+  buildFnEditor(body, "Off function", slot, "offFn", true, onFnChanged);
+  buildFnEditor(body, "Level function", slot, "levelFn", false, onFnChanged);
+  buildStateEditor(body, "On state (for reading current on/off back)", slot, "onState", persistBindings);
+  buildStateEditor(body, "Level state (for reading the current level back)", slot, "levelState", persistBindings);
 
   const suffixWrap = document.createElement("label");
   suffixWrap.innerHTML = `<span class="lbl">Zone / state suffix (only for a hub instance backing multiple slots - must match what the driver reports, e.g. "kitchen")</span>`;
@@ -597,27 +692,8 @@ function buildSlotRow(cat, slot, onDelete) {
   });
   suffixWrap.appendChild(suffixInput);
 
-  function populateInstances() {
-    instSel.innerHTML =
-      `<option value="">— none —</option>` +
-      instanceIds.map((id) => `<option value="${id}">${(manifests.get(id) || {}).displayName || id} (${id})</option>`).join("");
-    instSel.value = slot.instanceId || "";
-  }
-  instSel.addEventListener("change", () => {
-    slot.instanceId = instSel.value || undefined;
-    slot.onActionId = slot.offActionId = slot.levelActionId = slot.onStateId = slot.levelStateId = undefined;
-    onGroup.populate();
-    offGroup.populate();
-    levelGroup.populate();
-    onStateGroup.populate();
-    levelStateGroup.populate();
-    renderArgs();
-    persistBindings();
-  });
-  populateInstances();
   renderArgs();
-
-  body.append(instWrap, argsWrap, suffixWrap);
+  body.append(argsWrap, suffixWrap);
   row.append(header, body);
   return row;
 }
@@ -643,7 +719,11 @@ function buildCategoryCard(cat) {
   addBtn.textContent = `+ Add ${CATEGORY_LABEL[cat]}`;
   addBtn.addEventListener("click", (ev) => {
     ev.stopPropagation();
-    bindingsCache[cat].push({ id: Math.random().toString(16).slice(2, 10), name: `New ${CATEGORY_LABEL[cat]}`, fixedArgs: {} });
+    // A freshly-added slot has nothing configured yet, so it starts
+    // expanded - landing on a collapsed empty row after clicking "+ Add"
+    // would just leave the admin hunting for how to open it, the exact
+    // confusion an earlier version of this hit.
+    bindingsCache[cat].push({ id: Math.random().toString(16).slice(2, 10), name: `New ${CATEGORY_LABEL[cat]}`, fixedArgs: {}, __justAdded: true });
     persistBindings();
     renderSlotList(cat, list);
   });
@@ -662,18 +742,24 @@ function renderSlotList(cat, list) {
     list.innerHTML = `<p class="empty-hint">No ${(CATEGORY_LABEL_PLURAL[cat] || CATEGORY_LABEL[cat] + "s").toLowerCase()} yet - "+ Add ${CATEGORY_LABEL[cat]}" or Auto-generate above.</p>`;
     return;
   }
-  slots.forEach((slot) => {
-    const row = buildSlotRow(cat, slot, () => {
-      bindingsCache[cat] = bindingsCache[cat].filter((s) => s !== slot);
-      persistBindings();
-      renderSlotList(cat, list);
-    });
+  slots.forEach((slot, i) => {
+    const row = buildSlotRow(
+      cat,
+      slot,
+      () => {
+        bindingsCache[cat] = bindingsCache[cat].filter((s) => s !== slot);
+        persistBindings();
+        renderSlotList(cat, list);
+      },
+      i === slots.length - 1 && slot.__justAdded
+    );
+    delete slot.__justAdded;
     list.appendChild(row);
   });
 }
 
 async function renderDashboardTab() {
-  bindingsCache = await getBindings();
+  [bindingsCache, macrosCache] = await Promise.all([getBindings(), listMacros()]);
   const root = document.getElementById("bindingsCategoryCards");
   root.innerHTML = "";
   CATEGORY_ORDER.forEach((cat) => root.appendChild(buildCategoryCard(cat)));

@@ -4,18 +4,35 @@
 // on/off/level identically or they'd silently disagree about what a
 // control does.
 //
-// Dashboard presentation is driven by bindings.json "slots", not by the
-// driver instance directly (see server.js's loadBindings/saveBindings/
-// autoGenerateBindings) - a slot is {id, name, instanceId, onActionId,
-// offActionId, levelActionId, fixedArgs, stateSuffix}. This is what lets
-// one hub-style instance (e.g. a real multi-zone controller exporting one
-// action per role but taking a zone/name parameter) back MANY slots -
-// "kitchen light" and "living room light" both point at the same
-// instance's same turnOn/turnOff actions, just with different fixedArgs
-// (e.g. {zone:"kitchen"}) and a different stateSuffix to read the right
-// zone's state back (state key convention: "<stateId>#<suffix>", e.g.
+// Dashboard presentation is driven by bindings.json "slots" (see
+// server.js's loadBindings/saveBindings/autoGenerateBindings), matching
+// QTI's own real binding shape rather than Oak's earlier 1-tile-per-
+// instance approach:
+//   {
+//     id, name,
+//     onFn:  {kind:"action", instanceId, actionId} | {kind:"macro", macroId} | undefined,
+//     offFn: {kind:"action", instanceId, actionId} | {kind:"macro", macroId} | undefined,
+//     levelFn: {instanceId, actionId} | undefined,   // action only - a macro has
+//                                                     // no way to carry a live
+//                                                     // drag value, so this never
+//                                                     // gets a "kind" choice
+//     onState:    {instanceId, stateId} | undefined,
+//     levelState: {instanceId, stateId} | undefined,
+//     fixedArgs, stateSuffix,
+//   }
+// On/Off/Level each independently name their OWN instance+action (or a
+// macro, for on/off) - not one shared instance for the whole slot. This
+// is what lets a real QTI-style binding express "On also runs a
+// goodnight-style macro" or "On calls hub A but Off calls hub B", not
+// just "this slot's 3 functions all happen to live on one instance". A
+// hub-style driver backing many zones (e.g. "kitchen light" and "living
+// room light" both against the same multi-zone controller) still works
+// the same way it always did - fixedArgs (e.g. {zone:"kitchen"}) carries
+// the zone into whichever action gets called, and stateSuffix reads the
+// right zone back out of an instance's combined state object via
+// driver.js's "id#instanceKey" convention (ctx.setState's 3rd argument):
 // "light.on#kitchen" alongside "light.on#livingroom" in one instance's
-// state object).
+// state.
 export const CATEGORY_ICON = {
   light: "💡",
   switch: "🔌",
@@ -37,9 +54,8 @@ export const CATEGORY_LABEL = {
 export const CATEGORY_ORDER = ["light", "switch", "climate", "security", "media", "sensor", "generic"];
 
 // Still used for the "Add instance" two-step category-then-driver picker,
-// and by autoGenerateBindings-adjacent client code that wants to guess a
-// sensible default category for a newly bound slot - NOT for Dashboard
-// display anymore (that's entirely slot-driven now).
+// and for guessing a sensible default category for an uploaded driver -
+// NOT for Dashboard display anymore (that's entirely slot-driven now).
 export function effectiveCategories(manifest) {
   const raw = manifest.category || "generic";
   const arr = Array.isArray(raw) ? raw : [raw];
@@ -59,11 +75,11 @@ export function findAction(manifest, actionId) {
 // Role-tagged first (reliable, driver-declared), falling back to the old
 // turnOn/turnOff name heuristic only for a manifest with no role tags at
 // all - keeps working for a hand-written driver that hasn't adopted roles
-// yet, without reintroducing the armStay/disarm false-positive bug a name-
-// only heuristic already caused twice this session once a manifest DOES
-// use roles (a role-tagged "arm" action is never mistaken for "on"). Used
-// to suggest defaults when an admin picks an instance for a new slot, and
-// by autoGenerateBindings' client-side equivalent.
+// yet, without reintroducing the armStay/disarm false-positive bug a
+// name-only heuristic already caused twice this session once a manifest
+// DOES use roles. Used by the Driver tab's raw Actions panel (an
+// instance-level toggle, unrelated to Dashboard bindings) and to suggest
+// defaults when an admin picks an instance for a new function.
 export function getOnOffPair(manifest) {
   const onAction = findRoleAction(manifest, "on");
   const offAction = findRoleAction(manifest, "off");
@@ -76,38 +92,28 @@ export function getLevelAction(manifest) {
   return findRoleAction(manifest, "level");
 }
 
-// Resolves a slot's actual on/level state, zone-aware via
-// slot.stateSuffix. Reads the slot's OWN explicit onStateId/levelStateId
-// (set by autoGenerateBindings or picked by hand in the admin editor) -
-// NOT a manifest-wide role scan. That distinction matters for a hub
-// manifest like zone-hub: a blind "find the state with role=level" would
-// always return light.level, even for a climate slot asking about
-// climate.target (which has no role tag at all, deliberately, since
-// there's no settled climate role vocabulary yet) - the same "multiple
-// actions/states with the same role in one manifest" ambiguity
-// server.js's roleActionsForCategory already has to solve for actions.
-// Falls back to role-based lookup only for a slot with no explicit
-// onStateId/levelStateId set (an older auto-generated slot, or a
-// single-subsystem manifest where the ambiguity can't arise), and
-// further falls back to "any boolean state" for a manifest with no role
-// tags at all - same fallback getOnOffPair uses for actions.
-export function slotOnState(manifest, state, slot) {
-  const suffix = slot && slot.stateSuffix;
-  const stateId = (slot && slot.onStateId) || (findRoleState(manifest, "on") || {}).id;
+// Reads a value back out of a (single instance's) state object, zone-
+// aware via `suffix` (the "<stateId>#<suffix>" convention). `state`/
+// `stateId` must already be resolved to the right instance by the
+// caller - roles.js has no opinion on WHICH instance a slot's onState/
+// levelState points at, only how to read a value out of that instance's
+// state object once you hand it one.
+export function readState(state, stateId, suffix) {
+  if (!stateId) return undefined;
+  const key = suffix ? `${stateId}#${suffix}` : stateId;
+  return key in state ? state[key] : undefined;
+}
+// Same, but with the "any boolean state" fallback getOnOffPair's own
+// name-heuristic fallback mirrors - only reachable when a slot has no
+// explicit onState configured at all and no zone suffix (so there's
+// nothing to disambiguate), e.g. a freshly hand-created slot.
+export function readOnState(state, stateId, suffix) {
   if (stateId) {
     const key = suffix ? `${stateId}#${suffix}` : stateId;
-    if (key in state) return [key, state[key]];
-    if (!suffix) return undefined;
+    return key in state ? [key, state[key]] : undefined;
   }
   if (!suffix) return Object.entries(state).find(([, v]) => typeof v === "boolean");
   return undefined;
-}
-export function slotLevelState(manifest, state, slot) {
-  const stateId = (slot && slot.levelStateId) || (findRoleState(manifest, "level") || {}).id;
-  if (!stateId) return undefined;
-  const suffix = slot && slot.stateSuffix;
-  const key = suffix ? `${stateId}#${suffix}` : stateId;
-  return key in state ? state[key] : undefined;
 }
 
 // Merges a slot's fixed call arguments (e.g. {zone:"kitchen"}) with
