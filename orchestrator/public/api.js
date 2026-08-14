@@ -35,11 +35,11 @@ export async function deleteDriverPackage(driverId) {
   const res = await fetch(`/api/drivers/${driverId}`, { method: "DELETE" });
   return res.json();
 }
-export async function addInstance(id, driver, connection, settings, categoryOverride) {
+export async function addInstance(id, driver, connection, settings, label) {
   const res = await fetch("/api/instances", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, driver, connection, settings, categoryOverride }),
+    body: JSON.stringify({ id, driver, connection, settings, label }),
   });
   return res.json();
 }

@@ -19,8 +19,18 @@ let manifests = new Map(); // id -> manifest
 let instanceIds = [];
 let runningByInstance = new Map(); // id -> boolean
 let statesByInstance = new Map(); // id -> {key: value}
+let labelByInstance = new Map(); // id -> string|undefined - QTI's own generic "Label (optional, to tell instances apart)" field, e.g. telling two eisy instances apart
 let bindingsCache = null; // {light:[], switch:[], ...} - loaded when the Dashboard tab is opened
 let macrosCache = []; // loaded alongside bindingsCache - macros are a valid On/Off function target
+
+// Everywhere the UI shows "which instance is this", show the admin's own
+// label if they set one, falling back to the driver's generic
+// displayName - matters once there's more than one instance of the same
+// driver (two eisy boxes, two relays, ...) where the driver name alone
+// can't tell them apart.
+function instanceLabel(id) {
+  return labelByInstance.get(id) || (manifests.get(id) || {}).displayName || id;
+}
 const logBuffer = []; // {instanceId, label, text} - fed live by WS "event" messages
 
 const countPill = document.getElementById("countPill");
@@ -86,7 +96,7 @@ function renderInstancesList() {
     const row = document.createElement("div");
     row.className = "instance-row" + (running ? "" : " stopped");
     row.title = "Click to view/edit this instance in State/Actions/Events/Config";
-    row.innerHTML = `<div><div class="iname">${manifest.displayName}${
+    row.innerHTML = `<div><div class="iname">${instanceLabel(id)}${
       running ? "" : ' <span class="istatus">stopped</span>'
     }</div><div class="ikey">${manifest.id} · ${id}</div></div>`;
     row.addEventListener("click", () => {
@@ -136,7 +146,7 @@ function renderInstanceFilter() {
   instanceIds.forEach((id) => {
     const o = document.createElement("option");
     o.value = id;
-    o.textContent = manifests.get(id).displayName + " (" + id + ")";
+    o.textContent = instanceLabel(id) + " (" + id + ")";
     instanceFilter.appendChild(o);
   });
   instanceFilter.value = [...instanceFilter.options].some((o) => o.value === prev) ? prev : "";
@@ -158,7 +168,7 @@ function renderStatePanel() {
   rows.forEach(({ id, key, value }) => {
     const tr = document.createElement("tr");
     const valueHtml = typeof value === "boolean" ? `<span class="status-pill ${value ? "on" : "off"}">${value ? "on" : "off"}</span>` : String(value);
-    tr.innerHTML = `<td>${manifests.get(id).displayName}</td><td>${key}</td><td>${valueHtml}</td>`;
+    tr.innerHTML = `<td>${instanceLabel(id)}</td><td>${key}</td><td>${valueHtml}</td>`;
     stateBody.appendChild(tr);
   });
 }
@@ -174,6 +184,67 @@ function fieldInputs(action) {
     .join("");
 }
 
+// A "keyvalue" settings field (e.g. eisy's per-node address->name map,
+// matching QTI's own per-device Name fields in ConfigSettings.xml, just
+// as a proper dynamic list instead of QTI's fixed Name0..Name127 slots -
+// Oak's settings schema has no fixed-count constraint to work around, so
+// there's no reason to cap it at some arbitrary number). Stored as a
+// plain {key: value} object under settings.<key>. Not expressible as a
+// single <input>, so it's handled in two steps: a placeholder div is
+// emitted alongside the other string-templated fields, then
+// wireKeyValueField() turns it into an interactive add/remove row list
+// once the placeholder is actually in the DOM.
+function keyValueFieldPlaceholder(prefix, f) {
+  return `<div class="lbl">${f.label}</div><div class="keyvalue-rows" data-keyvalue-field="${prefix}.${f.key}"></div><button type="button" class="btn small" data-keyvalue-add="${prefix}.${f.key}">+ Add</button>`;
+}
+function wireKeyValueField(form, prefix, f, currentValue) {
+  const rowsEl = form.querySelector(`[data-keyvalue-field="${prefix}.${f.key}"]`);
+  const addBtn = form.querySelector(`[data-keyvalue-add="${prefix}.${f.key}"]`);
+  if (!rowsEl || !addBtn) return;
+  function addRow(k, v) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.marginBottom = "6px";
+    const keyInput = document.createElement("input");
+    keyInput.className = "kv-key";
+    keyInput.placeholder = f.keyLabel || "key";
+    keyInput.value = k || "";
+    const valInput = document.createElement("input");
+    valInput.className = "kv-val";
+    valInput.placeholder = f.valueLabel || "value";
+    valInput.value = v || "";
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn small danger";
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", () => row.remove());
+    row.append(keyInput, valInput, removeBtn);
+    rowsEl.appendChild(row);
+  }
+  Object.entries(currentValue || {}).forEach(([k, v]) => addRow(k, v));
+  addBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    addRow("", "");
+  });
+}
+// Collects every keyvalue field in `form` into {settings.<key>: {...}} /
+// {connection.<key>: {...}} shaped output, merged into the caller's
+// connection/settings objects - called instead of, not in addition to,
+// treating .kv-key/.kv-val as plain named inputs (they deliberately have
+// no name attribute, so the generic input-collection loop must skip them).
+function collectKeyValueFields(form, connection, settings) {
+  form.querySelectorAll("[data-keyvalue-field]").forEach((rowsEl) => {
+    const [group, key] = rowsEl.dataset.keyvalueField.split(".");
+    const obj = {};
+    rowsEl.querySelectorAll(".row").forEach((row) => {
+      const k = row.querySelector(".kv-key").value.trim();
+      const v = row.querySelector(".kv-val").value.trim();
+      if (k) obj[k] = v;
+    });
+    (group === "connection" ? connection : settings)[key] = obj;
+  });
+}
+
 function renderActionsPanel() {
   const filter = instanceFilter.value;
   actionsGrid.innerHTML = "";
@@ -186,7 +257,7 @@ function renderActionsPanel() {
     if (!runningByInstance.get(id)) {
       const notice = document.createElement("p");
       notice.className = "empty-hint";
-      notice.textContent = `${manifests.get(id).displayName} is stopped - start it (Running instances, or the Config tab) to use its actions.`;
+      notice.textContent = `${instanceLabel(id)} is stopped - start it (Running instances, or the Config tab) to use its actions.`;
       actionsGrid.appendChild(notice);
       return;
     }
@@ -210,12 +281,12 @@ function renderActionsPanel() {
         : "";
       form.innerHTML = `
         <div class="row">
-          <span class="tname">${isToggleAction ? manifest.displayName : a.label}</span>
+          <span class="tname">${isToggleAction ? instanceLabel(id) : a.label}</span>
           ${switchHtml}
         </div>
         ${isToggleAction ? "" : `<button class="btn small" type="submit">${a.label}</button>`}
         ${fieldInputs(a)}
-        <div class="tstate">${manifest.displayName} · ${id}</div>`;
+        <div class="tstate">${instanceLabel(id)} · ${id}</div>`;
       actionsGrid.appendChild(form);
     });
   });
@@ -260,7 +331,7 @@ function wireActionForms() {
 // near the bottom - otherwise a chatty driver yanks the view back down
 // mid-read.
 function logLine(instanceId, text) {
-  const label = manifests.has(instanceId) ? manifests.get(instanceId).displayName : instanceId;
+  const label = manifests.has(instanceId) ? instanceLabel(instanceId) : instanceId;
   logBuffer.push({ instanceId, label, text });
   if (logBuffer.length > MAX_LOG_LINES) logBuffer.shift();
   if (document.getElementById("eventsSubPanel").classList.contains("active")) renderEventsPanel();
@@ -299,6 +370,7 @@ async function renderConfigPanel() {
   const driverManifest = driverManifests.find((d) => d.id === manifest.id);
 
   function fieldInput(prefix, f, currentValue) {
+    if (f.type === "keyvalue") return keyValueFieldPlaceholder(prefix, f);
     const value = currentValue !== undefined ? currentValue : f.default;
     return `<label><span class="lbl">${f.label}</span><input name="${prefix}.${f.key}" type="${
       f.type === "number" ? "number" : "text"
@@ -313,6 +385,11 @@ async function renderConfigPanel() {
   configPanel.innerHTML = `
     <p class="sub">instance "${id}" · driver ${manifest.id} · ${running ? "running" : "stopped"}</p>
     <p class="sub">Dashboard presentation (name, category, which function is On/Off/Level) is configured on the <a href="#dashboard" onclick="location.hash='dashboard'">Dashboard</a> tab, not here - it's a binding, not part of this instance's connection.</p>
+    <form id="editLabelForm" class="config-form">
+      <label><span class="lbl">Label (optional, to tell instances apart, e.g. Kitchen Eisy)</span>
+        <input name="label" type="text" value="${cfg.label || ""}" /></label>
+      <button class="btn small primary" type="submit">Save label</button>
+    </form>
     ${
       running
         ? `<p class="empty-hint">Stop this instance before editing its connection/settings - editing a live connection out from under it isn't safe.</p>`
@@ -327,9 +404,25 @@ async function renderConfigPanel() {
       <button class="btn small${running ? " danger" : ""}" id="configToggleRunBtn">${running ? "Stop" : "Start"}</button>
     </div>`;
 
+  const editInstanceFormEl = document.getElementById("editInstanceForm");
+  (driverManifest.connection.options[0].fields || []).forEach((f) => f.type === "keyvalue" && wireKeyValueField(editInstanceFormEl, "connection", f, cfg.connection[f.key]));
+  (driverManifest.settings || []).forEach((f) => f.type === "keyvalue" && wireKeyValueField(editInstanceFormEl, "settings", f, cfg.settings[f.key]));
+  if (running) editInstanceFormEl.querySelectorAll(".kv-key, .kv-val, [data-keyvalue-add]").forEach((el) => (el.disabled = true));
+
   document.getElementById("configToggleRunBtn").addEventListener("click", async () => {
     const result = running ? await stopInstance(id) : await startInstance(id);
     if (result.error) alert(result.error);
+    fullRefresh();
+  });
+
+  document.getElementById("editLabelForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const label = ev.target.querySelector('[name="label"]').value.trim();
+    const result = await editInstance(id, { label });
+    if (result.error) {
+      alert(result.error);
+      return;
+    }
     fullRefresh();
   });
 
@@ -339,11 +432,13 @@ async function renderConfigPanel() {
       const connection = {};
       const settings = {};
       ev.target.querySelectorAll("input").forEach((input) => {
+        if (input.closest("[data-keyvalue-field]")) return;
         const [group, key] = input.name.split(".");
         const value = input.type === "number" ? Number(input.value) : input.value;
         if (group === "connection") connection[key] = value;
         else settings[key] = value;
       });
+      collectKeyValueFields(ev.target, connection, settings);
       const result = await editInstance(id, { connection, settings });
       if (result.error) {
         alert(result.error);
@@ -483,7 +578,7 @@ function buildFnEditor(container, label, slot, fnKey, allowMacro, onChanged) {
     const f = slot[fnKey];
     instSel.innerHTML =
       `<option value="">— instance —</option>` +
-      instanceIds.map((id) => `<option value="${id}">${(manifests.get(id) || {}).displayName || id} (${id})</option>`).join("");
+      instanceIds.map((id) => `<option value="${id}">${instanceLabel(id)} (${id})</option>`).join("");
     instSel.value = (f && f.kind !== "macro" && f.instanceId) || "";
   }
   function populateActions() {
@@ -567,7 +662,7 @@ function buildStateEditor(container, label, slot, stateKey, onChanged) {
     const ref = slot[stateKey];
     instSel.innerHTML =
       `<option value="">— instance —</option>` +
-      instanceIds.map((id) => `<option value="${id}">${(manifests.get(id) || {}).displayName || id} (${id})</option>`).join("");
+      instanceIds.map((id) => `<option value="${id}">${instanceLabel(id)} (${id})</option>`).join("");
     instSel.value = (ref && ref.instanceId) || "";
   }
   function populateStates() {
@@ -852,7 +947,7 @@ function addMacroStepRow() {
   row.className = "row";
   row.style.marginBottom = "6px";
   const instSel = document.createElement("select");
-  instSel.innerHTML = instanceIds.map((id) => `<option value="${id}">${manifests.get(id).displayName} (${id})</option>`).join("");
+  instSel.innerHTML = instanceIds.map((id) => `<option value="${id}">${instanceLabel(id)} (${id})</option>`).join("");
   const actionSel = document.createElement("select");
   function renderActions() {
     const manifest = manifests.get(instSel.value);
@@ -989,6 +1084,7 @@ async function fullRefresh() {
     list.map(async (summary) => {
       if (!manifests.has(summary.id)) manifests.set(summary.id, await getManifest(summary.id));
       runningByInstance.set(summary.id, summary.running);
+      labelByInstance.set(summary.id, summary.label);
       statesByInstance.set(summary.id, await getState(summary.id));
     })
   );
@@ -1080,6 +1176,7 @@ async function setupAddInstanceForm() {
   const fieldsRoot = document.getElementById("add-instance-fields");
 
   function configFieldInput(prefix, f) {
+    if (f.type === "keyvalue") return keyValueFieldPlaceholder(prefix, f);
     return `<input name="${prefix}.${f.key}" type="${f.type === "number" ? "number" : "text"}" placeholder="${f.label}${
       f.default !== undefined ? " (" + f.default + ")" : ""
     }" />`;
@@ -1094,9 +1191,12 @@ async function setupAddInstanceForm() {
     const settingFields = (manifest.settings || []).map((f) => configFieldInput("settings", f)).join("");
     fieldsRoot.innerHTML = `
       <input name="id" placeholder="instance id (e.g. relay2)" required />
+      <input name="label" placeholder="Label (optional, to tell instances apart, e.g. Kitchen Eisy)" />
       ${connFields}
       ${settingFields}
       <button class="btn small primary" type="submit">Add</button>`;
+    (manifest.connection.options[0].fields || []).forEach((f) => f.type === "keyvalue" && wireKeyValueField(fieldsRoot, "connection", f));
+    (manifest.settings || []).forEach((f) => f.type === "keyvalue" && wireKeyValueField(fieldsRoot, "settings", f));
   }
 
   function driversInCategory(cat) {
@@ -1127,17 +1227,19 @@ async function setupAddInstanceForm() {
     ev.preventDefault();
     const form = ev.target;
     const id = form.querySelector('[name="id"]').value.trim();
+    const label = form.querySelector('[name="label"]').value.trim();
     const connection = { transport: drivers.find((d) => d.id === driverPicker.value).connection.options[0].transport };
     const settings = {};
     form.querySelectorAll("input").forEach((input) => {
-      if (input.name === "id" || input.value === "") return;
+      if (input.name === "id" || input.name === "label" || input.value === "" || input.closest("[data-keyvalue-field]")) return;
       const [group, key] = input.name.split(".");
       const value = input.type === "number" ? Number(input.value) : input.value;
       if (group === "connection") connection[key] = value;
       else if (group === "settings") settings[key] = value;
     });
+    collectKeyValueFields(form, connection, settings);
     if (!id) return;
-    const result = await addInstance(id, driverPicker.value, connection, settings);
+    const result = await addInstance(id, driverPicker.value, connection, settings, label);
     if (result.error) {
       alert(result.error);
       return;

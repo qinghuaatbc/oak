@@ -342,7 +342,7 @@ async function runMacro(macro) {
 }
 
 for (const inst of config.instances)
-  addInstance(inst.id, { driver: inst.driver, connection: inst.connection, settings: inst.settings });
+  addInstance(inst.id, { driver: inst.driver, connection: inst.connection, settings: inst.settings, label: inst.label });
 
 function stopInstance(id) {
   const entry = instances.get(id);
@@ -372,12 +372,22 @@ function removeInstance(id) {
 // Editing a live connection's config out from under it isn't safe (e.g. a
 // TCP socket already open to the OLD host/port) - requiring stop-first
 // keeps this simple and correct instead of trying to hot-reconfigure a
-// running driver. Dashboard presentation (name, category, which function
-// is on/off/level) lives entirely in bindings.json now, not on the
-// instance spec - see loadBindings/saveBindings/autoGenerateBindings below.
+// running driver. Dashboard presentation (which category a slot lives in,
+// which function is on/off/level) lives entirely in bindings.json now,
+// not on the instance spec. `label` is the one exception, kept on the
+// instance itself rather than in bindings.json - it identifies WHICH
+// PHYSICAL DEVICE this instance is (matching QTI's own generic, driver-
+// independent "Label (optional, to tell instances apart)" field, e.g.
+// telling two eisy instances apart) rather than how it's presented on a
+// Dashboard slot, so it belongs with the instance, not a binding. Pure
+// presentation metadata with no runtime impact - editable regardless of
+// running state, unlike connection/settings.
 function editInstance(id, updates) {
   const entry = instances.get(id);
   if (!entry) return { error: "No such instance" };
+  if (updates.label !== undefined) {
+    entry.spec.label = updates.label ? String(updates.label).slice(0, 80) : undefined;
+  }
   if (updates.connection || updates.settings) {
     if (entry.running) return { error: "Stop the instance before editing its connection/settings" };
     if (updates.connection) entry.spec.connection = { ...entry.spec.connection, ...updates.connection };
@@ -397,6 +407,7 @@ function persistConfig() {
       driver: entry.spec.driver,
       connection: entry.spec.connection,
       settings: entry.spec.settings,
+      label: entry.spec.label,
     })),
   };
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(data, null, 2));
@@ -964,6 +975,7 @@ const server = http.createServer(async (req, res) => {
       id,
       driver: entry.spec.driver,
       displayName: entry.manifest.displayName,
+      label: entry.spec.label,
       running: entry.running,
       category: entry.manifest.category,
       actions: entry.manifest.actions.map((a) => a.id),
@@ -977,7 +989,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       if (!body.id || !body.driver) return sendJson(res, 400, { error: "id and driver are required" });
       if (instances.has(body.id)) return sendJson(res, 400, { error: `Instance "${body.id}" already exists` });
-      addInstance(body.id, { driver: body.driver, connection: body.connection || {}, settings: body.settings || {} });
+      addInstance(body.id, { driver: body.driver, connection: body.connection || {}, settings: body.settings || {}, label: body.label });
       persistConfig();
       broadcast({ type: "instanceAdded", instanceId: body.id });
       return sendJson(res, 200, { ok: true });
@@ -1032,6 +1044,7 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, {
       connection: entry.spec.connection,
       settings: entry.spec.settings,
+      label: entry.spec.label,
       running: entry.running,
       category: entry.manifest.category,
     });

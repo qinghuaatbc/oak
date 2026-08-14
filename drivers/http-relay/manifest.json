@@ -18,7 +18,14 @@
     ]
   },
   "settings": [
-    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 5000 }
+    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 5000 },
+    {
+      "key": "relayNames",
+      "type": "keyvalue",
+      "label": "Relay names",
+      "keyLabel": "Relay index (e.g. 0)",
+      "valueLabel": "Friendly name (e.g. Garage Door)"
+    }
   ],
   "actions": [
     { "id": "turnOn", "label": "Turn On", "role": "on", "params": [{ "key": "relay", "type": "number", "default": 0 }] },

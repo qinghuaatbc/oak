@@ -29,6 +29,24 @@ One JSON file per driver, next to a `driver.js`. Top-level fields:
 - `settings` — instance-level configuration fields, same shape as
   `connection.options[].fields`, for things that aren't about the transport
   itself (e.g. a default access code).
+  - **Any driver with a `perInstance` state** (see below — multiple zones,
+    relays, partitions, nodes, etc. behind one instance) should also declare
+    a `type: "keyvalue"` settings field mapping each instanceKey to a
+    friendly name (`keyLabel`/`valueLabel` describe the two columns, stored
+    as a plain `{key: value}` object). This is the standard way an installer
+    names each physical device up front, at instance-config time - not
+    something invented ad hoc per driver. Confirmed against QTI's own real
+    driver convention (its `ConfigSettings.xml` has repeated `Zone N Name`/
+    `Device N Name` fields per driver) before adopting it, but implemented
+    as a genuinely dynamic list rather than QTI's fixed-count workaround
+    (`Name0`..`Name127`) - that cap exists only because RTI's old scripting
+    environment had no dynamic arrays, a constraint Oak's settings schema
+    doesn't share, so there's no reason to carry the limitation forward.
+    See `drivers/eisy/manifest.json`'s `deviceNames` or
+    `drivers/dsc-powerseries/manifest.json`'s `zoneNames`/`partitionNames`
+    for worked examples. Skip this field entirely for a driver with no
+    `perInstance` state (nothing to disambiguate — the instance's own Label
+    already identifies "which physical device is this").
 - `actions` — things a user/automation can trigger. Each has an `id`,
   `label`, and typed `params`.
 - `events` — things the driver can report happened. Each has an `id`,

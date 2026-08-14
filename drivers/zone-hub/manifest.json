@@ -18,7 +18,14 @@
     ]
   },
   "settings": [
-    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 3000 }
+    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 3000 },
+    {
+      "key": "zoneNames",
+      "type": "keyvalue",
+      "label": "Zone names",
+      "keyLabel": "Zone id (e.g. kitchen)",
+      "valueLabel": "Friendly name (e.g. Kitchen)"
+    }
   ],
   "actions": [
     { "id": "lightOn", "label": "Light On", "role": "on", "params": [{ "key": "zone", "type": "string", "label": "Zone" }] },

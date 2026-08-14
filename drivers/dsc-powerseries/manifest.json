@@ -19,7 +19,21 @@
   },
   "settings": [
     { "key": "password", "type": "password", "label": "TPI Password", "default": "user" },
-    { "key": "accessCode", "type": "password", "label": "Default Access Code" }
+    { "key": "accessCode", "type": "password", "label": "Default Access Code" },
+    {
+      "key": "zoneNames",
+      "type": "keyvalue",
+      "label": "Zone names",
+      "keyLabel": "Zone number (e.g. 1)",
+      "valueLabel": "Friendly name (e.g. Front Door)"
+    },
+    {
+      "key": "partitionNames",
+      "type": "keyvalue",
+      "label": "Partition names",
+      "keyLabel": "Partition number (e.g. 1)",
+      "valueLabel": "Friendly name (e.g. Main House)"
+    }
   ],
   "actions": [
     {

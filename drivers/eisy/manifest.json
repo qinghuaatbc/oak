@@ -20,7 +20,14 @@
   "settings": [
     { "key": "username", "type": "string", "label": "Admin username" },
     { "key": "password", "type": "string", "label": "Admin password" },
-    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 5000 }
+    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 5000 },
+    {
+      "key": "deviceNames",
+      "type": "keyvalue",
+      "label": "Device names (matches QTI's own per-device Name fields for eisy - name each node up front here, not just as a raw address later on a Dashboard slot)",
+      "keyLabel": "Node address (e.g. 18 22 4B 1)",
+      "valueLabel": "Friendly name (e.g. Living Room Light)"
+    }
   ],
   "actions": [
     { "id": "nodeOn", "label": "Node On", "role": "on", "params": [{ "key": "address", "type": "string", "label": "Node address (e.g. 18 22 4B 1)" }] },
