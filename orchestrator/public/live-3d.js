@@ -9,7 +9,7 @@
 import { create3DViewer } from "./viewer3d.js";
 import { resolveMeshOnLevel } from "./roles.js";
 
-export function create3DPanel({ sceneSelectId, getBindingsData, getStatesByInstance, dispatchToggle }) {
+export function create3DPanel({ sceneRowId, getBindingsData, getStatesByInstance, dispatchToggle }) {
   let currentSceneId = null;
   let inited = false;
 
@@ -27,13 +27,25 @@ export function create3DPanel({ sceneSelectId, getBindingsData, getStatesByInsta
     resolveOnLevel: (mb) => resolveMeshOnLevel(getBindingsData(), getStatesByInstance(), mb),
   });
 
+  // A flat row of pill buttons (matching .sky-action-btn used elsewhere
+  // on this page) rather than a <select> - a customer picking which
+  // floor/room to view is a rare, low-cardinality choice best shown as
+  // one-tap buttons, not hidden behind a dropdown.
   function renderSceneSelect() {
-    const sel = document.getElementById(sceneSelectId);
-    if (!sel) return;
+    const row = document.getElementById(sceneRowId);
+    if (!row) return;
     const list = scenes();
-    sel.closest(".row").classList.toggle("sky-hidden", list.length < 2);
-    sel.innerHTML = list.map((s) => `<option value="${s.id}"${s.id === currentSceneId ? " selected" : ""}>${s.name}</option>`).join("");
-    sel.value = currentSceneId || "";
+    row.classList.toggle("sky-hidden", list.length < 2);
+    row.innerHTML = list
+      .map((s) => `<button type="button" class="sky-action-btn${s.id === currentSceneId ? " primary" : ""}" data-scene-id="${s.id}">${s.name}</button>`)
+      .join("");
+    row.querySelectorAll("[data-scene-id]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        currentSceneId = btn.dataset.sceneId;
+        renderSceneSelect();
+        await loadCurrentScene();
+      });
+    });
   }
 
   async function loadCurrentScene() {
@@ -82,14 +94,6 @@ export function create3DPanel({ sceneSelectId, getBindingsData, getStatesByInsta
   // a sysvar push in the past, not worth reproducing here).
   function refresh() {
     if (inited) viewer3d.updateVisuals();
-  }
-
-  const sel = document.getElementById(sceneSelectId);
-  if (sel) {
-    sel.addEventListener("change", async (ev) => {
-      currentSceneId = ev.target.value;
-      await loadCurrentScene();
-    });
   }
 
   return { show, refresh, hasScenes };

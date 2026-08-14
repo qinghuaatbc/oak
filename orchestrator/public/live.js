@@ -62,7 +62,7 @@ function dispatch3DMeshClick(mb) {
   feedbackToggle(slot.name, turningOn);
 }
 const panel3d = create3DPanel({
-  sceneSelectId: "live3dSceneSelect",
+  sceneRowId: "live3dSceneRow",
   getBindingsData: () => bindingsData,
   getStatesByInstance: () => statesByInstance,
   dispatchToggle: dispatch3DMeshClick,

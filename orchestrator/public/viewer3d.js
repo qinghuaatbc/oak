@@ -32,8 +32,8 @@ export function create3DViewer(opts) {
   };
 
   const ROLLER_MIN_SCALE = 0.05; // "rolled up" = squashed to 5% of original scale on one axis
-  const LERP_FAST = 0.08; // rotate/slide ease-per-frame factor
-  const LERP_SLOW = 0.05; // roller eases slower - it's a bigger visual change, a fast snap read as glitchy
+  const LERP_FAST = 0.035; // rotate/slide ease-per-frame factor - a garage/sliding door reads as glitchy-fast much above this
+  const LERP_SLOW = 0.02; // roller eases slower still - it's a bigger visual change, a fast snap reads as glitchy
 
   async function init() {
     const [THREE, { GLTFLoader }, { OrbitControls }] = await Promise.all([
