@@ -20,6 +20,7 @@ import {
   bindingSlot,
   resolveMeshOnLevel as resolveMeshOnLevelShared,
   callFn as callFnShared,
+  createGlbProgressHandler,
 } from "./roles.js";
 
 const FALLBACK_POLL_MS = 10000;
@@ -1278,6 +1279,7 @@ const viewer3d = create3DViewer({
   onDeviceClick: dispatchMeshDeviceClick,
   getMeshBindings: () => (currentGlb3DScene() || {}).meshBindings || {},
   resolveOnLevel: resolveMeshOnLevel,
+  onLoadProgress: createGlbProgressHandler("glb3dProgressTrack", "glb3dProgressBar"),
 });
 let viewer3dInited = false;
 

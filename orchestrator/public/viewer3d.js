@@ -124,9 +124,11 @@ export function create3DViewer(opts) {
     }
     clearDownLights();
     g3d.meshes = [];
+    if (opts.onLoadProgress) opts.onLoadProgress(0);
     g3d.loader.load(
       url,
       (gltf) => {
+        if (opts.onLoadProgress) opts.onLoadProgress(1);
         g3d.model = gltf.scene;
         g3d.scene.add(g3d.model);
         const box = new g3d.THREE.Box3().setFromObject(g3d.model);
@@ -161,8 +163,19 @@ export function create3DViewer(opts) {
         });
         updateVisuals();
       },
-      undefined,
-      (err) => console.error("GLB load failed:", err)
+      (event) => {
+        if (!opts.onLoadProgress) return;
+        // event.total is 0/absent when the server response has no
+        // Content-Length (shouldn't happen for our own static file
+        // route, which serves a fully-buffered file, but a driver author
+        // could point a scene's url at something else) - report
+        // indeterminate (null) rather than a wrong/frozen percentage.
+        opts.onLoadProgress(event.lengthComputable && event.total ? event.loaded / event.total : null);
+      },
+      (err) => {
+        console.error("GLB load failed:", err);
+        if (opts.onLoadProgress) opts.onLoadProgress(null);
+      }
     );
   }
 

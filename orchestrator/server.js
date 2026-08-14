@@ -886,7 +886,12 @@ function serveStatic(req, res) {
       return res.end("Not found");
     }
     const type = STATIC_TYPES[path.extname(filePath)] || "application/octet-stream";
-    res.writeHead(200, { "Content-Type": type });
+    // Explicit Content-Length (not left to Node to infer) - without it,
+    // this response comes back chunked with no declared size, so the
+    // browser's fetch/XHR progress events report lengthComputable:false
+    // for a .glb load and the admin/live 3D loading bar can only ever
+    // show an indeterminate stripe, never a real percentage.
+    res.writeHead(200, { "Content-Type": type, "Content-Length": data.length });
     res.end(data);
   });
 }

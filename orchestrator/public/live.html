@@ -157,6 +157,8 @@
   .sky-action-btn:hover{ background:var(--surface-strong); }
   .sky-action-btn.primary{ border-color:var(--accent-strong); background:var(--accent-tint); color:var(--accent-strong); }
   .empty{ color:var(--ink); font-size:14px; }
+  @keyframes glbProgressIndeterminate{ 0%{ transform:translateX(-40%); width:40%; } 100%{ transform:translateX(250%); width:40%; } }
+  .glb-progress-indeterminate{ animation:glbProgressIndeterminate 1.1s ease-in-out infinite; }
 </style>
 </head>
 <body>
@@ -175,7 +177,11 @@
     <div class="sky-grid" id="skyGrid"></div>
     <div class="sky-hidden" id="live3dPanel" style="flex:1; display:flex; flex-direction:column;">
       <div class="row sky-hidden" id="live3dSceneRow" style="margin-bottom:10px;"></div>
-      <div id="canvas3dWrap" style="position:relative; width:100%; flex:1; min-height:60vh; border-radius:16px; overflow:hidden; background:var(--surface);"></div>
+      <div id="canvas3dWrap" style="position:relative; width:100%; flex:1; min-height:60vh; border-radius:16px; overflow:hidden; background:var(--surface);">
+        <div id="live3dProgressTrack" style="position:absolute; top:0; left:0; right:0; height:4px; background:var(--hairline); z-index:5; display:none;">
+          <div id="live3dProgressBar" style="height:100%; width:0%; background:var(--accent); transition:width .15s;"></div>
+        </div>
+      </div>
     </div>
   </main>
 </div>

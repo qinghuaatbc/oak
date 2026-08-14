@@ -124,3 +124,10 @@ table th{ color:var(--faint); font-weight:500; }
 .events div{ padding:.15rem 0; border-bottom:1px dashed var(--line); }
 
 .empty-hint{ color:var(--faint); font-size:.84rem; padding:16px 0; text-align:center; }
+
+/* GLB load progress bar - indeterminate state (server response had no
+   Content-Length, or we just don't know it yet) is a sliding stripe
+   rather than a frozen half-full bar, which would misleadingly read as
+   "stuck at 50%". */
+@keyframes glbProgressIndeterminate{ 0%{ transform:translateX(-40%); width:40%; } 100%{ transform:translateX(250%); width:40%; } }
+.glb-progress-indeterminate{ animation:glbProgressIndeterminate 1.1s ease-in-out infinite; }

@@ -161,6 +161,9 @@
       </div>
       <div class="sub" id="glb3dHint"></div>
       <div id="canvas3dWrap" style="position:relative; width:100%; height:70vh; border-radius:16px; overflow:hidden; margin-top:12px; background:linear-gradient(180deg, var(--bg), var(--raised)); border:1px solid var(--line);">
+        <div id="glb3dProgressTrack" style="position:absolute; top:0; left:0; right:0; height:4px; background:var(--line); z-index:5; display:none;">
+          <div id="glb3dProgressBar" style="height:100%; width:0%; background:var(--accent); transition:width .15s;"></div>
+        </div>
         <div id="glbHint" class="empty-hint" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">Add a scene and upload a .glb to get started</div>
       </div>
     </div>

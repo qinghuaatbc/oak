@@ -199,3 +199,35 @@ export const ANIM_TYPES = [
   { value: "roller", label: "Roll up (shutter/blind)" },
 ];
 export const AXIS_ANIM_TYPES = new Set(["rotate", "slide", "roller"]);
+
+// A GLB can be tens of MB - wires viewer3d.js's onLoadProgress callback
+// to a track/bar element pair (see admin.html/live.html's #glb3dProgress*/
+// #live3dProgress* markup) so both the admin editor and the live view get
+// the same loading feedback from one implementation. `fraction` is a
+// 0..1 number, or null when the server response had no Content-Length to
+// compute a real percentage from (shown as a sliding indeterminate
+// stripe rather than a misleadingly frozen bar).
+export function createGlbProgressHandler(trackId, barId) {
+  let hideTimer = null;
+  return function onLoadProgress(fraction) {
+    const track = document.getElementById(trackId);
+    const bar = document.getElementById(barId);
+    if (!track || !bar) return;
+    clearTimeout(hideTimer);
+    if (fraction === null) {
+      track.style.display = "block";
+      bar.classList.add("glb-progress-indeterminate");
+      bar.style.width = "";
+      return;
+    }
+    bar.classList.remove("glb-progress-indeterminate");
+    track.style.display = "block";
+    bar.style.width = `${Math.round(Math.max(0, Math.min(1, fraction)) * 100)}%`;
+    if (fraction >= 1) {
+      hideTimer = setTimeout(() => {
+        track.style.display = "none";
+        bar.style.width = "0%";
+      }, 300);
+    }
+  };
+}

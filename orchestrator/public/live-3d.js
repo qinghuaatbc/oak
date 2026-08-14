@@ -7,7 +7,7 @@
 // like tapping a flat card does, via the `dispatchToggle` callback the
 // host page supplies.
 import { create3DViewer } from "./viewer3d.js";
-import { resolveMeshOnLevel } from "./roles.js";
+import { resolveMeshOnLevel, createGlbProgressHandler } from "./roles.js";
 
 export function create3DPanel({ sceneRowId, getBindingsData, getStatesByInstance, dispatchToggle }) {
   let currentSceneId = null;
@@ -25,6 +25,7 @@ export function create3DPanel({ sceneRowId, getBindingsData, getStatesByInstance
     onDeviceClick: (mb) => dispatchToggle(mb),
     getMeshBindings: () => (currentScene() || {}).meshBindings || {},
     resolveOnLevel: (mb) => resolveMeshOnLevel(getBindingsData(), getStatesByInstance(), mb),
+    onLoadProgress: createGlbProgressHandler("live3dProgressTrack", "live3dProgressBar"),
   });
 
   // A flat row of pill buttons (matching .sky-action-btn used elsewhere
