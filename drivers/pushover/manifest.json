@@ -1,0 +1,43 @@
+{
+  "id": "pushover",
+  "displayName": "Pushover",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "cloud",
+        "label": "Pushover Cloud API",
+        "transport": "http",
+        "fields": []
+      }
+    ]
+  },
+  "settings": [
+    { "key": "apiToken", "type": "password", "label": "Application API Token (pushover.net/apps - create one per app/purpose)" },
+    { "key": "userKey", "type": "password", "label": "User (or Group) Key (from your Pushover dashboard)" }
+  ],
+  "actions": [
+    {
+      "id": "sendMessage",
+      "label": "Send Message",
+      "params": [
+        { "key": "message", "type": "string", "label": "Message" },
+        { "key": "title", "type": "string", "label": "Title (optional)" },
+        { "key": "priority", "type": "number", "label": "Priority (-2 lowest .. 2 emergency)", "default": 0 },
+        { "key": "sound", "type": "string", "label": "Sound (optional, e.g. pushover, siren - see pushover.net/api#sounds)" },
+        { "key": "url", "type": "string", "label": "Supplementary URL (optional)" },
+        { "key": "urlTitle", "type": "string", "label": "URL title (optional)" }
+      ]
+    }
+  ],
+  "events": [
+    { "id": "messageSent", "label": "Message Sent", "params": ["title", "message"] },
+    { "id": "sendFailed", "label": "Send Failed", "params": ["error"] }
+  ],
+  "states": [
+    { "id": "lastMessage", "type": "string" },
+    { "id": "lastSentAt", "type": "number" }
+  ]
+}

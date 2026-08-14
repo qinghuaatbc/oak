@@ -43,6 +43,7 @@ function loadDriverModule(driverDir) {
     // dependency (like web-push), not a nice-to-have.
     WebSocket: WsClient,
     Buffer, // needed by any driver speaking a binary protocol (e.g. MQTT) - core Node global
+    URLSearchParams, // standard Web API, needed by any driver POSTing a form-urlencoded body (e.g. Pushover's REST API) - not exposed in a vm.Context by default the way it is in a normal Node global scope
   };
   vm.createContext(sandbox);
   const wrapped = `(function (module, exports, require) {\n${source}\n})`;
