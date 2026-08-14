@@ -176,3 +176,11 @@ export async function uploadGlb(filename, dataBase64) {
   });
   return res.json();
 }
+export async function uploadImage(filename, dataBase64) {
+  const res = await fetch("/api/image-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename, dataBase64 }),
+  });
+  return res.json();
+}

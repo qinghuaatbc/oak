@@ -33,12 +33,14 @@ const AUTOMATIONS_PATH = process.env.OAK_AUTOMATIONS || path.join(__dirname, "au
 const SETTINGS_PATH = process.env.OAK_SETTINGS || path.join(__dirname, "settings.json");
 const CAMERAS_PATH = process.env.OAK_CAMERAS || path.join(__dirname, "cameras.json");
 const MODELS_DIR = process.env.OAK_MODELS_DIR || path.join(__dirname, "models");
+const IMAGES_DIR = process.env.OAK_IMAGES_DIR || path.join(__dirname, "images");
 const DRIVERS_DIR = path.join(__dirname, "..", "drivers");
 const PUBLIC_DIR = path.join(__dirname, "public");
 const MAX_RECENT_EVENTS = 50;
 const STATIC_TYPES = {
   ".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
   ".glb": "model/gltf-binary",
+  ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml",
 };
 
 if (!fs.existsSync(CONFIG_PATH)) {
@@ -47,6 +49,7 @@ if (!fs.existsSync(CONFIG_PATH)) {
 }
 const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
 if (!fs.existsSync(MODELS_DIR)) fs.mkdirSync(MODELS_DIR, { recursive: true });
+if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
 const SERVER_START = Date.now();
 
 function loadJsonArray(filePath) {
@@ -707,6 +710,7 @@ function bindingsDefaults() {
   const obj = {};
   for (const c of BINDING_CATEGORIES) obj[c] = [];
   obj.glbs = [];
+  obj.pages = [];
   return obj;
 }
 function loadBindings() {
@@ -716,6 +720,7 @@ function loadBindings() {
     const out = bindingsDefaults();
     for (const c of BINDING_CATEGORIES) if (Array.isArray(raw[c])) out[c] = raw[c];
     if (Array.isArray(raw.glbs)) out.glbs = raw.glbs;
+    if (Array.isArray(raw.pages)) out.pages = raw.pages;
     return out;
   } catch (e) {
     console.error(`Failed to read ${BINDINGS_PATH}:`, e.message);
@@ -796,6 +801,79 @@ function sanitizeGlbScene(s) {
     meshBindings,
   };
 }
+// Layout: a custom drag-drop dashboard page, ported from QTI's own
+// live-custom.js/app.js feature (QTI is this project's own prior work,
+// not RTI's - reusing an already-proven design). A page is
+// {id, name, background, widgets[]} on a 12-column grid (x/y/w/h are grid
+// cell indices, not pixels, so the same coordinates place a widget
+// identically in the admin editor and the live renderer regardless of
+// either one's actual pixel row height). Unlike QTI - which stores a
+// separate lights/media/doors/keypads/security/imageButtons/cameras/
+// macros array per binding category and needs one widget TYPE per array -
+// Oak's Dashboard is already unified around one generic "slot" shape per
+// category (see BINDING_CATEGORIES/sanitizeSlot above), so a single
+// "slot" widget type with a {cat, slotId} pointer covers every device
+// category at once; only camera and macro (Oak's other two non-category
+// top-level entities) get their own widget types.
+const LAYOUT_WIDGET_TYPES = new Set(["slot", "camera", "macro", "pageLink", "appUrl", "label", "varDisplay"]);
+function sanitizeWidget(w) {
+  if (!w || typeof w !== "object" || !LAYOUT_WIDGET_TYPES.has(w.type)) return null;
+  const out = {
+    id: typeof w.id === "string" && w.id ? w.id : crypto.randomBytes(4).toString("hex"),
+    type: w.type,
+    x: Math.max(0, Math.min(11, Math.round(Number(w.x)) || 0)),
+    y: Math.max(0, Math.round(Number(w.y)) || 0),
+    w: Math.max(1, Math.min(12, Math.round(Number(w.w)) || 2)),
+    h: Math.max(1, Math.round(Number(w.h)) || 2),
+    locked: Boolean(w.locked),
+  };
+  if (Number.isFinite(Number(w.z))) out.z = Number(w.z);
+  if (w.type === "slot") {
+    // A pointer into bindings[cat] by slot id, not a copy - same
+    // {cat, id}-style reasoning as a 3D mesh binding (see
+    // sanitizeMeshBinding above): editing a slot's name/function on the
+    // Dashboard tab is automatically reflected on every page it's placed
+    // on, with no separate sync step.
+    if (!BINDING_CATEGORIES.includes(w.cat) || typeof w.slotId !== "string" || !w.slotId) return null;
+    out.cat = w.cat;
+    out.slotId = w.slotId;
+    if (w.showLevel !== undefined) out.showLevel = Boolean(w.showLevel);
+  } else if (w.type === "camera") {
+    if (typeof w.cameraId !== "string" || !w.cameraId) return null;
+    out.cameraId = w.cameraId;
+  } else if (w.type === "macro") {
+    if (typeof w.macroId !== "string" || !w.macroId) return null;
+    out.macroId = w.macroId;
+  } else if (w.type === "pageLink") {
+    out.label = typeof w.label === "string" ? w.label.slice(0, 60) : "Link";
+    if (typeof w.targetPageId !== "string" || !w.targetPageId) return null;
+    out.targetPageId = w.targetPageId;
+  } else if (w.type === "appUrl") {
+    out.label = typeof w.label === "string" ? w.label.slice(0, 60) : "Link";
+    if (typeof w.url !== "string" || !w.url) return null;
+    out.url = w.url.slice(0, 500);
+    out.openInNewTab = Boolean(w.openInNewTab);
+  } else if (w.type === "label") {
+    out.text = typeof w.text === "string" ? w.text.slice(0, 200) : "";
+  } else if (w.type === "varDisplay") {
+    out.label = typeof w.label === "string" ? w.label.slice(0, 60) : "Value";
+    if (typeof w.instanceId !== "string" || !w.instanceId || typeof w.stateId !== "string" || !w.stateId) return null;
+    out.instanceId = w.instanceId;
+    out.stateId = w.stateId;
+    if (typeof w.stateSuffix === "string" && w.stateSuffix) out.stateSuffix = w.stateSuffix;
+  }
+  return out;
+}
+function sanitizePage(p) {
+  if (!p || typeof p !== "object") return null;
+  const widgets = Array.isArray(p.widgets) ? p.widgets.map(sanitizeWidget).filter(Boolean) : [];
+  return {
+    id: typeof p.id === "string" && p.id ? p.id : crypto.randomBytes(4).toString("hex"),
+    name: typeof p.name === "string" && p.name ? p.name.slice(0, 60) : "Untitled",
+    background: p.background && typeof p.background.url === "string" ? { url: p.background.url } : null,
+    widgets,
+  };
+}
 function sanitizeBindings(raw) {
   const out = bindingsDefaults();
   if (!raw || typeof raw !== "object") return out;
@@ -804,6 +882,7 @@ function sanitizeBindings(raw) {
     out[c] = raw[c].map(sanitizeSlot).filter(Boolean);
   }
   out.glbs = Array.isArray(raw.glbs) ? raw.glbs.map(sanitizeGlbScene).filter(Boolean) : [];
+  out.pages = Array.isArray(raw.pages) ? raw.pages.map(sanitizePage).filter(Boolean) : [];
   return out;
 }
 
@@ -1128,6 +1207,9 @@ function serveStatic(req, res) {
   if (reqPath.startsWith("/models/")) {
     baseDir = MODELS_DIR;
     reqPath = reqPath.slice("/models".length);
+  } else if (reqPath.startsWith("/images/")) {
+    baseDir = IMAGES_DIR;
+    reqPath = reqPath.slice("/images".length);
   }
   const filePath = path.join(baseDir, reqPath);
   if (!filePath.startsWith(baseDir)) {
@@ -1355,6 +1437,27 @@ const server = http.createServer(async (req, res) => {
       const finalName = safeName.toLowerCase().endsWith(".glb") ? safeName : `${safeName}.glb`;
       fs.writeFileSync(path.join(MODELS_DIR, finalName), fileBuf);
       return sendJson(res, 200, { ok: true, url: `/models/${finalName}` });
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
+  }
+
+  // Generic image upload (Layout page backgrounds) - deliberately a
+  // separate endpoint/directory from glb-upload above rather than reused:
+  // that route force-renames anything uploaded through it to end in
+  // ".glb" and serves it as model/gltf-binary, which would mislabel a
+  // real JPEG/PNG background image.
+  const IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"]);
+  if (parts[1] === "image-upload" && parts.length === 2 && req.method === "POST") {
+    try {
+      const { filename, dataBase64 } = await readJsonBody(req);
+      if (!dataBase64) throw new Error("No file data received");
+      const fileBuf = Buffer.from(dataBase64, "base64");
+      const safeName = (filename || "image.png").replace(/[^A-Za-z0-9 _.-]/g, "").trim() || "image.png";
+      const ext = path.extname(safeName).toLowerCase();
+      const finalName = IMAGE_EXTS.has(ext) ? safeName : `${safeName}.png`;
+      fs.writeFileSync(path.join(IMAGES_DIR, finalName), fileBuf);
+      return sendJson(res, 200, { ok: true, url: `/images/${finalName}` });
     } catch (err) {
       return sendJson(res, 400, { error: err.message });
     }

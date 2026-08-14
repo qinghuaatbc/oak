@@ -131,3 +131,20 @@ table th{ color:var(--faint); font-weight:500; }
    "stuck at 50%". */
 @keyframes glbProgressIndeterminate{ 0%{ transform:translateX(-40%); width:40%; } 100%{ transform:translateX(250%); width:40%; } }
 .glb-progress-indeterminate{ animation:glbProgressIndeterminate 1.1s ease-in-out infinite; }
+
+/* Layout: drag-drop custom dashboard builder - 12-column grid, cell
+   (not pixel) coordinates, shared between this admin canvas and
+   layout.html's live renderer so a widget lands in the same relative
+   spot in both (see server.js's sanitizeWidget comment). */
+.layout-canvas{ display:grid; grid-template-columns:repeat(12,1fr); grid-auto-rows:60px; gap:6px; min-height:420px; background:var(--bg); border:1px dashed var(--line); border-radius:12px; padding:8px; position:relative; background-size:cover; background-position:center; }
+.layout-widget{ background:var(--raised); border:1px solid var(--line); border-radius:8px; padding:8px; position:relative; overflow:hidden; cursor:grab; display:flex; flex-direction:column; gap:2px; font-size:.76rem; touch-action:none; }
+.layout-widget.selected{ outline:2px solid var(--accent); outline-offset:-2px; }
+.layout-widget.locked{ cursor:default; }
+.layout-widget .lw-type{ font-family:var(--mono); font-size:.65rem; color:var(--faint); text-transform:uppercase; letter-spacing:.04em; }
+.layout-widget .lw-name{ font-weight:600; }
+.layout-widget .resize-handle{ position:absolute; right:0; bottom:0; width:16px; height:16px; cursor:nwse-resize; opacity:.5; display:flex; align-items:flex-end; justify-content:flex-end; font-size:11px; padding:2px; }
+.layout-hidden{ display:none !important; }
+.layout-drag-ghost{ position:fixed; z-index:1000; pointer-events:none; background:var(--accent); color:var(--accent-ink); padding:6px 10px; border-radius:8px; font-size:.76rem; font-weight:600; opacity:.92; transform:translate(-50%, -50%); }
+.layout-palette-chip{ padding:6px 10px; border-radius:999px; border:1px solid var(--line); background:var(--raised); font-size:.76rem; cursor:grab; user-select:none; touch-action:none; }
+.layout-palette-group-label{ width:100%; font-family:var(--mono); font-size:.68rem; color:var(--faint); text-transform:uppercase; letter-spacing:.04em; margin-top:6px; }
+#layoutPreviewFrame{ width:100%; height:70vh; border:1px solid var(--line); border-radius:12px; margin-top:12px; }

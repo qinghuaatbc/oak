@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Oak Layout</title>
+<script type="importmap">{"imports":{}}</script>
+<style>
+  /* Same palette tokens as live.html - QTI is this project's own code, so
+     reusing its actual design system, not approximating it. Trimmed to
+     what a custom-laid-out page needs (no comm/chat/3D chrome). */
+  :root{
+    --page-bg: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.5) 0%, transparent 55%),
+               radial-gradient(ellipse at 75% 70%, rgba(140,220,255,0.35) 0%, transparent 55%),
+               linear-gradient(135deg, #a8c8f0 0%, #9bbfe8 50%, #a4c4ee 100%);
+    --ink:#6b4400; --ink-soft:#8a6a30;
+    --sidebar-bg:rgba(255,255,255,0.72); --sidebar-border:rgba(255,255,255,0.9);
+    --card-bg:rgba(210,220,240,0.52); --card-border:rgba(255,255,255,0.96);
+    --card-shadow:0 2px 12px rgba(80,100,140,0.14), inset 0 1px 0 rgba(255,255,255,1);
+    --accent:#dcb15c; --accent-strong:#a5793a; --accent-tint:rgba(255,190,80,0.25);
+    --accent-ink:#3a2a08;
+    --surface:rgba(255,255,255,0.5); --surface-strong:rgba(255,255,255,0.8);
+    --hairline:rgba(0,0,0,0.08);
+    --good:#2f9563; --bad:#d9634e;
+    --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono: ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme='light']){
+      --page-bg: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.04) 0%, transparent 55%),
+                 radial-gradient(ellipse at 75% 70%, rgba(80,140,200,0.25) 0%, transparent 55%),
+                 linear-gradient(135deg, #0f1720 0%, #141d27 50%, #101820 100%);
+      --ink:#f0ead9; --ink-soft:#c9b98f;
+      --sidebar-bg:rgba(20,26,32,0.72); --sidebar-border:rgba(255,255,255,0.08);
+      --card-bg:rgba(30,38,46,0.65); --card-border:rgba(255,255,255,0.08);
+      --card-shadow:0 2px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+      --accent:#e8c273; --accent-strong:#c99a4e; --accent-tint:rgba(255,190,80,0.16);
+      --accent-ink:#211705;
+      --surface:rgba(255,255,255,0.06); --surface-strong:rgba(255,255,255,0.10);
+      --hairline:rgba(255,255,255,0.10);
+      --good:#58c993; --bad:#ef8a82;
+    }
+  }
+  :root[data-theme='dark']{
+    --page-bg: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.04) 0%, transparent 55%),
+               radial-gradient(ellipse at 75% 70%, rgba(80,140,200,0.25) 0%, transparent 55%),
+               linear-gradient(135deg, #0f1720 0%, #141d27 50%, #101820 100%);
+    --ink:#f0ead9; --ink-soft:#c9b98f;
+    --sidebar-bg:rgba(20,26,32,0.72); --sidebar-border:rgba(255,255,255,0.08);
+    --card-bg:rgba(30,38,46,0.65); --card-border:rgba(255,255,255,0.08);
+    --card-shadow:0 2px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+    --accent:#e8c273; --accent-strong:#c99a4e; --accent-tint:rgba(255,190,80,0.16);
+    --accent-ink:#211705;
+    --surface:rgba(255,255,255,0.06); --surface-strong:rgba(255,255,255,0.10);
+    --hairline:rgba(255,255,255,0.10);
+    --good:#58c993; --bad:#ef8a82;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:var(--sans); color:var(--ink); background:var(--page-bg); min-height:100vh; }
+
+  .lo-wrap{ display:flex; flex-direction:column; min-height:100vh; }
+  .lo-tabs{ display:flex; gap:6px; padding:14px 16px; overflow-x:auto; scroll-behavior:smooth; background:var(--sidebar-bg); border-bottom:1px solid var(--sidebar-border); mask-image:linear-gradient(90deg, transparent, black 12px, black calc(100% - 24px), transparent); }
+  .lo-tab{ flex-shrink:0; padding:8px 16px; border-radius:999px; border:1px solid var(--sidebar-border); background:var(--surface); color:var(--ink); font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .lo-tab.active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  #conn{ display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:.7rem; color:var(--ink); padding:5px 10px; border-radius:999px; background:var(--surface); border:1px solid var(--hairline); white-space:nowrap; margin-left:auto; flex-shrink:0; align-self:center; }
+  #dot{ width:8px; height:8px; border-radius:50%; background:var(--bad); flex:none; display:inline-block; }
+  #conn.connected #dot{ background:var(--good); }
+
+  .lo-canvas{ flex:1; display:grid; grid-template-columns:repeat(12,1fr); grid-auto-rows:60px; gap:10px; padding:20px; background-size:cover; background-position:center; align-content:start; }
+  @media (max-width:700px){
+    .lo-widget{ grid-column:1 / -1 !important; grid-row:auto !important; min-height:64px; }
+  }
+
+  .lo-widget{ background:var(--card-bg); backdrop-filter:blur(20px) saturate(1.6); -webkit-backdrop-filter:blur(20px) saturate(1.6); border:1px solid var(--card-border); border-radius:14px; box-shadow:var(--card-shadow); padding:12px; display:flex; flex-direction:column; gap:6px; overflow:hidden; position:relative; }
+  .lo-widget.on{ box-shadow:var(--card-shadow), 0 0 0 2px var(--accent-tint); }
+  .lo-widget.tappable{ cursor:pointer; }
+  .lo-w-icon{ font-size:22px; }
+  .lo-w-name{ font-size:13px; font-weight:700; color:var(--ink); }
+  .lo-w-sub{ font-size:11px; color:var(--ink-soft); margin-top:auto; }
+  .lo-w-broken{ border:1px dashed var(--bad); color:var(--bad); align-items:center; justify-content:center; text-align:center; font-size:12px; }
+  .lo-slider{ width:100%; margin-top:auto; }
+  .lo-w-video{ width:100%; flex:1; border-radius:8px; background:#000; object-fit:contain; }
+  .lo-empty{ padding:60px 20px; text-align:center; color:var(--ink-soft); font-size:14px; }
+</style>
+</head>
+<body>
+<div class="lo-wrap">
+  <div class="lo-tabs" id="loTabs">
+    <div id="conn"><span id="dot"></span><span id="connlabel">connecting</span></div>
+  </div>
+  <div class="lo-canvas" id="loCanvas"></div>
+</div>
+<script type="module" src="layout.js"></script>
+</body>
+</html>

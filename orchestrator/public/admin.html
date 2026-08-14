@@ -15,7 +15,7 @@
   </div>
   <div class="row">
     <span class="status-pill off" id="countPill">no instances running</span>
-    <nav><a href="live.html" target="_blank" rel="noopener">Open Live View ↗</a></nav>
+    <nav><a href="live.html" target="_blank" rel="noopener">Open Live View ↗</a> · <a href="layout.html" target="_blank" rel="noopener">Open Layout ↗</a></nav>
   </div>
 </header>
 
@@ -209,7 +209,32 @@
   </section>
 
   <section class="page" id="page-layout">
-    <div class="card"><h2>Layout</h2><p class="empty-hint">Coming soon - the drag-drop page builder isn't built yet.</p></div>
+    <div class="card">
+      <h2>Layout</h2>
+      <div class="sub">Drag widgets from the palette onto the grid to build a custom dashboard page - any number of pages, viewed at layout.html.</div>
+      <div class="row" style="margin-bottom:8px;">
+        <select id="layoutPageSelect"></select>
+        <button class="btn small" id="layoutPageUpBtn" type="button" title="Move page earlier">↑</button>
+        <button class="btn small" id="layoutPageDownBtn" type="button" title="Move page later">↓</button>
+        <button class="btn small" id="layoutAddPageBtn" type="button">+ Add Page</button>
+        <button class="btn small" id="layoutRenamePageBtn" type="button">Rename</button>
+        <button class="btn small danger" id="layoutDeletePageBtn" type="button">Delete Page</button>
+      </div>
+      <div class="row" style="margin-bottom:8px;">
+        <input type="file" id="layoutBgInput" accept="image/*" />
+        <button class="btn small" id="layoutBgUploadBtn" type="button">Set background</button>
+        <button class="btn small" id="layoutBgClearBtn" type="button">Clear background</button>
+        <button class="btn small" id="layoutUndoBtn" type="button" disabled>Undo</button>
+        <button class="btn small" id="layoutPreviewBtn" type="button">Preview: Off</button>
+      </div>
+      <div class="sub">Drag a chip onto the grid to place it. Drag a placed widget to move it, its corner handle to resize, click to edit.</div>
+      <div id="layoutPalette" style="display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 12px;"></div>
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div id="layoutCanvas" class="layout-canvas" style="flex:1; min-width:0;"></div>
+        <div id="layoutWidgetEditor" class="card layout-hidden" style="width:260px; flex-shrink:0;"></div>
+      </div>
+      <iframe id="layoutPreviewFrame" class="layout-hidden" title="Layout preview"></iframe>
+    </div>
   </section>
 
   <section class="page" id="page-templates">

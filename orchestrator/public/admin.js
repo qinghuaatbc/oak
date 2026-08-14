@@ -4,7 +4,7 @@ import {
   getHealth, listMacros, saveMacro, deleteMacro, runMacro,
   listAutomations, saveAutomation, deleteAutomation, runAutomation,
   getSettings, saveSettings,
-  listCameras, addCamera, deleteCamera, uploadGlb,
+  listCameras, addCamera, deleteCamera, uploadGlb, uploadImage,
   uploadDriver, deleteDriverPackage,
   getBindings, saveBindings, autoGenerateBindings,
 } from "./api.js";
@@ -611,6 +611,7 @@ function activateMainTab(page) {
   else if (page === "health") renderHealthTab();
   else if (page === "camera") renderCameraTab();
   else if (page === "3d") open3DTab();
+  else if (page === "layout") openLayoutTab();
 }
 document.querySelectorAll("nav.maintabs .mt").forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -945,6 +946,7 @@ function buildSlotRow(cat, slot, onDelete, startExpanded) {
   delBtn.textContent = "Delete";
   delBtn.addEventListener("click", (ev) => {
     ev.stopPropagation();
+    if (!confirm(`Delete "${slot.name || "this"}"?`)) return;
     onDelete();
   });
   header.append(nameInput, editBtn, delBtn);
@@ -1705,6 +1707,531 @@ document.getElementById("settings-form").addEventListener("submit", async (ev) =
   const longitude = document.getElementById("settingsLon").value;
   const result = await saveSettings({ latitude, longitude });
   if (result.error) alert(result.error);
+});
+
+// ---------------------------------------------------------------------
+// Layout: drag-drop custom dashboard builder, ported from QTI's own
+// live-custom.js/app.js feature (QTI is this project's own prior work,
+// not RTI's - reusing an already-proven design, not approximating one).
+// A page is {id, name, background, widgets:[{id,type,x,y,w,h,z,locked,...}]}
+// on a 12-column grid - x/y/w/h are grid CELL indices, not pixels, so the
+// same coordinates place a widget identically here and in layout.html's
+// live renderer regardless of either canvas's actual row-pixel height
+// (see server.js's sanitizeWidget comment for why Oak's widget types
+// differ from QTI's: a single "slot" type with a {cat,slotId} pointer
+// covers every Dashboard category at once here, since Oak's Dashboard is
+// already unified around one generic slot shape per category - QTI needed
+// one widget type per its own separate lights/media/doors/keypads/
+// security/imageButtons arrays).
+//
+// Deliberately NOT ported from QTI's version (real feature cuts, not
+// oversights): per-widget custom on/off images, the multi-select bulk
+// toolbar, and "copy widget to another page" - all genuine QTI features,
+// but each is meaningfully more code for a secondary polish gain; skipped
+// to keep this port's surface area proportionate. Undo, multi-page,
+// pointer-based drag/resize (not native HTML5 DnD - unreliable on touch,
+// see QTI's own comment on why it avoided that API), and the broken-
+// binding placeholder ARE ported, since those are the parts that make the
+// feature actually usable/safe day-to-day rather than a demo.
+// ---------------------------------------------------------------------
+const LAYOUT_ROW_PITCH = 60; // px - must match style.css's .layout-canvas grid-auto-rows
+let layoutPages = [];
+let layoutCurrentPageId = null;
+let layoutSelectedWidgetId = null;
+let layoutUndoSnapshot = null; // single-level JSON snapshot, same "oops" recovery model as QTI's own - not a full history stack
+let layoutCamerasCache = [];
+let layoutMacrosCache = [];
+let layoutPreviewOn = false;
+
+function currentLayoutPage() {
+  return layoutPages.find((p) => p.id === layoutCurrentPageId);
+}
+function persistLayoutPages() {
+  bindingsCache.pages = layoutPages;
+  return persistBindings();
+}
+function pushLayoutUndo() {
+  layoutUndoSnapshot = JSON.stringify(layoutPages);
+  document.getElementById("layoutUndoBtn").disabled = false;
+}
+async function undoLayoutChange() {
+  if (!layoutUndoSnapshot) return;
+  layoutPages = JSON.parse(layoutUndoSnapshot);
+  layoutUndoSnapshot = null;
+  document.getElementById("layoutUndoBtn").disabled = true;
+  if (!currentLayoutPage()) layoutCurrentPageId = layoutPages[0] && layoutPages[0].id;
+  layoutSelectedWidgetId = null;
+  await persistLayoutPages();
+  renderLayoutPageSelect();
+  renderLayoutCanvas();
+  renderLayoutWidgetEditor(null);
+}
+
+// Shared pointer-drag helper (mouse AND touch identically) - explicitly
+// not the native HTML5 Drag and Drop API, which QTI's own port comment
+// documents as unreliable on iOS Safari, exactly the device an installer
+// would plausibly want to design a layout from on-site. A 6px movement
+// threshold distinguishes a genuine drag from a tap-to-select.
+function startPointerDrag(startEv, { threshold = 6, onDragStart, onDragMove, onDrop, onTap } = {}) {
+  const downX = startEv.clientX;
+  const downY = startEv.clientY;
+  let dragging = false;
+  let ghost = null;
+  function move(ev) {
+    if (!dragging) {
+      if (Math.hypot(ev.clientX - downX, ev.clientY - downY) < threshold) return;
+      dragging = true;
+      if (onDragStart) ghost = onDragStart(ev);
+    }
+    if (ghost) {
+      ghost.style.left = `${ev.clientX}px`;
+      ghost.style.top = `${ev.clientY}px`;
+    }
+    if (onDragMove) onDragMove(ev);
+  }
+  function up(ev) {
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up);
+    if (ghost) ghost.remove();
+    if (dragging) {
+      if (onDrop) onDrop(ev);
+    } else if (onTap) {
+      onTap(ev);
+    }
+  }
+  document.addEventListener("pointermove", move);
+  document.addEventListener("pointerup", up);
+}
+function layoutGridCellFromPoint(clientX, clientY) {
+  const canvas = document.getElementById("layoutCanvas");
+  const rect = canvas.getBoundingClientRect();
+  const colWidth = rect.width / 12;
+  const x = Math.max(0, Math.min(11, Math.floor((clientX - rect.left) / colWidth)));
+  const y = Math.max(0, Math.floor((clientY - rect.top) / LAYOUT_ROW_PITCH));
+  return { x, y };
+}
+function pointerOverCanvas(ev) {
+  const rect = document.getElementById("layoutCanvas").getBoundingClientRect();
+  return ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom;
+}
+function makeDragGhost(label) {
+  const ghost = document.createElement("div");
+  ghost.className = "layout-drag-ghost";
+  ghost.textContent = label;
+  document.body.appendChild(ghost);
+  return ghost;
+}
+
+function layoutWidgetIcon(w) {
+  if (w.type === "slot") return CATEGORY_ICON[w.cat] || "⚙️";
+  return { camera: "📷", macro: "▶️", pageLink: "🔗", appUrl: "🌐", label: "📝", varDisplay: "📊" }[w.type] || "❔";
+}
+function layoutWidgetLabel(w) {
+  if (w.type === "slot") {
+    const slot = (bindingsCache[w.cat] || []).find((s) => s.id === w.slotId);
+    return slot ? slot.name : "(missing binding)";
+  }
+  if (w.type === "camera") return (layoutCamerasCache.find((c) => c.id === w.cameraId) || {}).name || "(missing camera)";
+  if (w.type === "macro") return (layoutMacrosCache.find((m) => m.id === w.macroId) || {}).name || "(missing macro)";
+  if (w.type === "pageLink" || w.type === "appUrl") return w.label || "Link";
+  if (w.type === "label") return w.text || "(empty label)";
+  if (w.type === "varDisplay") return w.label || "Value";
+  return w.type;
+}
+
+// ---------------------------------------------------------------------
+// Palette: one chip per existing Dashboard slot (grouped by category, so
+// it's always in sync with the Dashboard tab - nothing here is a
+// separate list to maintain), plus cameras, macros, and 4 fixed special
+// chips. Dragging a chip onto the canvas places a widget there.
+// ---------------------------------------------------------------------
+function renderLayoutPalette() {
+  const root = document.getElementById("layoutPalette");
+  root.innerHTML = "";
+  function addGroupLabel(text) {
+    const el = document.createElement("div");
+    el.className = "layout-palette-group-label";
+    el.textContent = text;
+    root.appendChild(el);
+  }
+  function addChip(label, icon, buildWidget) {
+    const chip = document.createElement("div");
+    chip.className = "layout-palette-chip";
+    chip.textContent = `${icon} ${label}`;
+    chip.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      startPointerDrag(ev, {
+        onDragStart: () => makeDragGhost(label),
+        onDrop: (dropEv) => {
+          if (!pointerOverCanvas(dropEv)) return;
+          const { x, y } = layoutGridCellFromPoint(dropEv.clientX, dropEv.clientY);
+          const partial = buildWidget(x, y);
+          if (partial) addLayoutWidget(partial);
+        },
+      });
+    });
+    root.appendChild(chip);
+  }
+  CATEGORY_ORDER.forEach((cat) => {
+    const slots = bindingsCache[cat] || [];
+    if (!slots.length) return;
+    addGroupLabel(CATEGORY_LABEL[cat]);
+    slots.forEach((slot) => addChip(slot.name, CATEGORY_ICON[cat], (x, y) => ({ type: "slot", cat, slotId: slot.id, x, y, w: 2, h: 2 })));
+  });
+  if (layoutCamerasCache.length) {
+    addGroupLabel("Cameras");
+    layoutCamerasCache.forEach((c) => addChip(c.name, "📷", (x, y) => ({ type: "camera", cameraId: c.id, x, y, w: 3, h: 3 })));
+  }
+  if (layoutMacrosCache.length) {
+    addGroupLabel("Macros");
+    layoutMacrosCache.forEach((m) => addChip(m.name, "▶️", (x, y) => ({ type: "macro", macroId: m.id, x, y, w: 2, h: 1 })));
+  }
+  addGroupLabel("Other");
+  addChip("Page Link", "🔗", (x, y) => {
+    const target = layoutPages.find((p) => p.id !== layoutCurrentPageId);
+    if (!target) {
+      alert("Add another page first - a Page Link needs a page to point to.");
+      return null;
+    }
+    return { type: "pageLink", label: target.name, targetPageId: target.id, x, y, w: 2, h: 1 };
+  });
+  addChip("App URL", "🌐", (x, y) => ({ type: "appUrl", label: "Link", url: "https://", x, y, w: 2, h: 1 }));
+  addChip("Label", "📝", (x, y) => ({ type: "label", text: "Label", x, y, w: 2, h: 1 }));
+  addChip("Variable Display", "📊", (x, y) =>
+    instanceIds.length ? { type: "varDisplay", label: "Value", instanceId: instanceIds[0], stateId: "", x, y, w: 2, h: 1 } : (alert("Add a driver instance first."), null)
+  );
+}
+function addLayoutWidget(partial) {
+  pushLayoutUndo();
+  const widget = { id: Math.random().toString(16).slice(2, 10), locked: false, ...partial };
+  currentLayoutPage().widgets.push(widget);
+  persistLayoutPages();
+  renderLayoutCanvas();
+  selectLayoutWidget(widget.id);
+}
+
+// ---------------------------------------------------------------------
+// Canvas: renders the current page's widgets as schematic (icon + name)
+// boxes, positioned via inline grid-column/row from their x/y/w/h - not
+// live-interactive (dragging would conflict with a real toggle click
+// anyway); use Preview for the actual end-user rendering.
+// ---------------------------------------------------------------------
+function renderLayoutCanvas() {
+  const canvas = document.getElementById("layoutCanvas");
+  canvas.innerHTML = "";
+  const page = currentLayoutPage();
+  if (!page) return;
+  canvas.style.backgroundImage = page.background && page.background.url ? `url(${page.background.url})` : "";
+  page.widgets.forEach((w) => canvas.appendChild(buildLayoutWidgetBox(w)));
+}
+function buildLayoutWidgetBox(w) {
+  const box = document.createElement("div");
+  box.className = "layout-widget" + (w.id === layoutSelectedWidgetId ? " selected" : "") + (w.locked ? " locked" : "");
+  box.style.gridColumn = `${w.x + 1} / span ${w.w}`;
+  box.style.gridRow = `${w.y + 1} / span ${w.h}`;
+  if (w.z) box.style.zIndex = w.z;
+  box.innerHTML = `<div class="lw-type">${w.type}${w.locked ? " 🔒" : ""}</div><div class="lw-name">${layoutWidgetIcon(w)} ${layoutWidgetLabel(w)}</div>`;
+  if (!w.locked) {
+    const handle = document.createElement("div");
+    handle.className = "resize-handle";
+    handle.textContent = "↘";
+    handle.addEventListener("pointerdown", (ev) => startLayoutResize(ev, w, box));
+    box.appendChild(handle);
+    box.addEventListener("pointerdown", (ev) => {
+      if (ev.target === handle) return;
+      startLayoutWidgetMove(ev, w);
+    });
+  } else {
+    box.addEventListener("click", () => selectLayoutWidget(w.id));
+  }
+  return box;
+}
+function startLayoutWidgetMove(startEv, widget) {
+  startPointerDrag(startEv, {
+    onDragStart: () => makeDragGhost(layoutWidgetLabel(widget)),
+    onDrop: (ev) => {
+      if (!pointerOverCanvas(ev)) return;
+      const { x, y } = layoutGridCellFromPoint(ev.clientX, ev.clientY);
+      pushLayoutUndo();
+      widget.x = Math.min(12 - widget.w, x);
+      widget.y = y;
+      persistLayoutPages();
+      renderLayoutCanvas();
+    },
+    onTap: () => selectLayoutWidget(widget.id),
+  });
+}
+function startLayoutResize(startEv, widget, box) {
+  startEv.stopPropagation();
+  startEv.preventDefault();
+  const startX = startEv.clientX;
+  const startY = startEv.clientY;
+  const startW = widget.w;
+  const startH = widget.h;
+  const colWidth = document.getElementById("layoutCanvas").getBoundingClientRect().width / 12;
+  let newW = startW;
+  let newH = startH;
+  function move(ev) {
+    const dCols = Math.round((ev.clientX - startX) / colWidth);
+    const dRows = Math.round((ev.clientY - startY) / LAYOUT_ROW_PITCH);
+    newW = Math.max(1, Math.min(12 - widget.x, startW + dCols));
+    newH = Math.max(1, startH + dRows);
+    box.style.gridColumn = `${widget.x + 1} / span ${newW}`;
+    box.style.gridRow = `${widget.y + 1} / span ${newH}`;
+  }
+  function up() {
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up);
+    if (newW !== startW || newH !== startH) {
+      pushLayoutUndo();
+      widget.w = newW;
+      widget.h = newH;
+      persistLayoutPages();
+      renderLayoutCanvas();
+    }
+  }
+  document.addEventListener("pointermove", move);
+  document.addEventListener("pointerup", up);
+}
+function selectLayoutWidget(id) {
+  layoutSelectedWidgetId = id;
+  renderLayoutCanvas();
+  const widget = currentLayoutPage().widgets.find((w) => w.id === id);
+  renderLayoutWidgetEditor(widget);
+}
+
+// ---------------------------------------------------------------------
+// Widget editor: placement-only options (this is explicitly NOT where
+// you rename a light or rebind its function - that stays on the
+// Dashboard/Macro tab, same boundary QTI's own editor draws) plus each
+// special type's own inline fields.
+// ---------------------------------------------------------------------
+function renderLayoutWidgetEditor(widget) {
+  const box = document.getElementById("layoutWidgetEditor");
+  if (!widget) {
+    box.classList.add("layout-hidden");
+    box.innerHTML = "";
+    return;
+  }
+  box.classList.remove("layout-hidden");
+  let fieldsHtml = "";
+  if (widget.type === "pageLink") {
+    const otherPages = layoutPages.filter((p) => p.id !== layoutCurrentPageId);
+    fieldsHtml = `<label><span class="lbl">Label</span><input id="lwLabel" type="text" value="${widget.label || ""}" /></label>
+      <label><span class="lbl">Target page</span><select id="lwTarget">${otherPages.map((p) => `<option value="${p.id}"${p.id === widget.targetPageId ? " selected" : ""}>${p.name}</option>`).join("")}</select></label>`;
+  } else if (widget.type === "appUrl") {
+    fieldsHtml = `<label><span class="lbl">Label</span><input id="lwLabel" type="text" value="${widget.label || ""}" /></label>
+      <label><span class="lbl">URL</span><input id="lwUrl" type="text" value="${widget.url || ""}" /></label>
+      <label style="display:flex; align-items:center; gap:6px; flex-direction:row;"><input id="lwNewTab" type="checkbox" ${widget.openInNewTab ? "checked" : ""} /> <span class="lbl" style="margin:0;">Open in new tab</span></label>`;
+  } else if (widget.type === "label") {
+    fieldsHtml = `<label><span class="lbl">Text</span><input id="lwText" type="text" value="${widget.text || ""}" /></label>`;
+  } else if (widget.type === "varDisplay") {
+    fieldsHtml = `<label><span class="lbl">Label</span><input id="lwLabel" type="text" value="${widget.label || ""}" /></label>
+      <label><span class="lbl">Instance</span><select id="lwVarInst">${instanceIds.map((id) => `<option value="${id}"${id === widget.instanceId ? " selected" : ""}>${instanceLabel(id)} (${id})</option>`).join("")}</select></label>
+      <label><span class="lbl">State</span><select id="lwVarState"></select></label>
+      <label><span class="lbl">Suffix (optional)</span><input id="lwVarSuffix" type="text" value="${widget.stateSuffix || ""}" /></label>`;
+  } else if (widget.type === "slot") {
+    const slot = (bindingsCache[widget.cat] || []).find((s) => s.id === widget.slotId);
+    fieldsHtml = `<p class="empty-hint">Edit its function/state on the Dashboard tab - only placement options live here.</p>`;
+    if (slot && slot.levelFn) {
+      fieldsHtml += `<label style="display:flex; align-items:center; gap:6px; flex-direction:row;"><input id="lwShowLevel" type="checkbox" ${widget.showLevel !== false ? "checked" : ""} /> <span class="lbl" style="margin:0;">Show level control</span></label>`;
+    }
+  } else if (widget.type === "camera" && !layoutCamerasCache.some((c) => c.id === widget.cameraId)) {
+    fieldsHtml = `<p class="empty-hint">⚠ This camera no longer exists.</p>`;
+  } else if (widget.type === "macro" && !layoutMacrosCache.some((m) => m.id === widget.macroId)) {
+    fieldsHtml = `<p class="empty-hint">⚠ This macro no longer exists.</p>`;
+  }
+  box.innerHTML = `
+    <h2 style="font-size:.9rem;">${layoutWidgetIcon(widget)} ${layoutWidgetLabel(widget)}</h2>
+    ${fieldsHtml}
+    <label style="display:flex; align-items:center; gap:6px; flex-direction:row; margin-top:8px;"><input id="lwLocked" type="checkbox" ${widget.locked ? "checked" : ""} /> <span class="lbl" style="margin:0;">Locked</span></label>
+    <div class="row" style="margin-top:10px;">
+      <button class="btn small" id="lwFrontBtn" type="button">Bring to front</button>
+      <button class="btn small" id="lwBackBtn" type="button">Send to back</button>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <button class="btn small danger" id="lwRemoveBtn" type="button">Remove from page</button>
+    </div>`;
+
+  if (widget.type === "varDisplay") {
+    const stateSel = document.getElementById("lwVarState");
+    const instSel = document.getElementById("lwVarInst");
+    function renderStates() {
+      const manifest = manifests.get(instSel.value);
+      stateSel.innerHTML = (manifest ? manifest.states : []).map((s) => `<option value="${s.id}"${s.id === widget.stateId ? " selected" : ""}>${s.id}</option>`).join("");
+    }
+    instSel.addEventListener("change", renderStates);
+    renderStates();
+  }
+
+  function commitField(fn) {
+    pushLayoutUndo();
+    fn();
+    persistLayoutPages();
+    renderLayoutCanvas();
+    renderLayoutWidgetEditor(widget);
+  }
+  const bind = (id, evt, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(evt, () => commitField(fn));
+  };
+  bind("lwLabel", "change", () => (widget.label = document.getElementById("lwLabel").value));
+  bind("lwTarget", "change", () => (widget.targetPageId = document.getElementById("lwTarget").value));
+  bind("lwUrl", "change", () => (widget.url = document.getElementById("lwUrl").value));
+  bind("lwNewTab", "change", () => (widget.openInNewTab = document.getElementById("lwNewTab").checked));
+  bind("lwText", "change", () => (widget.text = document.getElementById("lwText").value));
+  bind("lwVarInst", "change", () => (widget.instanceId = document.getElementById("lwVarInst").value));
+  bind("lwVarState", "change", () => (widget.stateId = document.getElementById("lwVarState").value));
+  bind("lwVarSuffix", "change", () => (widget.stateSuffix = document.getElementById("lwVarSuffix").value || undefined));
+  bind("lwShowLevel", "change", () => (widget.showLevel = document.getElementById("lwShowLevel").checked));
+  bind("lwLocked", "change", () => (widget.locked = document.getElementById("lwLocked").checked));
+  document.getElementById("lwFrontBtn").addEventListener("click", () =>
+    commitField(() => {
+      const maxZ = Math.max(0, ...currentLayoutPage().widgets.map((w) => w.z || 0));
+      widget.z = maxZ + 1;
+    })
+  );
+  document.getElementById("lwBackBtn").addEventListener("click", () =>
+    commitField(() => {
+      const minZ = Math.min(0, ...currentLayoutPage().widgets.map((w) => w.z || 0));
+      widget.z = minZ - 1;
+    })
+  );
+  document.getElementById("lwRemoveBtn").addEventListener("click", async () => {
+    if (!confirm(`Remove "${layoutWidgetLabel(widget)}" from this page?`)) return;
+    pushLayoutUndo();
+    const page = currentLayoutPage();
+    page.widgets = page.widgets.filter((w) => w.id !== widget.id);
+    layoutSelectedWidgetId = null;
+    await persistLayoutPages();
+    renderLayoutCanvas();
+    renderLayoutWidgetEditor(null);
+  });
+}
+
+// ---------------------------------------------------------------------
+// Page toolbar + tab bootstrap
+// ---------------------------------------------------------------------
+function renderLayoutPageSelect() {
+  const sel = document.getElementById("layoutPageSelect");
+  sel.innerHTML = layoutPages.map((p) => `<option value="${p.id}"${p.id === layoutCurrentPageId ? " selected" : ""}>${p.name}</option>`).join("");
+}
+async function ensureLayoutPage() {
+  if (!bindingsCache.pages.length) {
+    bindingsCache.pages.push({ id: Math.random().toString(16).slice(2, 10), name: "Main", background: null, widgets: [] });
+    await persistBindings();
+  }
+  layoutPages = bindingsCache.pages;
+  if (!layoutCurrentPageId || !currentLayoutPage()) layoutCurrentPageId = layoutPages[0].id;
+}
+async function openLayoutTab() {
+  await ensureBindingsCache();
+  const [cams, macroList] = await Promise.all([listCameras(), listMacros()]);
+  layoutCamerasCache = cams;
+  layoutMacrosCache = macroList;
+  await ensureLayoutPage();
+  layoutSelectedWidgetId = null;
+  layoutUndoSnapshot = null;
+  document.getElementById("layoutUndoBtn").disabled = true;
+  renderLayoutPageSelect();
+  renderLayoutPalette();
+  renderLayoutCanvas();
+  renderLayoutWidgetEditor(null);
+  if (layoutPreviewOn) reloadLayoutPreview();
+}
+function moveLayoutPage(delta) {
+  const idx = layoutPages.findIndex((p) => p.id === layoutCurrentPageId);
+  const newIdx = idx + delta;
+  if (newIdx < 0 || newIdx >= layoutPages.length) return;
+  pushLayoutUndo();
+  [layoutPages[idx], layoutPages[newIdx]] = [layoutPages[newIdx], layoutPages[idx]];
+  persistLayoutPages();
+  renderLayoutPageSelect();
+}
+document.getElementById("layoutPageSelect").addEventListener("change", (ev) => {
+  layoutCurrentPageId = ev.target.value;
+  layoutSelectedWidgetId = null;
+  renderLayoutCanvas();
+  renderLayoutWidgetEditor(null);
+});
+document.getElementById("layoutPageUpBtn").addEventListener("click", () => moveLayoutPage(-1));
+document.getElementById("layoutPageDownBtn").addEventListener("click", () => moveLayoutPage(1));
+document.getElementById("layoutAddPageBtn").addEventListener("click", async () => {
+  const name = prompt("Page name:", `Page ${layoutPages.length + 1}`);
+  if (!name) return;
+  pushLayoutUndo();
+  const page = { id: Math.random().toString(16).slice(2, 10), name: name.slice(0, 60), background: null, widgets: [] };
+  layoutPages.push(page);
+  layoutCurrentPageId = page.id;
+  await persistLayoutPages();
+  renderLayoutPageSelect();
+  renderLayoutCanvas();
+  renderLayoutWidgetEditor(null);
+});
+document.getElementById("layoutRenamePageBtn").addEventListener("click", async () => {
+  const page = currentLayoutPage();
+  if (!page) return;
+  const name = prompt("Page name:", page.name);
+  if (!name) return;
+  pushLayoutUndo();
+  page.name = name.slice(0, 60);
+  await persistLayoutPages();
+  renderLayoutPageSelect();
+});
+document.getElementById("layoutDeletePageBtn").addEventListener("click", async () => {
+  const page = currentLayoutPage();
+  if (!page) return;
+  if (layoutPages.length === 1) {
+    alert("Can't delete the only page.");
+    return;
+  }
+  if (!confirm(`Delete page "${page.name}"?`)) return;
+  pushLayoutUndo();
+  layoutPages = layoutPages.filter((p) => p.id !== page.id);
+  layoutCurrentPageId = layoutPages[0].id;
+  await persistLayoutPages();
+  renderLayoutPageSelect();
+  renderLayoutCanvas();
+  renderLayoutWidgetEditor(null);
+});
+document.getElementById("layoutUndoBtn").addEventListener("click", undoLayoutChange);
+document.getElementById("layoutBgUploadBtn").addEventListener("click", async () => {
+  const page = currentLayoutPage();
+  const input = document.getElementById("layoutBgInput");
+  const file = input.files[0];
+  if (!file) {
+    alert("Pick an image file first");
+    return;
+  }
+  const buf = await file.arrayBuffer();
+  const dataBase64 = btoa(new Uint8Array(buf).reduce((s, b) => s + String.fromCharCode(b), ""));
+  const result = await uploadImage(file.name, dataBase64);
+  if (result.error) {
+    alert(result.error);
+    return;
+  }
+  pushLayoutUndo();
+  page.background = { url: result.url };
+  await persistLayoutPages();
+  renderLayoutCanvas();
+});
+document.getElementById("layoutBgClearBtn").addEventListener("click", async () => {
+  const page = currentLayoutPage();
+  if (!page || !page.background) return;
+  pushLayoutUndo();
+  page.background = null;
+  await persistLayoutPages();
+  renderLayoutCanvas();
+});
+function reloadLayoutPreview() {
+  document.getElementById("layoutPreviewFrame").src = `layout.html?preview=${Date.now()}&page=${encodeURIComponent(layoutCurrentPageId || "")}`;
+}
+document.getElementById("layoutPreviewBtn").addEventListener("click", (ev) => {
+  layoutPreviewOn = !layoutPreviewOn;
+  ev.target.textContent = `Preview: ${layoutPreviewOn ? "On" : "Off"}`;
+  document.getElementById("layoutPreviewFrame").classList.toggle("layout-hidden", !layoutPreviewOn);
+  if (layoutPreviewOn) reloadLayoutPreview();
+  else document.getElementById("layoutPreviewFrame").src = "";
 });
 
 // --- Camera: RTSP -> ffmpeg -> WS -> MSE, see camera-player.js and
