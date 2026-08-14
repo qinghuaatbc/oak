@@ -1,0 +1,37 @@
+{
+  "id": "sonos",
+  "displayName": "Sonos",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "http",
+        "label": "Speaker",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Speaker IP address (one instance per speaker/zone)" },
+          { "key": "port", "type": "number", "label": "Port", "default": 1400 }
+        ]
+      }
+    ]
+  },
+  "settings": [{ "key": "pollIntervalMs", "type": "number", "label": "Poll interval (ms)", "default": 5000 }],
+  "actions": [
+    { "id": "play", "label": "Play", "role": "on", "params": [] },
+    { "id": "pause", "label": "Pause", "role": "off", "params": [] },
+    { "id": "next", "label": "Next Track", "params": [] },
+    { "id": "previous", "label": "Previous Track", "params": [] },
+    { "id": "setVolume", "label": "Set Volume", "role": "level", "params": [{ "key": "level", "type": "number", "label": "Volume (0-100)", "default": 30 }] },
+    { "id": "mute", "label": "Mute", "params": [] },
+    { "id": "unmute", "label": "Unmute", "params": [] }
+  ],
+  "events": [{ "id": "stateChanged", "label": "State Changed", "params": ["transportState", "volume"] }],
+  "states": [
+    { "id": "media.on", "type": "boolean", "role": "on" },
+    { "id": "media.level", "type": "number", "role": "level" },
+    { "id": "media.transportState", "type": "string" },
+    { "id": "media.muted", "type": "boolean" }
+  ]
+}
