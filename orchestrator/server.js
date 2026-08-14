@@ -848,7 +848,15 @@ function serveStatic(req, res) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
-  const parts = url.pathname.split("/").filter(Boolean);
+  // url.pathname keeps percent-encoding intact (Node's URL parser doesn't
+  // decode it) - an instance/driver/camera/macro id containing a space or
+  // other URL-special character (e.g. an id typed straight from a
+  // driver's display name, like "Generic dimmer" instead of a slug) never
+  // matches its actual stored key without this, breaking every route
+  // that references it by path segment (stop/start/delete/manifest/state/
+  // config/action) with a silent 404 - the instance shows up in listings
+  // but nothing about it can be controlled.
+  const parts = decodeURIComponent(url.pathname).split("/").filter(Boolean);
 
   if (parts[0] !== "api") {
     if (req.method === "GET") return serveStatic(req, res);

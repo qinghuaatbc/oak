@@ -1,19 +1,29 @@
 // Thin fetch wrapper shared by admin.js and live.js.
+//
+// Every id used as a URL path segment goes through encodeURIComponent()
+// - an instance/driver/camera/macro id can contain spaces or other
+// URL-special characters (e.g. typed straight from a driver's display
+// name instead of a slug, like "Generic dimmer"), and a raw, unencoded
+// id in the URL either gets silently mismatched against the server's
+// stored key or, worse, characters like "#" get interpreted as a URL
+// fragment and never reach the server at all. Confirmed as a real,
+// live bug: an instance named with a space could be listed but not
+// stopped, started, or deleted - every route referencing it 404'd.
 
 export async function listInstances() {
   return (await fetch("/api/instances")).json();
 }
 export async function getManifest(id) {
-  return (await fetch(`/api/instances/${id}/manifest`)).json();
+  return (await fetch(`/api/instances/${encodeURIComponent(id)}/manifest`)).json();
 }
 export async function getState(id) {
-  return (await fetch(`/api/instances/${id}/state`)).json();
+  return (await fetch(`/api/instances/${encodeURIComponent(id)}/state`)).json();
 }
 export async function getEvents(id) {
-  return (await fetch(`/api/instances/${id}/events`)).json();
+  return (await fetch(`/api/instances/${encodeURIComponent(id)}/events`)).json();
 }
 export async function callAction(id, actionId, params) {
-  const res = await fetch(`/api/instances/${id}/action/${actionId}`, {
+  const res = await fetch(`/api/instances/${encodeURIComponent(id)}/action/${encodeURIComponent(actionId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params || {}),
@@ -32,7 +42,7 @@ export async function uploadDriver(driverId, manifestJson, driverJs) {
   return res.json();
 }
 export async function deleteDriverPackage(driverId) {
-  const res = await fetch(`/api/drivers/${driverId}`, { method: "DELETE" });
+  const res = await fetch(`/api/drivers/${encodeURIComponent(driverId)}`, { method: "DELETE" });
   return res.json();
 }
 export async function addInstance(id, driver, connection, settings, label) {
@@ -44,14 +54,14 @@ export async function addInstance(id, driver, connection, settings, label) {
   return res.json();
 }
 export async function deleteInstance(id) {
-  const res = await fetch(`/api/instances/${id}`, { method: "DELETE" });
+  const res = await fetch(`/api/instances/${encodeURIComponent(id)}`, { method: "DELETE" });
   return res.json();
 }
 export async function getConfig(id) {
-  return (await fetch(`/api/instances/${id}/config`)).json();
+  return (await fetch(`/api/instances/${encodeURIComponent(id)}/config`)).json();
 }
 export async function editInstance(id, updates) {
-  const res = await fetch(`/api/instances/${id}`, {
+  const res = await fetch(`/api/instances/${encodeURIComponent(id)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
@@ -59,11 +69,11 @@ export async function editInstance(id, updates) {
   return res.json();
 }
 export async function stopInstance(id) {
-  const res = await fetch(`/api/instances/${id}/stop`, { method: "POST" });
+  const res = await fetch(`/api/instances/${encodeURIComponent(id)}/stop`, { method: "POST" });
   return res.json();
 }
 export async function startInstance(id) {
-  const res = await fetch(`/api/instances/${id}/start`, { method: "POST" });
+  const res = await fetch(`/api/instances/${encodeURIComponent(id)}/start`, { method: "POST" });
   return res.json();
 }
 
@@ -99,11 +109,11 @@ export async function saveMacro(macro) {
   return res.json();
 }
 export async function deleteMacro(id) {
-  const res = await fetch(`/api/macros/${id}`, { method: "DELETE" });
+  const res = await fetch(`/api/macros/${encodeURIComponent(id)}`, { method: "DELETE" });
   return res.json();
 }
 export async function runMacro(id) {
-  const res = await fetch(`/api/macros/${id}/run`, { method: "POST" });
+  const res = await fetch(`/api/macros/${encodeURIComponent(id)}/run`, { method: "POST" });
   return res.json();
 }
 
@@ -119,7 +129,7 @@ export async function addCamera(name, rtspUrl) {
   return res.json();
 }
 export async function deleteCamera(id) {
-  const res = await fetch(`/api/cameras/${id}`, { method: "DELETE" });
+  const res = await fetch(`/api/cameras/${encodeURIComponent(id)}`, { method: "DELETE" });
   return res.json();
 }
 

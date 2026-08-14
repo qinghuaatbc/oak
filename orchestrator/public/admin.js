@@ -1370,7 +1370,7 @@ async function setupAddInstanceForm() {
     const connFields = (manifest.connection.options[0].fields || []).map((f) => configFieldInput("connection", f)).join("");
     const settingFields = (manifest.settings || []).map((f) => configFieldInput("settings", f)).join("");
     fieldsRoot.innerHTML = `
-      <input name="id" placeholder="instance id (e.g. relay2)" required />
+      <input name="id" placeholder="instance id (e.g. relay2 - letters/numbers/hyphens only, no spaces)" pattern="[A-Za-z0-9_-]+" title="Letters, numbers, hyphens, or underscores only - no spaces" required />
       <input name="label" placeholder="Label (optional, to tell instances apart, e.g. Kitchen Eisy)" />
       ${connFields}
       ${settingFields}
