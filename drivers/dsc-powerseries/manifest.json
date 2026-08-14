@@ -2,6 +2,7 @@
   "id": "dsc-powerseries",
   "displayName": "DSC PowerSeries (Envisalink)",
   "version": "0.1.0",
+  "category": "security",
   "connection": {
     "kind": "choice",
     "options": [
@@ -24,16 +25,19 @@
     {
       "id": "armAway",
       "label": "Arm (Away)",
+      "role": "arm",
       "params": [{ "key": "partition", "type": "number", "default": 1 }]
     },
     {
       "id": "armStay",
       "label": "Arm (Stay)",
+      "role": "arm",
       "params": [{ "key": "partition", "type": "number", "default": 1 }]
     },
     {
       "id": "disarm",
       "label": "Disarm",
+      "role": "disarm",
       "params": [
         { "key": "partition", "type": "number", "default": 1 },
         { "key": "code", "type": "string" }
@@ -59,6 +63,6 @@
   ],
   "states": [
     { "id": "zone.open", "type": "boolean", "perInstance": "zone" },
-    { "id": "partition.status", "type": "string", "perInstance": "partition" }
+    { "id": "partition.status", "type": "string", "role": "status", "perInstance": "partition" }
   ]
 }

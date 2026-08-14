@@ -3,10 +3,12 @@ import {
   getConfig, editInstance, stopInstance, startInstance,
   getHealth, listMacros, saveMacro, deleteMacro, runMacro,
   listCameras, addCamera, deleteCamera, listGlbModels, uploadGlb,
+  uploadDriver, deleteDriverPackage,
 } from "./api.js";
 import { connectLiveSocket } from "./live-socket.js";
 import { attachCameraPlayer } from "./camera-player.js";
 import { create3DViewer } from "./viewer3d.js";
+import { CATEGORY_ICON, CATEGORY_LABEL, CATEGORY_ORDER, effectiveCategories, getOnOffPair } from "./roles.js";
 
 const FALLBACK_POLL_MS = 10000;
 const REFRESH_DEBOUNCE_MS = 150;
@@ -16,6 +18,9 @@ let manifests = new Map(); // id -> manifest
 let instanceIds = [];
 let runningByInstance = new Map(); // id -> boolean
 let statesByInstance = new Map(); // id -> {key: value}
+let categoriesByInstance = new Map(); // id -> string[] (effective, override-aware)
+let dashboardMetaByInstance = new Map(); // id -> {hidden: boolean, label: string|undefined}
+let dashboardCat = "__all__";
 const logBuffer = []; // {instanceId, label, text} - fed live by WS "event" messages
 
 const countPill = document.getElementById("countPill");
@@ -60,12 +65,6 @@ function makeCardsCollapsible() {
       card.__setCollapsed(!collapsed);
     });
   });
-}
-
-function findTogglePair(manifest) {
-  const ids = new Set(manifest.actions.map((a) => a.id));
-  const pairs = [["turnOn", "turnOff"]]; // see live.js for why armStay/disarm is deliberately not here
-  return pairs.find(([on, off]) => ids.has(on) && ids.has(off));
 }
 
 function updateCountPill() {
@@ -192,7 +191,7 @@ function renderActionsPanel() {
     }
     const manifest = manifests.get(id);
     const state = statesByInstance.get(id) || {};
-    const togglePair = findTogglePair(manifest);
+    const togglePair = getOnOffPair(manifest);
     const boolEntry = Object.entries(state).find(([, v]) => typeof v === "boolean");
     const useToggle = Boolean(togglePair && boolEntry);
 
@@ -310,8 +309,27 @@ async function renderConfigPanel() {
     .join("");
   const settingFields = (driverManifest.settings || []).map((f) => fieldInput("settings", f, cfg.settings[f.key])).join("");
 
+  // Category is pure presentation metadata (which Dashboard/Live sections
+  // this instance shows up under) - editable regardless of running state,
+  // unlike connection/settings which need the instance stopped first. The
+  // manifest's own declared default is shown even when overridden, so
+  // "reset to default" is just unchecking back to that set.
+  const defaultCats = Array.isArray(driverManifest.category) ? driverManifest.category : [driverManifest.category || "generic"];
+  const activeCats = effectiveCategories(manifest, cfg.categoryOverride);
+  const catCheckboxes = CATEGORY_ORDER.map(
+    (c) =>
+      `<label style="display:inline-flex; align-items:center; gap:4px; margin-right:12px;"><input type="checkbox" name="cat" value="${c}" ${
+        activeCats.includes(c) ? "checked" : ""
+      } />${CATEGORY_ICON[c]} ${CATEGORY_LABEL[c]}${defaultCats.includes(c) ? " (default)" : ""}</label>`
+  ).join("");
+
   configPanel.innerHTML = `
     <p class="sub">instance "${id}" · driver ${manifest.id} · ${running ? "running" : "stopped"}</p>
+    <form id="editCategoryForm" class="config-form">
+      <span class="lbl">Dashboard/Live categories</span>
+      <div style="margin:6px 0 10px;">${catCheckboxes}</div>
+      <button class="btn small primary" type="submit">Save categories</button>
+    </form>
     ${
       running
         ? `<p class="empty-hint">Stop this instance before editing its connection/settings - editing a live connection out from under it isn't safe.</p>`
@@ -332,18 +350,36 @@ async function renderConfigPanel() {
     fullRefresh();
   });
 
+  document.getElementById("editCategoryForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const checked = [...ev.target.querySelectorAll('input[name="cat"]:checked')].map((i) => i.value);
+    // An override that exactly matches the manifest's own default is the
+    // same as no override at all - clearing it (rather than persisting a
+    // redundant copy) means a future driver update to its own default
+    // category keeps applying, instead of being silently frozen out by a
+    // stale override nobody meant to set in stone.
+    const sameAsDefault = checked.length === defaultCats.length && checked.every((c) => defaultCats.includes(c));
+    const result = await editInstance(id, { categoryOverride: sameAsDefault ? [] : checked });
+    if (result.error) {
+      alert(result.error);
+      return;
+    }
+    fullRefresh();
+  });
+
   if (!running) {
     document.getElementById("editInstanceForm").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const connection = {};
       const settings = {};
       ev.target.querySelectorAll("input").forEach((input) => {
+        if (input.name === "cat") return;
         const [group, key] = input.name.split(".");
         const value = input.type === "number" ? Number(input.value) : input.value;
         if (group === "connection") connection[key] = value;
         else settings[key] = value;
       });
-      const result = await editInstance(id, connection, settings);
+      const result = await editInstance(id, { connection, settings });
       if (result.error) {
         alert(result.error);
         return;
@@ -404,30 +440,77 @@ function activeMainTab() {
   return document.querySelector("nav.maintabs .mt.active").dataset.page;
 }
 
-// --- Dashboard: every instance's primary state + actions in one grid,
-// reusing the same toggle/tile logic as the Driver tab's Actions subpanel
-// but always showing every instance (no filter) - the point of a dashboard
-// is the whole-system glance the Driver tab's per-instance drill-down
-// deliberately isn't. ---
+// --- Dashboard: category is the tab - each category present across the
+// configured instances gets its own subtab (same subtabs widget the
+// Driver tab's State/Actions/Events/Config already use), not just a
+// heading in one long scroll. An instance with multiple declared
+// categories (a hub-style driver, e.g. a real Eisy-equivalent controlling
+// both lights and a thermostat through one instance) appears under every
+// one of them - Oak has no driver yet whose actions/states are annotated
+// finely enough to split a single instance's controls into separate per-
+// category widgets, so showing the whole instance card in each relevant
+// tab is the honest v1 scope. ---
+function renderDashboardCatTabs() {
+  const tabsEl = document.getElementById("dashboardCatTabs");
+  const present = new Set();
+  instanceIds.forEach((id) => (categoriesByInstance.get(id) || []).forEach((c) => present.add(c)));
+  const cats = CATEGORY_ORDER.filter((c) => present.has(c));
+  if (!cats.some((c) => c === dashboardCat) && dashboardCat !== "__all__") dashboardCat = "__all__";
+  const allTab = `<div class="st${dashboardCat === "__all__" ? " active" : ""}" data-cat="__all__">All</div>`;
+  const catTabs = cats
+    .map((c) => `<div class="st${dashboardCat === c ? " active" : ""}" data-cat="${c}">${CATEGORY_ICON[c] || "⚙️"} ${CATEGORY_LABEL[c] || c}</div>`)
+    .join("");
+  tabsEl.innerHTML = allTab + catTabs;
+  tabsEl.querySelectorAll(".st").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      dashboardCat = tab.dataset.cat;
+      renderDashboard();
+    });
+  });
+}
+
+function dashboardLabelFor(id) {
+  const meta = dashboardMetaByInstance.get(id);
+  return (meta && meta.label) || manifests.get(id).displayName;
+}
+
+// Tiles are auto-generated from the driver's own manifest by default (same
+// name/category the driver declares), but each one carries two small,
+// presentation-only overrides an admin can set without touching the
+// instance's connection/settings: a custom tile label, and hide-from-
+// dashboard (the instance keeps running, it's just not shown here). This is
+// the "auto-generate, but editable" middle ground between Oak's own
+// auto-category tiles and QTI's fully-manual, freely add/delete-able slot
+// system - Oak doesn't have freeform unbound slots, so "add" here means
+// "un-hide", not "create a tile with no backing instance".
 function renderDashboard() {
+  renderDashboardCatTabs();
   const grid = document.getElementById("dashboardGrid");
   grid.innerHTML = "";
-  if (!instanceIds.length) {
-    grid.innerHTML = `<p class="empty-hint">No instances configured.</p>`;
-    return;
+  const inCat = (id) => dashboardCat === "__all__" || (categoriesByInstance.get(id) || []).includes(dashboardCat);
+  const candidates = instanceIds.filter(inCat);
+  const visible = candidates.filter((id) => !(dashboardMetaByInstance.get(id) || {}).hidden);
+  const hidden = candidates.filter((id) => (dashboardMetaByInstance.get(id) || {}).hidden);
+  if (!visible.length) {
+    grid.innerHTML = `<p class="empty-hint">No instances in this category.</p>`;
   }
-  instanceIds.forEach((id) => {
+  visible.forEach((id) => {
     const manifest = manifests.get(id);
     const running = runningByInstance.get(id);
     const state = statesByInstance.get(id) || {};
+    const label = dashboardLabelFor(id);
     const wrap = document.createElement("div");
     wrap.className = "tile";
+    const editHtml = `<span class="tile-edit-btns" onclick="event.stopPropagation()">
+      <button class="icon-btn" data-edit-label="${id}" title="Rename tile">✎</button>
+      <button class="icon-btn" data-hide-tile="${id}" title="Remove from dashboard">✕</button>
+    </span>`;
     if (!running) {
-      wrap.innerHTML = `<div class="tname">${manifest.displayName}</div><div class="tstate">stopped</div>`;
+      wrap.innerHTML = `<div class="row" style="justify-content:space-between;"><div class="tname">${label}</div>${editHtml}</div><div class="tstate">stopped</div>`;
       grid.appendChild(wrap);
       return;
     }
-    const togglePair = findTogglePair(manifest);
+    const togglePair = getOnOffPair(manifest);
     const boolEntry = Object.entries(state).find(([, v]) => typeof v === "boolean");
     const useToggle = Boolean(togglePair && boolEntry);
     const switchHtml = useToggle
@@ -439,13 +522,28 @@ function renderDashboard() {
       .map(([k, v]) => (typeof v === "boolean" ? (v ? "ON" : "OFF") : String(v)))
       .join(" · ");
     wrap.innerHTML = `
+      <div class="row" style="justify-content:space-between;">
+        <span class="tname">${label}</span>
+        ${editHtml}
+      </div>
       <div class="row">
-        <span class="tname">${manifest.displayName}</span>
         ${switchHtml}
       </div>
       <div class="tstate">${stateText || "—"}</div>`;
     grid.appendChild(wrap);
   });
+  if (hidden.length) {
+    const hiddenWrap = document.createElement("div");
+    hiddenWrap.style.cssText = "grid-column:1/-1; margin-top:14px; padding-top:10px; border-top:1px solid var(--line);";
+    hiddenWrap.innerHTML = `<div class="sub" style="margin-bottom:8px;">Hidden from dashboard</div>`;
+    hidden.forEach((id) => {
+      const row = document.createElement("span");
+      row.style.cssText = "display:inline-flex; align-items:center; gap:6px; margin:0 12px 8px 0;";
+      row.innerHTML = `<span class="sub">${dashboardLabelFor(id)}</span><button class="btn small" data-show-tile="${id}">+ Add to dashboard</button>`;
+      hiddenWrap.appendChild(row);
+    });
+    grid.appendChild(hiddenWrap);
+  }
   grid.querySelectorAll("input[type=checkbox][data-on-action]").forEach((input) => {
     input.addEventListener("change", async () => {
       const action = input.checked ? input.dataset.onAction : input.dataset.offAction;
@@ -454,6 +552,30 @@ function renderDashboard() {
       } catch (err) {
         console.error("action failed", err);
       }
+    });
+  });
+  grid.querySelectorAll("[data-hide-tile]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await editInstance(btn.dataset.hideTile, { dashboardHidden: true });
+      await fullRefresh();
+    });
+  });
+  grid.querySelectorAll("[data-show-tile]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await editInstance(btn.dataset.showTile, { dashboardHidden: false });
+      await fullRefresh();
+    });
+  });
+  grid.querySelectorAll("[data-edit-label]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.editLabel;
+      const current = dashboardLabelFor(id);
+      const next = prompt("Dashboard tile label:", current);
+      if (next === null) return;
+      const trimmed = next.trim();
+      const isDefault = trimmed === manifests.get(id).displayName;
+      await editInstance(id, { dashboardLabel: isDefault ? "" : trimmed });
+      await fullRefresh();
     });
   });
 }
@@ -672,6 +794,8 @@ async function fullRefresh() {
     list.map(async (summary) => {
       if (!manifests.has(summary.id)) manifests.set(summary.id, await getManifest(summary.id));
       runningByInstance.set(summary.id, summary.running);
+      categoriesByInstance.set(summary.id, effectiveCategories(manifests.get(summary.id), summary.categoryOverride));
+      dashboardMetaByInstance.set(summary.id, { hidden: Boolean(summary.dashboardHidden), label: summary.dashboardLabel });
       statesByInstance.set(summary.id, await getState(summary.id));
     })
   );
@@ -682,6 +806,75 @@ async function fullRefresh() {
   if (mainTab === "dashboard") renderDashboard();
   else if (mainTab === "health") renderHealthTab();
 }
+
+// Category first, then driver (filtered to that category) - a flat driver
+// list gets unwieldy as the library grows, and the category is usually
+// the thing an installer actually knows going in ("I'm adding a light",
+// not "I'm adding an http-relay").
+// --- Uploaded drivers: manifest.json + driver.js as plain text (Oak has
+// no packaging/encryption step at all yet, unlike an .rtidriver) - ported
+// in spirit from QTI's own "Uploaded drivers" card (per-driver Delete
+// button, added after that project repeatedly needed a shell + manual rm
+// to clean up re-uploads). Deleting a driver a running instance still
+// uses, or one of Oak's own 4 built-in drivers, is rejected server-side
+// with a clear reason rather than silently refused here. ---
+async function renderUploadedDriversList() {
+  const listEl = document.getElementById("uploadedDriversList");
+  const drivers = await listDrivers();
+  if (!drivers.length) {
+    listEl.innerHTML = `<p class="empty-hint">No drivers found.</p>`;
+    return;
+  }
+  listEl.innerHTML = "";
+  drivers.forEach((d) => {
+    const row = document.createElement("div");
+    row.className = "instance-row";
+    row.innerHTML = `<div><div class="iname">${d.displayName}</div><div class="ikey">${d.id}</div></div>`;
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn small danger";
+    delBtn.textContent = "Delete";
+    delBtn.addEventListener("click", async () => {
+      if (!confirm(`Delete driver "${d.displayName}" permanently? The files are removed from disk.`)) return;
+      const result = await deleteDriverPackage(d.id);
+      if (result.error) {
+        alert(result.error);
+        return;
+      }
+      renderUploadedDriversList();
+    });
+    row.appendChild(delBtn);
+    listEl.appendChild(row);
+  });
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsText(file);
+  });
+}
+document.getElementById("upload-driver-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const driverId = document.getElementById("uploadDriverId").value.trim();
+  const manifestFile = document.getElementById("uploadManifestFile").files[0];
+  const driverJsFile = document.getElementById("uploadDriverJsFile").files[0];
+  if (!driverId || !manifestFile || !driverJsFile) {
+    alert("Driver id, manifest.json, and driver.js are all required");
+    return;
+  }
+  const [manifestJson, driverJs] = await Promise.all([readFileAsText(manifestFile), readFileAsText(driverJsFile)]);
+  const result = await uploadDriver(driverId, manifestJson, driverJs);
+  if (result.error) {
+    alert(result.error);
+    return;
+  }
+  document.getElementById("uploadDriverId").value = "";
+  document.getElementById("uploadManifestFile").value = "";
+  document.getElementById("uploadDriverJsFile").value = "";
+  renderUploadedDriversList();
+});
 
 async function setupAddInstanceForm() {
   const drivers = await listDrivers();
@@ -707,12 +900,29 @@ async function setupAddInstanceForm() {
       <button class="btn small primary" type="submit">Add</button>`;
   }
 
+  function driversInCategory(cat) {
+    if (cat === "__all__") return drivers;
+    return drivers.filter((d) => effectiveCategories(d).includes(cat));
+  }
+  function renderDriverOptionsFor(cat) {
+    const filtered = driversInCategory(cat);
+    driverPicker.innerHTML = filtered.map((d) => `<option value="${d.id}">${d.displayName}</option>`).join("");
+    renderFieldsFor(driverPicker.value);
+  }
+
+  const presentCats = CATEGORY_ORDER.filter((c) => drivers.some((d) => effectiveCategories(d).includes(c)));
+  const categoryPicker = document.createElement("select");
+  categoryPicker.innerHTML =
+    `<option value="__all__">All categories</option>` +
+    presentCats.map((c) => `<option value="${c}">${CATEGORY_ICON[c]} ${CATEGORY_LABEL[c]}</option>`).join("");
+  categoryPicker.addEventListener("change", () => renderDriverOptionsFor(categoryPicker.value));
+
   const driverPicker = document.createElement("select");
   driverPicker.name = "driver";
-  driverPicker.innerHTML = drivers.map((d) => `<option value="${d.id}">${d.displayName}</option>`).join("");
-  fieldsRoot.before(driverPicker);
   driverPicker.addEventListener("change", () => renderFieldsFor(driverPicker.value));
-  renderFieldsFor(driverPicker.value);
+
+  fieldsRoot.before(categoryPicker, driverPicker);
+  renderDriverOptionsFor("__all__");
 
   document.getElementById("add-instance-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -748,6 +958,7 @@ function scheduleRefresh() {
 makeCardsCollapsible();
 fullRefresh();
 setupAddInstanceForm();
+renderUploadedDriversList();
 connectLiveSocket((msg) => {
   if (msg.type === "event") {
     logLine(msg.instanceId, `[event] ${msg.event.id} ${JSON.stringify(msg.event.params)}`);

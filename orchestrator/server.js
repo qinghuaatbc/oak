@@ -341,7 +341,15 @@ async function runMacro(macro) {
   }
 }
 
-for (const inst of config.instances) addInstance(inst.id, { driver: inst.driver, connection: inst.connection, settings: inst.settings });
+for (const inst of config.instances)
+  addInstance(inst.id, {
+    driver: inst.driver,
+    connection: inst.connection,
+    settings: inst.settings,
+    categoryOverride: inst.categoryOverride,
+    dashboardHidden: inst.dashboardHidden,
+    dashboardLabel: inst.dashboardLabel,
+  });
 
 function stopInstance(id) {
   const entry = instances.get(id);
@@ -371,13 +379,34 @@ function removeInstance(id) {
 // Editing a live connection's config out from under it isn't safe (e.g. a
 // TCP socket already open to the OLD host/port) - requiring stop-first
 // keeps this simple and correct instead of trying to hot-reconfigure a
-// running driver.
+// running driver. categoryOverride/dashboardHidden/dashboardLabel are pure
+// presentation metadata (which Dashboard/Live sections this instance shows
+// up under, and how it's labeled there) - none of it touches the runtime,
+// so all of it is editable regardless of running state, unlike
+// connection/settings. Dashboard tiles are auto-generated from the driver's
+// own manifest by default (name, category) but an admin can hide an
+// instance from the Dashboard entirely or give its tile a custom label,
+// same "auto by default, manual override always wins" pattern as
+// categoryOverride - mirrors QTI's own editable-Dashboard UX without
+// QTI's fully-manual slot-binding model, since Oak's tiles are already
+// tied 1:1 to instances rather than freely-composed bindings.
 function editInstance(id, updates) {
   const entry = instances.get(id);
   if (!entry) return { error: "No such instance" };
-  if (entry.running) return { error: "Stop the instance before editing its config" };
-  if (updates.connection) entry.spec.connection = { ...entry.spec.connection, ...updates.connection };
-  if (updates.settings) entry.spec.settings = { ...entry.spec.settings, ...updates.settings };
+  if (updates.categoryOverride !== undefined) {
+    entry.spec.categoryOverride = updates.categoryOverride && updates.categoryOverride.length ? updates.categoryOverride : undefined;
+  }
+  if (updates.dashboardHidden !== undefined) {
+    entry.spec.dashboardHidden = Boolean(updates.dashboardHidden);
+  }
+  if (updates.dashboardLabel !== undefined) {
+    entry.spec.dashboardLabel = updates.dashboardLabel ? String(updates.dashboardLabel).slice(0, 60) : undefined;
+  }
+  if (updates.connection || updates.settings) {
+    if (entry.running) return { error: "Stop the instance before editing its connection/settings" };
+    if (updates.connection) entry.spec.connection = { ...entry.spec.connection, ...updates.connection };
+    if (updates.settings) entry.spec.settings = { ...entry.spec.settings, ...updates.settings };
+  }
   return { ok: true };
 }
 
@@ -392,6 +421,9 @@ function persistConfig() {
       driver: entry.spec.driver,
       connection: entry.spec.connection,
       settings: entry.spec.settings,
+      categoryOverride: entry.spec.categoryOverride,
+      dashboardHidden: entry.spec.dashboardHidden,
+      dashboardLabel: entry.spec.dashboardLabel,
     })),
   };
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(data, null, 2));
@@ -498,11 +530,59 @@ function startCameraFfmpeg(rtspUrl, ws) {
   return proc;
 }
 
+// The 4 drivers shipped with Oak itself - kept undeletable through the
+// upload UI (a driver folder living outside DRIVERS_DIR entirely would be
+// a bigger change; blocking deletion of the ones this repo ships is the
+// simple, correct guard for now).
+const BUILTIN_DRIVERS = new Set(["dsc-powerseries", "http-relay", "mqtt-plug", "generic-dimmer"]);
+
 function listDriverManifests() {
   return fs
     .readdirSync(DRIVERS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => JSON.parse(fs.readFileSync(path.join(DRIVERS_DIR, d.name, "manifest.json"), "utf8")));
+}
+
+// Uploaded drivers are plain text (a manifest.json + a driver.js), not a
+// packaged/encrypted bundle the way an .rtidriver is - Oak has no
+// packaging step at all yet, so this is the honest v1: upload the two
+// files as-is. Validated only for "is this parseable as a manifest with
+// the fields the runtime actually needs" - not sandboxed any more
+// tightly than the drivers Oak already ships with, since every driver
+// (built-in or uploaded) already runs through the same vm.Context in
+// runtime/loader.js and Oak's whole model already assumes an installer
+// trusts what they're adding, the same trust boundary RTI's own driver
+// install flow has.
+function uploadDriver(driverId, manifestJson, driverJs) {
+  const safeId = String(driverId || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9-]/g, "");
+  if (!safeId) return { error: "Driver id must be alphanumeric/hyphens" };
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestJson);
+  } catch (e) {
+    return { error: `manifest.json isn't valid JSON: ${e.message}` };
+  }
+  if (!manifest.id || !manifest.displayName || !Array.isArray(manifest.actions) || !Array.isArray(manifest.states)) {
+    return { error: "manifest.json must have id, displayName, actions[], states[]" };
+  }
+  if (!driverJs || !driverJs.trim()) return { error: "driver.js is required" };
+  const dir = path.join(DRIVERS_DIR, safeId);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "manifest.json"), manifestJson);
+  fs.writeFileSync(path.join(dir, "driver.js"), driverJs);
+  return { ok: true, id: safeId };
+}
+
+function deleteDriverPackage(driverId) {
+  if (BUILTIN_DRIVERS.has(driverId)) return { error: "This driver ships with Oak and can't be removed here" };
+  const dir = path.join(DRIVERS_DIR, driverId);
+  if (!fs.existsSync(dir)) return { error: "No such driver" };
+  const inUse = [...instances.values()].some((entry) => entry.spec.driver === driverId);
+  if (inUse) return { error: "An instance is still using this driver - remove that instance first" };
+  fs.rmSync(dir, { recursive: true, force: true });
+  return { ok: true };
 }
 
 function sendJson(res, status, obj) {
@@ -562,6 +642,23 @@ const server = http.createServer(async (req, res) => {
 
   if (parts[1] === "drivers" && parts.length === 2 && req.method === "GET") {
     return sendJson(res, 200, listDriverManifests());
+  }
+
+  if (parts[1] === "drivers" && parts.length === 2 && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const result = uploadDriver(body.driverId, body.manifestJson, body.driverJs);
+      if (result.error) return sendJson(res, 400, result);
+      return sendJson(res, 200, result);
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
+  }
+
+  if (parts[1] === "drivers" && parts.length === 3 && req.method === "DELETE") {
+    const result = deleteDriverPackage(parts[2]);
+    if (result.error) return sendJson(res, 400, result);
+    return sendJson(res, 200, result);
   }
 
   if (parts[1] === "health" && parts.length === 2 && req.method === "GET") {
@@ -658,6 +755,10 @@ const server = http.createServer(async (req, res) => {
       driver: entry.spec.driver,
       displayName: entry.manifest.displayName,
       running: entry.running,
+      category: entry.manifest.category,
+      categoryOverride: entry.spec.categoryOverride,
+      dashboardHidden: Boolean(entry.spec.dashboardHidden),
+      dashboardLabel: entry.spec.dashboardLabel,
       actions: entry.manifest.actions.map((a) => a.id),
       events: entry.manifest.events.map((e) => e.id),
     }));
@@ -669,7 +770,14 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       if (!body.id || !body.driver) return sendJson(res, 400, { error: "id and driver are required" });
       if (instances.has(body.id)) return sendJson(res, 400, { error: `Instance "${body.id}" already exists` });
-      addInstance(body.id, { driver: body.driver, connection: body.connection || {}, settings: body.settings || {} });
+      addInstance(body.id, {
+        driver: body.driver,
+        connection: body.connection || {},
+        settings: body.settings || {},
+        categoryOverride: body.categoryOverride,
+        dashboardHidden: body.dashboardHidden,
+        dashboardLabel: body.dashboardLabel,
+      });
       persistConfig();
       broadcast({ type: "instanceAdded", instanceId: body.id });
       return sendJson(res, 200, { ok: true });
@@ -721,7 +829,15 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (parts[3] === "config" && req.method === "GET") {
-    return sendJson(res, 200, { connection: entry.spec.connection, settings: entry.spec.settings, running: entry.running });
+    return sendJson(res, 200, {
+      connection: entry.spec.connection,
+      settings: entry.spec.settings,
+      running: entry.running,
+      category: entry.manifest.category,
+      categoryOverride: entry.spec.categoryOverride,
+      dashboardHidden: Boolean(entry.spec.dashboardHidden),
+      dashboardLabel: entry.spec.dashboardLabel,
+    });
   }
 
   if (parts[3] === "state" && req.method === "GET") {

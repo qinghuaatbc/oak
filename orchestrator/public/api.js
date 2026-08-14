@@ -23,11 +23,23 @@ export async function callAction(id, actionId, params) {
 export async function listDrivers() {
   return (await fetch("/api/drivers")).json();
 }
-export async function addInstance(id, driver, connection, settings) {
+export async function uploadDriver(driverId, manifestJson, driverJs) {
+  const res = await fetch("/api/drivers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ driverId, manifestJson, driverJs }),
+  });
+  return res.json();
+}
+export async function deleteDriverPackage(driverId) {
+  const res = await fetch(`/api/drivers/${driverId}`, { method: "DELETE" });
+  return res.json();
+}
+export async function addInstance(id, driver, connection, settings, categoryOverride) {
   const res = await fetch("/api/instances", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, driver, connection, settings }),
+    body: JSON.stringify({ id, driver, connection, settings, categoryOverride }),
   });
   return res.json();
 }
@@ -38,11 +50,11 @@ export async function deleteInstance(id) {
 export async function getConfig(id) {
   return (await fetch(`/api/instances/${id}/config`)).json();
 }
-export async function editInstance(id, connection, settings) {
+export async function editInstance(id, updates) {
   const res = await fetch(`/api/instances/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ connection, settings }),
+    body: JSON.stringify(updates),
   });
   return res.json();
 }

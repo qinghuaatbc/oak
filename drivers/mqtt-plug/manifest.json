@@ -2,6 +2,7 @@
   "id": "mqtt-plug",
   "displayName": "Generic MQTT Plug/Sensor",
   "version": "0.1.0",
+  "category": "switch",
   "connection": {
     "kind": "choice",
     "options": [
@@ -21,8 +22,8 @@
     { "key": "clientId", "type": "string", "label": "MQTT client id", "default": "oak-mqtt-plug" }
   ],
   "actions": [
-    { "id": "turnOn", "label": "Turn On", "params": [] },
-    { "id": "turnOff", "label": "Turn Off", "params": [] }
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] }
   ],
   "events": [
     { "id": "connected", "label": "Broker Connected", "params": [] },
@@ -30,6 +31,6 @@
     { "id": "stateChanged", "label": "State Changed", "params": ["on"] }
   ],
   "states": [
-    { "id": "plug.on", "type": "boolean" }
+    { "id": "plug.on", "type": "boolean", "role": "on" }
   ]
 }

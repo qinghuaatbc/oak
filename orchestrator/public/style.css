@@ -85,6 +85,13 @@ button.btn.primary:hover{ opacity:.9; color:var(--accent-ink); }
 button.btn.danger:hover{ border-color:var(--bad); color:var(--bad); }
 button.btn.small{ padding:5px 10px; font-size:.76rem; }
 
+.icon-btn{
+  border:1px solid var(--line); background:var(--raised); color:var(--faint); border-radius:6px;
+  width:22px; height:22px; line-height:1; font-size:.72rem; cursor:pointer; padding:0;
+}
+.icon-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.tile-edit-btns{ display:flex; gap:4px; flex-shrink:0; }
+
 table{ width:100%; border-collapse:collapse; font-family:var(--mono); font-size:.8rem; }
 table td, table th{ text-align:left; padding:5px 8px; border-bottom:1px dashed var(--line); }
 table th{ color:var(--faint); font-weight:500; }

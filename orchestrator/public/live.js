@@ -1,149 +1,333 @@
-// Live view: sidebar-by-driver-type + frosted-glass sky-card grid, ported
-// from QTI's own live.js/live.html structure (sky-wrap/sky-sidebar/
-// sky-card) - simplified to plain icon+label+buttons cards since Oak has
-// no dimmable/level-type state yet to justify QTI's ring-dial widget.
+// Live view: category sidebar + frosted-glass sky-card grid, ported from
+// QTI's own live.js/live.html structure (sky-wrap/sky-sidebar/sky-card,
+// ring-dial geometry). Cards are built once per instance and updated in
+// place afterward (cardEls Map), not rebuilt from scratch on every
+// refresh - QTI's own shared.js has a direct comment on why: a full
+// rebuild mid-drag is exactly the bug that bit its admin tile grid once
+// already, and the ring widget below needs real dragging to work at all.
 import { listInstances, getManifest, getState, callAction } from "./api.js";
 import { connectWS } from "./live-socket.js";
 import { createCommPanel } from "./comm.js";
+import { CATEGORY_ICON, CATEGORY_LABEL, CATEGORY_ORDER, effectiveCategories, getOnOffPair, getLevelAction, getOnState, getLevelState } from "./roles.js";
 
 const FALLBACK_POLL_MS = 10000;
 const REFRESH_DEBOUNCE_MS = 150;
-const DRIVER_ICONS = { "dsc-powerseries": "🔒", "http-relay": "🔌", "mqtt-plug": "📡" };
-const DRIVER_ICON_FALLBACK = "⚙️";
 
 const grid = document.getElementById("skyGrid");
 const sidebar = document.getElementById("skySidebar");
-let manifests = new Map();
+let manifests = new Map(); // id -> manifest
+let instanceIds = [];
+let categoriesByInstance = new Map(); // id -> string[]
+let cardEls = new Map(); // id -> {el, apply(state, running)}
 let activeCat = "__all__";
 
-// See admin.js's identical helper for why armStay/disarm is deliberately
-// NOT in this list: matching by action id alone isn't enough - DSC's
-// partition.status is a string, not boolean, so treating it as a toggle
-// pair silently dropped "disarm" from the UI (its button was skipped
-// assuming the pair's other button covered it) while "Turn Stay" always
-// showed "Turn On" and never reflected real state. Fixed the same way:
-// callers gate on `useToggle` (pair AND a real boolean state), not on
-// `togglePair` alone.
-function findTogglePair(manifest) {
-  const ids = new Set(manifest.actions.map((a) => a.id));
-  const pairs = [["turnOn", "turnOff"]];
-  return pairs.find(([on, off]) => ids.has(on) && ids.has(off));
+// ---------------------------------------------------------------------
+// Ring-dial geometry - identical constants/math to QTI's own live.js
+// (itself ported from workshop/web_dashboard's WebDashboard.js).
+// ---------------------------------------------------------------------
+const RING_S = 160,
+  RING_CX = 80,
+  RING_CY = 80,
+  RING_R_ARC = 64,
+  RING_START = 135,
+  RING_SPAN = 270;
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function ringPolar(angle, r) {
+  const a = (angle * Math.PI) / 180;
+  return [RING_CX + r * Math.cos(a), RING_CY + r * Math.sin(a)];
+}
+function ringArc(startAngle, spanDeg, r) {
+  if (spanDeg <= 0) return "";
+  const clipped = Math.min(spanDeg, RING_SPAN - 0.1);
+  const [sx, sy] = ringPolar(startAngle, r);
+  const [ex, ey] = ringPolar(startAngle + clipped, r);
+  return `M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${r} ${r} 0 ${clipped > 180 ? 1 : 0} 1 ${ex.toFixed(2)} ${ey.toFixed(2)}`;
+}
+const RING_TRACK_D = ringArc(RING_START, RING_SPAN, RING_R_ARC);
+function ringAngleToProgress(raw) {
+  if (raw >= RING_START) return Math.min((raw - RING_START) / RING_SPAN, 1);
+  if (raw <= RING_START - 360 + RING_SPAN) return Math.min((raw + 360 - RING_START) / RING_SPAN, 1);
+  return raw <= 90 ? 1 : 0;
+}
+function ringProgressFromEvent(svgEl, evt) {
+  const rect = svgEl.getBoundingClientRect();
+  const scale = rect.width / RING_S;
+  const raw = ((Math.atan2(evt.clientY - rect.top - RING_CY * scale, evt.clientX - rect.left - RING_CX * scale) * 180) / Math.PI + 360) % 360;
+  return ringAngleToProgress(raw);
 }
 
-function buildCard(instanceId, manifest, state, running) {
-  const icon = DRIVER_ICONS[manifest.id] || DRIVER_ICON_FALLBACK;
-  const togglePair = findTogglePair(manifest);
-  const boolEntry = Object.entries(state).find(([, v]) => typeof v === "boolean");
-  const useToggle = Boolean(togglePair && boolEntry);
-  const on = boolEntry ? boolEntry[1] : false;
-  const zh = langZh;
+// A ring-dial card for a light/media-category instance with a role-tagged
+// "level" action - tap toggles on/off (via the on/off role pair, if any),
+// drag sets level. hasDial=false (level role present but no on/off pair)
+// still shows the ring, drag-only, no tap-toggle.
+function buildRingCard(instanceId, manifest, categories) {
+  const onOffPair = getOnOffPair(manifest);
+  const levelAction = getLevelAction(manifest);
+  const hasDial = Boolean(levelAction);
+
+  const box = document.createElement("div");
+  box.className = "sky-card";
+  box.dataset.categories = JSON.stringify(categories);
+  box.dataset.on = "0";
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "sky-ring");
+  svg.setAttribute("viewBox", `0 0 ${RING_S} ${RING_S}`);
+  const track = document.createElementNS(SVG_NS, "path");
+  track.setAttribute("class", "ring-track");
+  track.setAttribute("d", RING_TRACK_D);
+  const val = document.createElementNS(SVG_NS, "path");
+  val.setAttribute("class", "ring-val");
+  const thumb = document.createElementNS(SVG_NS, "circle");
+  thumb.setAttribute("class", "ring-thumb");
+  thumb.setAttribute("r", "9");
+  const bulb = document.createElementNS(SVG_NS, "text");
+  bulb.setAttribute("class", "ring-bulb");
+  bulb.setAttribute("x", "80");
+  bulb.setAttribute("y", "88");
+  bulb.textContent = categories.includes("media") ? "🔊" : "💡";
+  svg.append(track, val, thumb, bulb);
+  box.appendChild(svg);
+
+  const valueEl = document.createElement("div");
+  valueEl.className = "sky-value";
+  const labelEl = document.createElement("div");
+  labelEl.className = "sky-label";
+  labelEl.textContent = manifest.displayName;
+  const offlineEl = document.createElement("div");
+  offlineEl.className = "sky-offline-badge sky-hidden";
+  box.append(valueEl, labelEl, offlineEl);
+
+  function applyVisual(value, on) {
+    val.setAttribute("d", ringArc(RING_START, (value / 100) * RING_SPAN, RING_R_ARC));
+    const [tx, ty] = ringPolar(RING_START + (value / 100) * RING_SPAN, RING_R_ARC);
+    thumb.setAttribute("cx", tx.toFixed(2));
+    thumb.setAttribute("cy", ty.toFixed(2));
+    bulb.style.opacity = on ? Math.max(0.35, value / 100) : 0.25;
+    valueEl.textContent = on ? String(value) : "—";
+    box.dataset.on = on ? "1" : "0";
+  }
+  applyVisual(0, false);
+
+  // Tap-vs-drag decided by distance from where the pointer first went
+  // down, not from the ring center - QTI's own comment explains why: the
+  // ring track sits near the outer edge, so a center-distance check
+  // misreads nearly every tap as a tiny drag.
+  const DRAG_THRESHOLD_PX = 8;
+  let dragging = false;
+  let didDrag = false;
+  let throttleTimer = null;
+  let pendingValue = null;
+  let downX = 0;
+  let downY = 0;
+  let currentOn = false;
+
+  svg.addEventListener("pointerdown", (ev) => {
+    ev.preventDefault();
+    dragging = true;
+    didDrag = false;
+    downX = ev.clientX;
+    downY = ev.clientY;
+    svg.setPointerCapture(ev.pointerId);
+  });
+  svg.addEventListener("pointermove", (ev) => {
+    if (!dragging || !hasDial) return;
+    if (!didDrag) {
+      if (Math.hypot(ev.clientX - downX, ev.clientY - downY) < DRAG_THRESHOLD_PX) return;
+      didDrag = true;
+    }
+    const v = Math.round(ringProgressFromEvent(svg, ev) * 100);
+    applyVisual(v, true);
+    pendingValue = v;
+    if (!throttleTimer) {
+      throttleTimer = setTimeout(() => {
+        throttleTimer = null;
+        callAction(instanceId, levelAction.id, { [levelAction.params && levelAction.params[0] ? levelAction.params[0].key : "level"]: pendingValue }).catch((e) =>
+          console.error("level action failed", e)
+        );
+      }, 200);
+    }
+  });
+  svg.addEventListener("pointerup", (ev) => {
+    if (!dragging) return;
+    dragging = false;
+    if (!hasDial || !didDrag) {
+      if (!onOffPair) return;
+      const turningOn = box.dataset.on !== "1";
+      callAction(instanceId, turningOn ? onOffPair[0] : onOffPair[1], {}).catch((e) => console.error("action failed", e));
+      feedbackToggle(manifest.displayName, turningOn);
+      scheduleRefresh();
+      return;
+    }
+    const v = Math.round(ringProgressFromEvent(svg, ev) * 100);
+    applyVisual(v, true);
+    const paramKey = levelAction.params && levelAction.params[0] ? levelAction.params[0].key : "level";
+    callAction(instanceId, levelAction.id, { [paramKey]: v }).catch((e) => console.error("level action failed", e));
+  });
+
+  function apply(state, running) {
+    box.classList.toggle("offline", !running);
+    offlineEl.classList.toggle("sky-hidden", running);
+    offlineEl.textContent = langZh ? "离线" : "offline";
+    const onEntry = getOnState(manifest, state);
+    const levelValue = getLevelState(manifest, state);
+    currentOn = onEntry ? onEntry[1] : levelValue > 0;
+    applyVisual(levelValue !== undefined ? levelValue : currentOn ? 100 : 0, currentOn);
+  }
+
+  return { el: box, apply, categories };
+}
+
+// Plain card (icon + value text + action buttons) for everything without
+// a level role - switches, security, sensors, and any driver action set
+// too varied for a single ring to represent.
+function buildPlainCard(instanceId, manifest, categories) {
+  const icon = CATEGORY_ICON[categories[0]] || "⚙️";
+  const onOffPair = getOnOffPair(manifest);
 
   const card = document.createElement("div");
-  card.className = "sky-card" + (running ? "" : " offline");
-  card.dataset.category = manifest.id;
-  card.dataset.on = on ? "1" : "0";
+  card.className = "sky-card";
+  card.dataset.categories = JSON.stringify(categories);
+  card.dataset.on = "0";
 
   const iconEl = document.createElement("div");
   iconEl.className = "sky-icon";
   iconEl.textContent = icon;
-
   const valueEl = document.createElement("div");
   valueEl.className = "sky-value";
-  // A stopped instance's state is a last-known snapshot from before it was
-  // stopped (see server.js's lastState) - still shown, but the "offline"
-  // badge below makes clear it's not live right now.
-  valueEl.textContent = Object.keys(state).length
-    ? Object.entries(state)
-        .map(([k, v]) => (typeof v === "boolean" ? (v ? (zh ? "开" : "ON") : zh ? "关" : "OFF") : String(v)))
-        .join(" · ")
-    : "—";
-
   const labelEl = document.createElement("div");
   labelEl.className = "sky-label";
   labelEl.textContent = manifest.displayName;
-
-  if (!running) {
-    const offlineEl = document.createElement("div");
-    offlineEl.className = "sky-offline-badge";
-    offlineEl.textContent = zh ? "离线" : "offline";
-    card.append(iconEl, valueEl, labelEl, offlineEl);
-    return card;
-  }
-
+  const offlineEl = document.createElement("div");
+  offlineEl.className = "sky-offline-badge sky-hidden";
   const actionsEl = document.createElement("div");
   actionsEl.className = "sky-actions";
+
   manifest.actions.forEach((a) => {
-    if (useToggle && a.id === togglePair[1]) return; // toggle pair -> one tap target, not two buttons
+    if (onOffPair && a.id === onOffPair[1]) return; // toggle pair -> one tap target, not two buttons
     const btn = document.createElement("button");
-    btn.className = "sky-action-btn" + (useToggle && a.id === togglePair[0] ? " primary" : "");
-    btn.textContent = useToggle && a.id === togglePair[0] ? (on ? (zh ? "关闭" : "Turn Off") : zh ? "开启" : "Turn On") : a.label;
+    btn.className = "sky-action-btn" + (onOffPair && a.id === onOffPair[0] ? " primary" : "");
     btn.addEventListener("click", async (ev) => {
       ev.stopPropagation();
-      const actionId = useToggle && a.id === togglePair[0] ? (on ? togglePair[1] : togglePair[0]) : a.id;
+      const isToggle = onOffPair && a.id === onOffPair[0];
+      const on = card.dataset.on === "1";
+      const actionId = isToggle ? (on ? onOffPair[1] : onOffPair[0]) : a.id;
       try {
         await callAction(instanceId, actionId, {});
       } catch (err) {
         console.error("action failed", err);
       }
-      feedbackToggle(a.label, useToggle ? !on : undefined);
+      feedbackToggle(a.label, isToggle ? !on : undefined);
       scheduleRefresh();
     });
     actionsEl.appendChild(btn);
   });
 
-  card.append(iconEl, valueEl, labelEl, actionsEl);
-  return card;
+  card.append(iconEl, valueEl, labelEl, offlineEl, actionsEl);
+
+  function apply(state, running) {
+    card.classList.toggle("offline", !running);
+    offlineEl.classList.toggle("sky-hidden", running);
+    offlineEl.textContent = langZh ? "离线" : "offline";
+    actionsEl.classList.toggle("sky-hidden", !running);
+    const onEntry = getOnState(manifest, state);
+    const on = onEntry ? onEntry[1] : false;
+    card.dataset.on = on ? "1" : "0";
+    valueEl.textContent = Object.keys(state).length
+      ? Object.entries(state)
+          .map(([, v]) => (typeof v === "boolean" ? (v ? (langZh ? "开" : "ON") : langZh ? "关" : "OFF") : String(v)))
+          .join(" · ")
+      : "—";
+    // Relabel the toggle button (On/Off text follows current state) and
+    // every plain button's own label - simplest correct approach given
+    // button count/order is fixed once at build time.
+    let bi = 0;
+    manifest.actions.forEach((a) => {
+      if (onOffPair && a.id === onOffPair[1]) return;
+      const btn = actionsEl.children[bi++];
+      if (!btn) return;
+      btn.textContent = onOffPair && a.id === onOffPair[0] ? (on ? (langZh ? "关闭" : "Turn Off") : langZh ? "开启" : "Turn On") : a.label;
+    });
+  }
+
+  return { el: card, apply, categories };
 }
 
-function renderSidebar(categories) {
-  const cats = [...categories];
+function renderSidebar() {
+  const present = new Set();
+  instanceIds.forEach((id) => (categoriesByInstance.get(id) || []).forEach((c) => present.add(c)));
+  const cats = CATEGORY_ORDER.filter((c) => present.has(c));
+
   sidebar.innerHTML = "";
   const allBtn = document.createElement("button");
   allBtn.className = "sky-cat" + (activeCat === "__all__" ? " active" : "");
   allBtn.innerHTML = `<span>☰</span><span>${langZh ? "全部" : "All"}</span>`;
   allBtn.addEventListener("click", () => setActiveCategory("__all__"));
   sidebar.appendChild(allBtn);
-  cats.forEach((driverId) => {
+  cats.forEach((cat) => {
     const btn = document.createElement("button");
-    btn.className = "sky-cat" + (activeCat === driverId ? " active" : "");
-    // Driver id, not the first word of displayName - two different drivers
-    // both named "Generic ..." (http-relay, mqtt-plug) rendered identical,
-    // indistinguishable "Generic" sidebar labels otherwise.
-    const label = driverId
-      .split("-")
-      .map((w) => w[0].toUpperCase() + w.slice(1))
-      .join(" ");
-    btn.innerHTML = `<span>${DRIVER_ICONS[driverId] || DRIVER_ICON_FALLBACK}</span><span>${label}</span>`;
-    btn.addEventListener("click", () => setActiveCategory(driverId));
+    btn.className = "sky-cat" + (activeCat === cat ? " active" : "");
+    btn.innerHTML = `<span>${CATEGORY_ICON[cat] || "⚙️"}</span><span>${langZh ? zhCategoryLabel(cat) : CATEGORY_LABEL[cat] || cat}</span>`;
+    btn.addEventListener("click", () => setActiveCategory(cat));
     sidebar.appendChild(btn);
   });
+}
+const ZH_CATEGORY_LABEL = { light: "灯光", switch: "开关", security: "安防", climate: "温控", media: "媒体", sensor: "传感器", generic: "通用" };
+function zhCategoryLabel(cat) {
+  return ZH_CATEGORY_LABEL[cat] || cat;
 }
 
 function setActiveCategory(cat) {
   activeCat = cat;
-  refresh(); // renderSidebar (called from refresh) re-derives .active from activeCat
+  renderSidebar();
+  applyCategoryVisibility();
+}
+function applyCategoryVisibility() {
+  cardEls.forEach(({ el, categories }) => {
+    el.classList.toggle("sky-hidden", activeCat !== "__all__" && !categories.includes(activeCat));
+  });
+  grid.querySelector(".empty")?.remove();
+  if (![...cardEls.values()].some(({ categories }) => activeCat === "__all__" || categories.includes(activeCat))) {
+    const p = document.createElement("p");
+    p.className = "empty";
+    p.textContent = langZh ? "没有可显示的实例。" : "No instances to show.";
+    grid.appendChild(p);
+  }
 }
 
 async function refresh() {
   const list = await listInstances();
-  const cards = await Promise.all(
-    list.map(async (summary) => {
-      if (!manifests.has(summary.id)) manifests.set(summary.id, await getManifest(summary.id));
-      const manifest = manifests.get(summary.id);
-      const state = await getState(summary.id);
-      return { instanceId: summary.id, manifest, state, running: summary.running };
-    })
-  );
+  instanceIds = list.map((s) => s.id);
+  const seen = new Set();
 
-  renderSidebar(new Set(cards.map((c) => c.manifest.id)));
+  for (const summary of list) {
+    seen.add(summary.id);
+    if (!manifests.has(summary.id)) manifests.set(summary.id, await getManifest(summary.id));
+    const manifest = manifests.get(summary.id);
+    const categories = effectiveCategories(manifest, summary.categoryOverride);
+    categoriesByInstance.set(summary.id, categories);
+    const state = await getState(summary.id);
 
-  const visible = activeCat === "__all__" ? cards : cards.filter((c) => c.manifest.id === activeCat);
-  grid.innerHTML = "";
-  if (!visible.length) {
-    grid.innerHTML = `<p class="empty">${langZh ? "没有可显示的实例。" : "No instances to show."}</p>`;
-    return;
+    if (!cardEls.has(summary.id)) {
+      const useRing = categories.some((c) => c === "light" || c === "media") && Boolean(getLevelAction(manifest));
+      const card = useRing ? buildRingCard(summary.id, manifest, categories) : buildPlainCard(summary.id, manifest, categories);
+      cardEls.set(summary.id, card);
+      grid.appendChild(card.el);
+    }
+    cardEls.get(summary.id).apply(state, summary.running);
   }
-  visible.forEach(({ instanceId, manifest, state, running }) => grid.appendChild(buildCard(instanceId, manifest, state, running)));
+
+  // Drop cards for instances removed since the last refresh.
+  for (const [id, card] of [...cardEls.entries()]) {
+    if (!seen.has(id)) {
+      card.el.remove();
+      cardEls.delete(id);
+    }
+  }
+
+  renderSidebar();
+  applyCategoryVisibility();
 }
 
 let refreshTimer = null;
@@ -292,11 +476,6 @@ function setMicUI(micState) {
   cmdBtn.classList.toggle("listening", recognizing);
 }
 
-// Same "prime on a real synchronous gesture" fix as QTI's own unlockSpeech -
-// mobile browsers only let speechSynthesis produce audio if activated by a
-// genuine user gesture, and the real announcement fires from
-// SpeechRecognition's async onresult callback, well after that gesture
-// window has closed.
 let speechUnlocked = false;
 function unlockSpeech() {
   if (speechUnlocked) return;
@@ -329,10 +508,6 @@ cmdBtn.addEventListener("click", () => {
   recognizer.start();
 });
 
-// Longest-name-wins, same as QTI's own findNamedSlot - "kitchen main relay"
-// should prefer a slot literally named that over a shorter partial match.
-// Falls back to the only instance if nothing named is mentioned and
-// exactly one instance exists.
 function findNamedInstance(cmdLower, cmdRaw) {
   const named = instanceIds
     .map((id) => ({ id, manifest: manifests.get(id) }))
@@ -342,14 +517,11 @@ function findNamedInstance(cmdLower, cmdRaw) {
 }
 
 function findMatchingAction(manifest, cmdLower, wantsOn, wantsOff) {
-  const togglePair = findTogglePair(manifest);
-  if (togglePair) {
-    if (wantsOn) return manifest.actions.find((a) => a.id === togglePair[0]);
-    if (wantsOff) return manifest.actions.find((a) => a.id === togglePair[1]);
+  const onOffPair = getOnOffPair(manifest);
+  if (onOffPair) {
+    if (wantsOn) return manifest.actions.find((a) => a.id === onOffPair[0]);
+    if (wantsOff) return manifest.actions.find((a) => a.id === onOffPair[1]);
   }
-  // Fallback: score each action's own label against words in the command -
-  // covers DSC-style actions ("Arm Stay", "Disarm") that aren't a simple
-  // on/off pair at all.
   let best = null;
   let bestScore = 0;
   manifest.actions.forEach((a) => {

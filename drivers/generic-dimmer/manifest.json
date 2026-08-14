@@ -1,0 +1,35 @@
+{
+  "id": "generic-dimmer",
+  "displayName": "Generic Dimmable Light",
+  "version": "0.1.0",
+  "category": "light",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "http",
+        "label": "HTTP",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 80 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 5000 }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "setLevel", "label": "Set Level", "role": "level", "params": [{ "key": "level", "type": "number", "default": 100 }] }
+  ],
+  "events": [
+    { "id": "stateChanged", "label": "State Changed", "params": ["on", "level"] }
+  ],
+  "states": [
+    { "id": "light.on", "type": "boolean", "role": "on" },
+    { "id": "light.level", "type": "number", "role": "level" }
+  ]
+}

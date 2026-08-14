@@ -43,6 +43,16 @@
           <div id="instancesList"><p class="empty-hint">Loading…</p></div>
         </div>
         <div class="card" data-default-collapsed="true">
+          <h2>Uploaded drivers</h2>
+          <div id="uploadedDriversList"></div>
+          <form id="upload-driver-form" class="row" style="margin-top:10px;">
+            <input type="text" id="uploadDriverId" placeholder="driver id (e.g. my-plug)" />
+            <label class="lbl" style="width:100%;">manifest.json<input type="file" id="uploadManifestFile" accept=".json" /></label>
+            <label class="lbl" style="width:100%;">driver.js<input type="file" id="uploadDriverJsFile" accept=".js" /></label>
+            <button class="btn small primary" type="submit">Upload</button>
+          </form>
+        </div>
+        <div class="card" data-default-collapsed="true">
           <h2>Add instance</h2>
           <form id="add-instance-form">
             <div class="row" id="add-instance-fields"></div>
@@ -81,8 +91,9 @@
   <section class="page" id="page-dashboard">
     <div class="card">
       <h2>Dashboard</h2>
-      <div class="sub">every instance's primary state and actions, at a glance</div>
-      <div class="tile-grid" id="dashboardGrid"></div>
+      <div class="sub">organized by category - a driver instance appears under every category it declares</div>
+      <div class="subtabs" id="dashboardCatTabs"></div>
+      <div class="tile-grid" id="dashboardGrid" style="margin-top:12px;"></div>
     </div>
   </section>
 

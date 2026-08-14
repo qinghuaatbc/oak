@@ -24,6 +24,7 @@
     --accent:#dcb15c; --accent-strong:#a5793a; --accent-tint:rgba(255,190,80,0.25);
     --surface:rgba(255,255,255,0.5); --surface-strong:rgba(255,255,255,0.8);
     --hairline:rgba(0,0,0,0.08);
+    --track-bg:rgba(0,0,0,0.08); --thumb-ring:#fff;
     --good:#2f9563; --bad:#d9634e;
     --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     --mono: ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
@@ -41,6 +42,7 @@
       --accent:#e8c273; --accent-strong:#c99a4e; --accent-tint:rgba(255,190,80,0.16);
       --surface:rgba(255,255,255,0.06); --surface-strong:rgba(255,255,255,0.10);
       --hairline:rgba(255,255,255,0.10);
+      --track-bg:rgba(255,255,255,0.12); --thumb-ring:#1c2329;
       --good:#58c993; --bad:#ef8a82;
     }
   }
@@ -59,6 +61,7 @@
     --accent:#e8c273; --accent-strong:#c99a4e; --accent-tint:rgba(255,190,80,0.16);
     --surface:rgba(255,255,255,0.06); --surface-strong:rgba(255,255,255,0.10);
     --hairline:rgba(255,255,255,0.10);
+    --track-bg:rgba(255,255,255,0.12); --thumb-ring:#1c2329;
     --good:#58c993; --bad:#ef8a82;
   }
   *{ box-sizing:border-box; }
@@ -141,6 +144,11 @@
   .sky-card.offline{ opacity:.55; cursor:default; }
   .sky-offline-badge{ font-size:11px; font-weight:600; color:var(--bad); text-transform:uppercase; letter-spacing:.04em; }
   .sky-icon{ font-size:32px; }
+  .sky-ring{ width:100%; max-width:120px; touch-action:none; cursor:pointer; }
+  .ring-track{ fill:none; stroke:var(--track-bg); stroke-width:6; stroke-linecap:round; }
+  .ring-val{ fill:none; stroke:var(--accent); stroke-width:6; stroke-linecap:round; }
+  .ring-thumb{ fill:var(--accent); stroke:var(--thumb-ring); stroke-width:2; }
+  .ring-bulb{ font-size:50px; text-anchor:middle; dominant-baseline:middle; }
   .sky-value{ font-size:13px; color:var(--ink); font-weight:600; }
   .sky-label{ font-size:12px; font-weight:600; color:var(--ink); text-align:center; }
   .sky-actions{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
