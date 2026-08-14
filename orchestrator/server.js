@@ -721,7 +721,7 @@ function startCameraFfmpeg(rtspUrl, ws) {
 // upload UI (a driver folder living outside DRIVERS_DIR entirely would be
 // a bigger change; blocking deletion of the ones this repo ships is the
 // simple, correct guard for now).
-const BUILTIN_DRIVERS = new Set(["dsc-powerseries", "http-relay", "mqtt-plug", "generic-dimmer", "zone-hub", "eisy"]);
+const BUILTIN_DRIVERS = new Set(["dsc-powerseries", "http-relay", "mqtt-plug", "generic-dimmer", "zone-hub", "eisy", "homeassistant"]);
 
 function listDriverManifests() {
   return fs
@@ -1011,6 +1011,17 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       if (!body.id || !body.driver) return sendJson(res, 400, { error: "id and driver are required" });
+      // The id becomes a URL path segment for every stop/start/delete/
+      // action/config/state route this instance ever gets - a space or
+      // other URL-special character here (easy to end up with if someone
+      // pastes a driver's display name instead of typing a short slug)
+      // makes the instance impossible to control afterward, since the
+      // browser's encoded URL never matches this raw stored key. Caught
+      // here instead of a decodeURIComponent-and-hope-it-matches dance
+      // on every route.
+      if (!/^[A-Za-z0-9_-]+$/.test(body.id)) {
+        return sendJson(res, 400, { error: "Instance id must be letters, numbers, hyphens, or underscores only (no spaces) - e.g. \"living_room_light\"" });
+      }
       if (instances.has(body.id)) return sendJson(res, 400, { error: `Instance "${body.id}" already exists` });
       addInstance(body.id, { driver: body.driver, connection: body.connection || {}, settings: body.settings || {}, label: body.label });
       persistConfig();
