@@ -21,6 +21,7 @@ const path = require("path");
 const vm = require("vm");
 const Module = require("module");
 const { EventEmitter } = require("events");
+const WsClient = require("ws");
 
 function loadDriverModule(driverDir) {
   const filePath = path.join(driverDir, "driver.js");
@@ -32,6 +33,15 @@ function loadDriverModule(driverDir) {
     require: Module.createRequire(filePath),
     console,
     fetch, // standard Web API, available as a Node global since Node 18 - not from any driver SDK
+    // Node's own built-in WebSocket global (since Node 22) is spec-strict
+    // and has no way to send custom request headers (Authorization, a
+    // subprotocol, Origin) during the handshake, which real device APIs
+    // routinely require (e.g. UDI's ISY/eisy real-time event stream needs
+    // Authorization + Sec-WebSocket-Protocol: ISYSUB + a specific Origin).
+    // The `ws` package's WebSocket does support a headers/protocol options
+    // object, so it's what's exposed here - this is a real, load-bearing
+    // dependency (like web-push), not a nice-to-have.
+    WebSocket: WsClient,
     Buffer, // needed by any driver speaking a binary protocol (e.g. MQTT) - core Node global
   };
   vm.createContext(sandbox);

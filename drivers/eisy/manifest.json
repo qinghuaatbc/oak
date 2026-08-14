@@ -20,7 +20,6 @@
   "settings": [
     { "key": "username", "type": "string", "label": "Admin username" },
     { "key": "password", "type": "string", "label": "Admin password" },
-    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 5000 },
     {
       "key": "deviceNames",
       "type": "keyvalue",

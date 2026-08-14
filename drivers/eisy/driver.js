@@ -1,12 +1,19 @@
 "use strict";
-// Universal Devices ISY994/eisy driver over their own published REST API
-// (not RTI-specific - UDI documents these endpoints/commands themselves
-// for any third-party integrator, independent of any particular control
-// system): GET /rest/status polls every node's current property values
-// as XML, GET /rest/nodes/<address>/cmd/<command>[/<value>] sends a
-// command. DON/DOF (Insteon's own standard "device on"/"device off"
-// mnemonics) and CLISPH/CLISPC (climate setpoint heat/cool) are UDI's
-// own real command vocabulary, not invented here.
+// Universal Devices ISY994/eisy driver over their own published REST +
+// WebSocket API (not RTI-specific - UDI documents these endpoints/
+// commands themselves for any third-party integrator, independent of any
+// particular control system): GET /rest/status for one initial baseline
+// read, then a live WS subscription at /rest/subscribe for real-time node
+// updates (no polling once connected), and GET /rest/nodes/<address>/
+// cmd/<command>[/<value>] to send a command. DON/DOF (Insteon's own
+// standard "device on"/"device off" mnemonics) and CLISPH/CLISPC (climate
+// setpoint heat/cool) are UDI's own real command vocabulary, not invented
+// here. The WS handshake (Sec-WebSocket-Protocol: ISYSUB, a specific
+// Origin, Basic auth) and the <control>/<node>/<action> event shape were
+// both confirmed against a real eisy unit on the local network before
+// writing this, not guessed - a bare WebSocket upgrade with only the
+// standard headers gets a 400, the ISYSUB protocol + Origin combination
+// is what actually gets a 101.
 //
 // Node addresses (e.g. "18 22 4B 1") are a free-form action/state
 // parameter rather than individually declared in the manifest - a real
@@ -22,8 +29,9 @@ function xmlAttr(tag, name) {
 
 // Minimal purpose-built extractor for ISY's /rest/status response shape
 // (<node id="..."><property id="ST" value="..." .../></node> repeated) -
-// not a general XML parser, Oak has no XML dependency and this is the
-// only shape this driver ever needs to read.
+// used once at connect time for the initial baseline read. Not a general
+// XML parser, Oak has no XML dependency and this is the only shape this
+// driver ever needs to read here.
 function parseNodes(xml) {
   const nodes = {};
   const nodeRe = /<node id="([^"]+)">([\s\S]*?)<\/node>/g;
@@ -43,54 +51,97 @@ function parseNodes(xml) {
   return nodes;
 }
 
+// The real-time event stream's message shape: <Event seqnum="..."
+// sid="..." timestamp="..."><control>ST</control><action uom="100"
+// prec="0">255</action><node>18 22 4B 1</node><eventInfo/></Event> - note
+// <action> carries attributes (uom/prec) on real hardware, confirmed by
+// capturing actual traffic from a real eisy unit; a naive "<action>" (no
+// attributes) match silently fails to extract the value against real
+// devices even though it works fine against a hand-written test double
+// that doesn't happen to add those attributes - exactly the gap this
+// project's own established practice of real-hardware testing exists to
+// catch. A system-level event (heartbeat, sync status, etc.) has an EMPTY
+// <node></node> tag, not a missing one, which the caller's falsy check on
+// the extracted empty string already handles correctly either way.
+function parseEvent(xml) {
+  const control = (xml.match(/<control>([^<]*)<\/control>/) || [])[1];
+  const node = (xml.match(/<node>([^<]*)<\/node>/) || [])[1];
+  const action = (xml.match(/<action[^>]*>([^<]*)<\/action>/) || [])[1];
+  return { control, node, action };
+}
+
 function create(ctx) {
   const baseUrl = ctx.http.baseUrl;
   const username = (ctx.config.settings && ctx.config.settings.username) || "";
   const password = (ctx.config.settings && ctx.config.settings.password) || "";
   const authHeader = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
-  let pollHandle = null;
+  const RECONNECT_MS = 5000;
+  let ws = null;
+  let reconnectHandle = null;
+  let stopped = false;
   // Last-seen Insteon-native values (ST 0-255, setpoints x10) per node -
-  // used only to skip redundant setState/emitEvent calls when a poll
-  // returns unchanged data, same throttle-on-change pattern every other
-  // Oak driver in this project already uses.
+  // used only to skip redundant setState/emitEvent calls when a duplicate
+  // update arrives, same throttle-on-change pattern every other Oak
+  // driver in this project already uses.
   let lastRaw = {};
 
-  async function fetchStatus() {
+  function applyNodeProp(address, propId, rawValue) {
+    const prev = lastRaw[address] || {};
+    if (prev[propId] === rawValue) return;
+    lastRaw[address] = { ...prev, [propId]: rawValue };
+    if (propId === "ST") {
+      const raw = Number(rawValue);
+      ctx.setState("node.on", raw > 0, address);
+      ctx.setState("node.level", Math.round((raw / 255) * 100), address);
+      ctx.emitEvent("stateChanged", { address, property: "ST", value: raw });
+    } else if (propId === "CLISPH") {
+      ctx.setState("climate.heatSetpoint", Math.round(Number(rawValue) / 10), address);
+      ctx.emitEvent("stateChanged", { address, property: "CLISPH", value: Number(rawValue) / 10 });
+    } else if (propId === "CLISPC") {
+      ctx.setState("climate.coolSetpoint", Math.round(Number(rawValue) / 10), address);
+      ctx.emitEvent("stateChanged", { address, property: "CLISPC", value: Number(rawValue) / 10 });
+    }
+  }
+
+  async function fetchInitialStatus() {
     try {
       const res = await fetch(`${baseUrl}/rest/status`, { headers: { Authorization: authHeader } });
       const xml = await res.text();
       const nodes = parseNodes(xml);
       for (const [address, props] of Object.entries(nodes)) {
-        const prev = lastRaw[address] || {};
-        const next = { ...prev };
-        if ("ST" in props && props.ST !== prev.ST) {
-          next.ST = props.ST;
-          const raw = Number(props.ST);
-          ctx.setState("node.on", raw > 0, address);
-          ctx.setState("node.level", Math.round((raw / 255) * 100), address);
-          ctx.emitEvent("stateChanged", { address, property: "ST", value: raw });
-        }
-        if ("CLISPH" in props && props.CLISPH !== prev.CLISPH) {
-          next.CLISPH = props.CLISPH;
-          ctx.setState("climate.heatSetpoint", Math.round(Number(props.CLISPH) / 10), address);
-          ctx.emitEvent("stateChanged", { address, property: "CLISPH", value: Number(props.CLISPH) / 10 });
-        }
-        if ("CLISPC" in props && props.CLISPC !== prev.CLISPC) {
-          next.CLISPC = props.CLISPC;
-          ctx.setState("climate.coolSetpoint", Math.round(Number(props.CLISPC) / 10), address);
-          ctx.emitEvent("stateChanged", { address, property: "CLISPC", value: Number(props.CLISPC) / 10 });
-        }
-        lastRaw[address] = next;
+        for (const [propId, value] of Object.entries(props)) applyNodeProp(address, propId, value);
       }
     } catch (err) {
-      ctx.log("status poll failed:", err.message);
+      ctx.log("initial status fetch failed:", err.message);
     }
+  }
+
+  function connectEventStream() {
+    if (stopped) return;
+    const wsUrl = baseUrl.replace(/^http/, "ws") + "/rest/subscribe";
+    ws = new WebSocket(wsUrl, "ISYSUB", {
+      headers: { Authorization: authHeader, Origin: "com.universal-devices.websockets.isy" },
+    });
+    ws.on("open", () => ctx.log("Event stream connected:", wsUrl));
+    ws.on("message", (data) => {
+      const xml = data.toString();
+      const { control, node, action } = parseEvent(xml);
+      if (!control || !node || action === undefined) return; // heartbeat or non-node message
+      if (control === "ST" || control === "CLISPH" || control === "CLISPC") applyNodeProp(node, control, action);
+    });
+    ws.on("close", () => {
+      if (stopped) return;
+      ctx.log(`Event stream disconnected, reconnecting in ${RECONNECT_MS}ms`);
+      reconnectHandle = ctx.clock.after(RECONNECT_MS, connectEventStream);
+    });
+    ws.on("error", (err) => ctx.log("Event stream error:", err.message));
   }
 
   async function sendCommand(address, control, value) {
     const path = value !== undefined ? `/rest/nodes/${encodeURIComponent(address)}/cmd/${control}/${value}` : `/rest/nodes/${encodeURIComponent(address)}/cmd/${control}`;
+    // No fetchStatus() after the command the way the old polling version
+    // needed - the event stream reports the resulting state change itself.
     await fetch(`${baseUrl}${path}`, { headers: { Authorization: authHeader } });
-    await fetchStatus();
   }
 
   ctx.onAction("nodeOn", ({ address }) => sendCommand(address, "DON"));
@@ -100,14 +151,15 @@ function create(ctx) {
   ctx.onAction("climateSetCoolSetpoint", ({ address, setpoint = 76 }) => sendCommand(address, "CLISPC", Math.round(setpoint * 10)));
 
   return {
-    onConnect() {
-      ctx.log("Polling", baseUrl);
-      fetchStatus();
-      const intervalMs = (ctx.config.settings && ctx.config.settings.pollIntervalMs) || 5000;
-      pollHandle = ctx.clock.every(intervalMs, () => fetchStatus());
+    async onConnect() {
+      ctx.log("Connecting to", baseUrl);
+      await fetchInitialStatus();
+      connectEventStream();
     },
     onDisconnect() {
-      if (pollHandle) pollHandle.cancel();
+      stopped = true;
+      if (reconnectHandle) reconnectHandle.cancel();
+      if (ws) ws.terminate();
     },
   };
 }
