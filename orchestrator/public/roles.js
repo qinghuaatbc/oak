@@ -122,3 +122,80 @@ export function readOnState(state, stateId, suffix) {
 export function slotCallParams(slot, extra) {
   return { ...(slot && slot.fixedArgs), ...extra };
 }
+
+// "Which instance's running-state represents this slot" - a slot's
+// On/Off/Level/onState/levelState can each reference a DIFFERENT
+// instance (a macro-bound On, an Off on a different hub, etc.), so
+// there's no single "the" instance anymore. Level wins first (it's the
+// most likely to be this slot's real device when present), then
+// whichever action-kind On/Off is set, then whichever state ref is set -
+// good enough for an offline badge without needing to track every
+// referenced instance's running-state independently. Shared by live.js's
+// card grid and viewer3d.js's mesh bindings - both need the same answer.
+export function primaryInstanceId(slot) {
+  if (slot.levelFn) return slot.levelFn.instanceId;
+  if (slot.onFn && slot.onFn.kind === "action") return slot.onFn.instanceId;
+  if (slot.offFn && slot.offFn.kind === "action") return slot.offFn.instanceId;
+  if (slot.onState) return slot.onState.instanceId;
+  if (slot.levelState) return slot.levelState.instanceId;
+  return undefined;
+}
+export function slotOnEntry(slot, state) {
+  return slot.onState ? readOnState(state, slot.onState.stateId, slot.stateSuffix) : undefined;
+}
+export function slotLevelValue(slot, state) {
+  return slot.levelState ? readState(state, slot.levelState.stateId, slot.stateSuffix) : undefined;
+}
+
+// Dispatches a slot's On/Off function, which is either a single action
+// call or a macro run (the slot shape's only two function-ref "kinds" -
+// see this file's header comment). A macro run takes no params (its
+// steps carry their own fixed args, configured on the Macro tab) - the
+// slot's own fixedArgs only apply to the action case. Takes callAction/
+// runMacro as params rather than importing api.js directly, so this
+// stays usable from viewer3d.js too without that module needing to know
+// about the fetch layer.
+export function callFn(fn, slot, { callAction, runMacro }) {
+  if (!fn) return Promise.resolve();
+  if (fn.kind === "macro") return runMacro(fn.macroId);
+  return callAction(fn.instanceId, fn.actionId, slotCallParams(slot));
+}
+
+// A 3D mesh binding is a POINTER {cat, id} into bindingsData[cat], not a
+// copy of a slot - see server.js's sanitizeMeshBinding comment. Looking
+// it up here (rather than duplicating slot data into the mesh binding)
+// means a scene's device wiring always reflects the Dashboard tab's own
+// current slot definition, with exactly one source of truth.
+export function bindingSlot(bindingsData, mb) {
+  if (!mb || !bindingsData[mb.cat]) return undefined;
+  return bindingsData[mb.cat].find((s) => s.id === mb.id);
+}
+
+// Resolves a mesh binding's live on/level exactly the way a Dashboard
+// ring card does (slotOnEntry/slotLevelValue above) - shared by the admin
+// 3D editor and the live 3D view so both agree with each other, and with
+// the flat card grid, about what "on" means for a given slot.
+export function resolveMeshOnLevel(bindingsData, statesByInstance, mb) {
+  const slot = bindingSlot(bindingsData, mb);
+  if (!slot) return { on: false, level: 0 };
+  const state = statesByInstance.get(primaryInstanceId(slot)) || {};
+  const onEntry = slotOnEntry(slot, state);
+  const levelValue = slotLevelValue(slot, state);
+  const on = onEntry ? onEntry[1] : levelValue > 0;
+  return { on, level: levelValue !== undefined ? levelValue : on ? 100 : 0 };
+}
+
+// Mesh animation vocabulary - matches QTI's own create3DViewer exactly
+// (QTI is this project's own prior work, not RTI's - reusing an
+// already-proven design, not approximating one). ANIM_TYPES is ordered
+// for the admin bind-picker's <select>; AXIS_ANIM_TYPES marks which ones
+// need an axis+direction row (a plain glow/pulse has neither).
+export const ANIM_TYPES = [
+  { value: "", label: "None (click only)" },
+  { value: "light", label: "Glow" },
+  { value: "pulse", label: "Pulse (media)" },
+  { value: "rotate", label: "Rotate 90° (swing door)" },
+  { value: "slide", label: "Slide open (sliding door/window)" },
+  { value: "roller", label: "Roll up (shutter/blind)" },
+];
+export const AXIS_ANIM_TYPES = new Set(["rotate", "slide", "roller"]);

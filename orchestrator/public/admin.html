@@ -147,13 +147,21 @@
   <section class="page" id="page-3d">
     <div class="card">
       <h2>3D</h2>
-      <div class="sub">upload a .glb model to view it - no device-position binding yet, just the viewer</div>
-      <div class="row">
-        <input type="file" id="glbUploadInput" accept=".glb" />
-        <button class="btn small primary" id="glbUploadBtn">Upload</button>
+      <div class="sub">Upload a .glb model per scene, turn on Edit Bindings, then click a mesh to bind it to a device and animation (ported from QTI's own 3D binding feature).</div>
+      <div class="row" style="margin-bottom:8px;">
+        <select id="glb3dSceneSelect"></select>
+        <button class="btn small" id="glb3dAddSceneBtn" type="button">+ Add Scene</button>
+        <button class="btn small" id="glb3dRenameSceneBtn" type="button">Rename</button>
+        <button class="btn small danger" id="glb3dDeleteSceneBtn" type="button">Delete Scene</button>
       </div>
+      <div class="row" style="margin-bottom:8px;">
+        <input type="file" id="glbUploadInput" accept=".glb" />
+        <button class="btn small primary" id="glbUploadBtn">Upload GLB</button>
+        <button class="btn small" id="glb3dEditToggleBtn" type="button">Edit Bindings: Off</button>
+      </div>
+      <div class="sub" id="glb3dHint"></div>
       <div id="canvas3dWrap" style="position:relative; width:100%; height:70vh; border-radius:16px; overflow:hidden; margin-top:12px; background:linear-gradient(180deg, var(--bg), var(--raised)); border:1px solid var(--line);">
-        <div id="glbHint" class="empty-hint" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">Upload a .glb to get started</div>
+        <div id="glbHint" class="empty-hint" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">Add a scene and upload a .glb to get started</div>
       </div>
     </div>
   </section>

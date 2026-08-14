@@ -12,20 +12,26 @@
 import { listInstances, getState, callAction, getBindings, runMacro } from "./api.js";
 import { connectWS } from "./live-socket.js";
 import { createCommPanel } from "./comm.js";
-import { CATEGORY_ICON, CATEGORY_LABEL, CATEGORY_ORDER, readOnState, readState, slotCallParams } from "./roles.js";
+import {
+  CATEGORY_ICON,
+  CATEGORY_LABEL,
+  CATEGORY_ORDER,
+  slotCallParams,
+  primaryInstanceId,
+  slotOnEntry,
+  slotLevelValue,
+  callFn as callFnShared,
+  bindingSlot,
+  resolveMeshOnLevel,
+} from "./roles.js";
+import { create3DPanel } from "./live-3d.js";
 
-// Dispatches a slot's On/Off function, which is either a single action
-// call or a macro run - the only two "kinds" a function ref can be (see
-// roles.js's header comment for the full slot shape). A macro run takes
-// no params (its steps carry their own fixed args, configured on the
-// Macro tab) - the slot's own fixedArgs only apply to the action case.
-// Level is always action-kind (never a macro - a macro can't receive a
-// live drag value), so it's called directly via callAction at its own
-// call sites instead of going through this helper.
+// Thin wrapper binding roles.js's generic callFn to this page's api.js
+// imports - see roles.js for why callFn takes callAction/runMacro as
+// params instead of importing api.js itself (so viewer3d.js's dispatch
+// path, wired up in live-3d.js, can share the exact same function).
 function callFn(fn, slot) {
-  if (!fn) return Promise.resolve();
-  if (fn.kind === "macro") return runMacro(fn.macroId);
-  return callAction(fn.instanceId, fn.actionId, slotCallParams(slot));
+  return callFnShared(fn, slot, { callAction, runMacro });
 }
 
 const FALLBACK_POLL_MS = 10000;
@@ -33,11 +39,34 @@ const REFRESH_DEBOUNCE_MS = 150;
 
 const grid = document.getElementById("skyGrid");
 const sidebar = document.getElementById("skySidebar");
+const live3dPanelEl = document.getElementById("live3dPanel");
 let runningByInstance = new Map(); // instanceId -> boolean
 let statesByInstance = new Map(); // instanceId -> {key: value}
 let bindingsData = Object.fromEntries(CATEGORY_ORDER.map((c) => [c, []])); // cat -> slot[]
 let cardEls = new Map(); // slotId -> {el, apply(state, running), cat}
 let activeCat = "__all__";
+
+// A bound 3D mesh's tap toggles its device exactly like a flat card's tap
+// does - resolve current on/off via the same shared helper the card grid
+// uses, then call whichever of On/Off is appropriate.
+function dispatch3DMeshClick(mb) {
+  const slot = bindingSlot(bindingsData, mb);
+  if (!slot) return;
+  const { on } = resolveMeshOnLevel(bindingsData, statesByInstance, mb);
+  const fn = on ? slot.offFn : slot.onFn;
+  if (!fn) return;
+  const turningOn = !on;
+  callFn(fn, slot)
+    .then(() => panel3d.refresh())
+    .catch((e) => console.error("3D mesh action failed", e));
+  feedbackToggle(slot.name, turningOn);
+}
+const panel3d = create3DPanel({
+  sceneSelectId: "live3dSceneSelect",
+  getBindingsData: () => bindingsData,
+  getStatesByInstance: () => statesByInstance,
+  dispatchToggle: dispatch3DMeshClick,
+});
 
 // ---------------------------------------------------------------------
 // Ring-dial geometry - identical constants/math to QTI's own live.js
@@ -73,29 +102,6 @@ function ringProgressFromEvent(svgEl, evt) {
   const scale = rect.width / RING_S;
   const raw = ((Math.atan2(evt.clientY - rect.top - RING_CY * scale, evt.clientX - rect.left - RING_CX * scale) * 180) / Math.PI + 360) % 360;
   return ringAngleToProgress(raw);
-}
-
-// "Which instance's running-state represents this card" - a slot's
-// On/Off/Level/onState/levelState can each reference a DIFFERENT
-// instance (a macro-bound On, an Off on a different hub, etc.), so
-// there's no single "the" instance anymore. Level wins first (it's the
-// most likely to be this card's real device when present), then
-// whichever action-kind On/Off is set, then whichever state ref is set -
-// good enough for the offline badge without needing to track every
-// referenced instance's running-state independently.
-function primaryInstanceId(slot) {
-  if (slot.levelFn) return slot.levelFn.instanceId;
-  if (slot.onFn && slot.onFn.kind === "action") return slot.onFn.instanceId;
-  if (slot.offFn && slot.offFn.kind === "action") return slot.offFn.instanceId;
-  if (slot.onState) return slot.onState.instanceId;
-  if (slot.levelState) return slot.levelState.instanceId;
-  return undefined;
-}
-function slotOnEntry(slot, state) {
-  return slot.onState ? readOnState(state, slot.onState.stateId, slot.stateSuffix) : undefined;
-}
-function slotLevelValue(slot, state) {
-  return slot.levelState ? readState(state, slot.levelState.stateId, slot.stateSuffix) : undefined;
 }
 
 // A ring-dial card for any slot with a Level function bound - tap toggles
@@ -345,6 +351,17 @@ function renderSidebar() {
     btn.addEventListener("click", () => setActiveCategory(cat));
     sidebar.appendChild(btn);
   });
+  // 3D is treated as just another filterable category, matching QTI's
+  // own live pages - only shown once at least one scene has an uploaded
+  // model, so an installer who hasn't touched the 3D tab yet sees nothing
+  // different here.
+  if (panel3d.hasScenes()) {
+    const btn = document.createElement("button");
+    btn.className = "sky-cat" + (activeCat === "__3d__" ? " active" : "");
+    btn.innerHTML = `<span>🏠</span><span>3D</span>`;
+    btn.addEventListener("click", () => setActiveCategory("__3d__"));
+    sidebar.appendChild(btn);
+  }
 }
 const ZH_CATEGORY_LABEL = { light: "灯光", switch: "开关", security: "安防", climate: "温控", media: "媒体", sensor: "传感器", generic: "通用" };
 function zhCategoryLabel(cat) {
@@ -357,6 +374,13 @@ function setActiveCategory(cat) {
   applyCategoryVisibility();
 }
 function applyCategoryVisibility() {
+  const is3D = activeCat === "__3d__";
+  grid.classList.toggle("sky-hidden", is3D);
+  live3dPanelEl.classList.toggle("sky-hidden", !is3D);
+  if (is3D) {
+    panel3d.show();
+    return;
+  }
   cardEls.forEach(({ el, cat }) => {
     el.classList.toggle("sky-hidden", activeCat !== "__all__" && cat !== activeCat);
   });

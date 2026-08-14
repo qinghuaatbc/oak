@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Oak Live</title>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
 <script>
   if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 </script>
@@ -172,6 +173,12 @@
       <div id="conn"><span id="dot"></span><span id="connlabel">connecting</span></div>
     </div>
     <div class="sky-grid" id="skyGrid"></div>
+    <div class="sky-hidden" id="live3dPanel" style="flex:1; display:flex; flex-direction:column;">
+      <div class="row sky-hidden" style="margin-bottom:10px;">
+        <select id="live3dSceneSelect"></select>
+      </div>
+      <div id="canvas3dWrap" style="position:relative; width:100%; flex:1; min-height:60vh; border-radius:16px; overflow:hidden; background:var(--surface);"></div>
+    </div>
   </main>
 </div>
 

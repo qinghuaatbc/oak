@@ -440,9 +440,19 @@ function persistConfig() {
 // category the same way QTI's admin does (Lights, Switches, ...).
 const BINDINGS_PATH = process.env.OAK_BINDINGS || path.join(__dirname, "bindings.json");
 const BINDING_CATEGORIES = ["light", "switch", "climate", "security", "media", "sensor", "generic"];
+// 3D mesh-binding animation vocabulary - matches QTI's own create3DViewer
+// exactly (QTI is this project's own prior work, not RTI's, so this is
+// reusing an already-proven design rather than approximating one): a mesh
+// either just highlights on click ("light"/glow), breathes continuously
+// while on ("pulse", for speakers/media), or moves along one axis
+// ("rotate"/"slide"/"roller" - swinging door, sliding door/window,
+// roller shutter). Only the axis types need an axis+direction.
+const ANIM_TYPES = ["", "light", "pulse", "rotate", "slide", "roller"];
+const AXIS_ANIM_TYPES = new Set(["rotate", "slide", "roller"]);
 function bindingsDefaults() {
   const obj = {};
   for (const c of BINDING_CATEGORIES) obj[c] = [];
+  obj.glbs = [];
   return obj;
 }
 function loadBindings() {
@@ -451,6 +461,7 @@ function loadBindings() {
     const raw = JSON.parse(fs.readFileSync(BINDINGS_PATH, "utf8"));
     const out = bindingsDefaults();
     for (const c of BINDING_CATEGORIES) if (Array.isArray(raw[c])) out[c] = raw[c];
+    if (Array.isArray(raw.glbs)) out.glbs = raw.glbs;
     return out;
   } catch (e) {
     console.error(`Failed to read ${BINDINGS_PATH}:`, e.message);
@@ -498,6 +509,39 @@ function sanitizeSlot(s) {
     stateSuffix: typeof s.stateSuffix === "string" && s.stateSuffix ? s.stateSuffix : undefined,
   };
 }
+// A mesh binding is a POINTER into bindings[cat], not a copy of a slot -
+// {cat:"light", id:"7c61707f"} looks up the same slot the Dashboard tab
+// already renders, so a 3D scene's device wiring (on/off/level functions,
+// state refs, fixedArgs) has exactly one source of truth. This mirrors
+// QTI's own {kind, id} mesh-binding shape (server.js's meshBindings), just
+// with Oak's actual category vocabulary in place of QTI's fixed
+// lights/media/doors/security set.
+function sanitizeMeshBinding(m) {
+  if (!m || typeof m !== "object") return undefined;
+  if (!BINDING_CATEGORIES.includes(m.cat) || typeof m.id !== "string" || !m.id) return undefined;
+  const out = { cat: m.cat, id: m.id, animType: ANIM_TYPES.includes(m.animType) ? m.animType : "" };
+  if (AXIS_ANIM_TYPES.has(out.animType)) {
+    out.axis = ["x", "y", "z"].includes(m.axis) ? m.axis : "x";
+    out.dir = m.dir === -1 ? -1 : 1;
+  }
+  return out;
+}
+function sanitizeGlbScene(s) {
+  if (!s || typeof s !== "object") return null;
+  const meshBindings = {};
+  if (s.meshBindings && typeof s.meshBindings === "object") {
+    for (const [meshName, mb] of Object.entries(s.meshBindings)) {
+      const sm = sanitizeMeshBinding(mb);
+      if (sm) meshBindings[meshName] = sm;
+    }
+  }
+  return {
+    id: typeof s.id === "string" && s.id ? s.id : crypto.randomBytes(4).toString("hex"),
+    name: typeof s.name === "string" && s.name ? s.name.slice(0, 60) : "Untitled",
+    url: typeof s.url === "string" && s.url ? s.url : null,
+    meshBindings,
+  };
+}
 function sanitizeBindings(raw) {
   const out = bindingsDefaults();
   if (!raw || typeof raw !== "object") return out;
@@ -505,6 +549,7 @@ function sanitizeBindings(raw) {
     if (!Array.isArray(raw[c])) continue;
     out[c] = raw[c].map(sanitizeSlot).filter(Boolean);
   }
+  out.glbs = Array.isArray(raw.glbs) ? raw.glbs.map(sanitizeGlbScene).filter(Boolean) : [];
   return out;
 }
 

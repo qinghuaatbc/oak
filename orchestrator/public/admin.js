@@ -2,14 +2,25 @@ import {
   listInstances, getManifest, getState, callAction, listDrivers, addInstance, deleteInstance,
   getConfig, editInstance, stopInstance, startInstance,
   getHealth, listMacros, saveMacro, deleteMacro, runMacro,
-  listCameras, addCamera, deleteCamera, listGlbModels, uploadGlb,
+  listCameras, addCamera, deleteCamera, uploadGlb,
   uploadDriver, deleteDriverPackage,
   getBindings, saveBindings, autoGenerateBindings,
 } from "./api.js";
 import { connectLiveSocket } from "./live-socket.js";
 import { attachCameraPlayer } from "./camera-player.js";
 import { create3DViewer } from "./viewer3d.js";
-import { CATEGORY_ICON, CATEGORY_LABEL, CATEGORY_ORDER, effectiveCategories, getOnOffPair } from "./roles.js";
+import {
+  CATEGORY_ICON,
+  CATEGORY_LABEL,
+  CATEGORY_ORDER,
+  effectiveCategories,
+  getOnOffPair,
+  ANIM_TYPES,
+  AXIS_ANIM_TYPES,
+  bindingSlot,
+  resolveMeshOnLevel as resolveMeshOnLevelShared,
+  callFn as callFnShared,
+} from "./roles.js";
 
 const FALLBACK_POLL_MS = 10000;
 const REFRESH_DEBOUNCE_MS = 150;
@@ -595,7 +606,7 @@ function activateMainTab(page) {
   else if (page === "macro") renderMacrosTab();
   else if (page === "health") renderHealthTab();
   else if (page === "camera") renderCameraTab();
-  else if (page === "3d" && !viewer3dInited) initViewer3DWithRetry();
+  else if (page === "3d") open3DTab();
 }
 document.querySelectorAll("nav.maintabs .mt").forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -1229,29 +1240,146 @@ document.getElementById("add-camera-form").addEventListener("submit", async (ev)
   renderCameraTab();
 });
 
-// --- 3D: upload-and-view only (see viewer3d.js for what's deliberately
-// not ported from QTI's version - no device-mesh binding). Retried with
-// backoff on init failure - a transient CDN hiccup fetching three.js
-// shouldn't leave the tab permanently stuck with no explanation, the exact
-// failure mode QTI's own initViewer3DWithRetry comment documents hitting. ---
-const viewer3d = create3DViewer();
+// --- 3D: mesh-to-device binding editor, ported from QTI's own
+// create3DViewer + app.js's openMeshBindPicker (QTI is this project's own
+// prior work, not RTI's - reusing an already-proven design). A scene is a
+// named GLB model + a meshBindings map (mesh name -> {cat, id, animType,
+// axis, dir}), persisted as bindings.glbs alongside the Dashboard's own
+// category slot arrays (see server.js's sanitizeGlbScene) - multiple
+// scenes (e.g. one per floor) are supported, matching QTI's own scene
+// picker. A mesh binding is a POINTER into bindingsCache[cat] by slot id,
+// not a copy - see roles.js's bindingSlot comment - so the 3D view always
+// reflects the Dashboard tab's current device wiring.
+let glb3dEditMode = false;
+let glb3dCurrentSceneId = null;
+
+async function ensureBindingsCache() {
+  if (!bindingsCache) bindingsCache = await getBindings();
+  return bindingsCache;
+}
+function currentGlb3DScene() {
+  return (bindingsCache && bindingsCache.glbs || []).find((s) => s.id === glb3dCurrentSceneId);
+}
+function resolveMeshOnLevel(mb) {
+  return resolveMeshOnLevelShared(bindingsCache, statesByInstance, mb);
+}
+function dispatchMeshDeviceClick(mb) {
+  const slot = bindingSlot(bindingsCache, mb);
+  if (!slot) return;
+  const { on } = resolveMeshOnLevel(mb);
+  const fn = on ? slot.offFn : slot.onFn;
+  if (!fn) return;
+  callFnShared(fn, slot, { callAction, runMacro }).then(() => viewer3d.updateVisuals());
+}
+
+const viewer3d = create3DViewer({
+  editable: () => glb3dEditMode,
+  onEditClick: (meshName, x, y) => openMeshBindPicker(meshName, x, y),
+  onDeviceClick: dispatchMeshDeviceClick,
+  getMeshBindings: () => (currentGlb3DScene() || {}).meshBindings || {},
+  resolveOnLevel: resolveMeshOnLevel,
+});
 let viewer3dInited = false;
+
+function renderGlb3DHint() {
+  const scene = currentGlb3DScene();
+  const hintEl = document.getElementById("glb3dHint");
+  if (!scene) {
+    hintEl.textContent = `No scenes yet - "+ Add Scene" to create one.`;
+    return;
+  }
+  const bound = Object.keys(scene.meshBindings || {}).length;
+  hintEl.textContent = glb3dEditMode
+    ? `Edit mode: click a mesh in the model to bind it to a device and animation (${bound} bound).`
+    : `Click a bound mesh to toggle its device (${bound} bound). Turn on Edit Bindings to rebind meshes.`;
+}
+function renderGlb3DSceneSelect() {
+  const sel = document.getElementById("glb3dSceneSelect");
+  const scenes = (bindingsCache && bindingsCache.glbs) || [];
+  sel.innerHTML = scenes.map((s) => `<option value="${s.id}"${s.id === glb3dCurrentSceneId ? " selected" : ""}>${s.name}</option>`).join("");
+}
+async function loadGlb3DScene(sceneId) {
+  glb3dCurrentSceneId = sceneId;
+  renderGlb3DSceneSelect();
+  const scene = currentGlb3DScene();
+  const hintEl = document.getElementById("glbHint");
+  if (!scene || !scene.url) {
+    hintEl.style.display = "flex";
+    hintEl.textContent = scene ? "Upload a .glb for this scene to get started" : "Add a scene and upload a .glb to get started";
+  } else {
+    hintEl.style.display = "none";
+    viewer3d.loadGLB(scene.url);
+  }
+  renderGlb3DHint();
+}
+
+// Retried with backoff on init failure - a transient CDN hiccup fetching
+// three.js shouldn't leave the tab permanently stuck with no explanation,
+// the exact failure mode QTI's own initViewer3DWithRetry comment
+// documents hitting.
 async function initViewer3DWithRetry(attempt) {
   attempt = attempt || 0;
   try {
     await viewer3d.init();
     viewer3dInited = true;
-    const models = await listGlbModels();
-    if (models.length) {
-      document.getElementById("glbHint").style.display = "none";
-      viewer3d.loadGLB(models[0].url);
-    }
   } catch (e) {
     console.error(`3D viewer init failed (attempt ${attempt + 1}):`, e);
     if (attempt < 3) setTimeout(() => initViewer3DWithRetry(attempt + 1), 1500 * (attempt + 1));
   }
 }
+async function open3DTab() {
+  await ensureBindingsCache();
+  if (!bindingsCache.glbs.length) {
+    bindingsCache.glbs.push({ id: Math.random().toString(16).slice(2, 10), name: "Main Scene", url: null, meshBindings: {} });
+    persistBindings();
+  }
+  if (!glb3dCurrentSceneId || !currentGlb3DScene()) glb3dCurrentSceneId = bindingsCache.glbs[0].id;
+  if (!viewer3dInited) await initViewer3DWithRetry();
+  await loadGlb3DScene(glb3dCurrentSceneId);
+}
+
+document.getElementById("glb3dSceneSelect").addEventListener("change", (ev) => loadGlb3DScene(ev.target.value));
+document.getElementById("glb3dAddSceneBtn").addEventListener("click", async () => {
+  const name = prompt("Scene name:", `Scene ${bindingsCache.glbs.length + 1}`);
+  if (!name) return;
+  const scene = { id: Math.random().toString(16).slice(2, 10), name: name.slice(0, 60), url: null, meshBindings: {} };
+  bindingsCache.glbs.push(scene);
+  await persistBindings();
+  await loadGlb3DScene(scene.id);
+});
+document.getElementById("glb3dRenameSceneBtn").addEventListener("click", async () => {
+  const scene = currentGlb3DScene();
+  if (!scene) return;
+  const name = prompt("Scene name:", scene.name);
+  if (!name) return;
+  scene.name = name.slice(0, 60);
+  await persistBindings();
+  renderGlb3DSceneSelect();
+});
+document.getElementById("glb3dDeleteSceneBtn").addEventListener("click", async () => {
+  const scene = currentGlb3DScene();
+  if (!scene) return;
+  if (!confirm(`Delete scene "${scene.name}"? This only removes its bindings, not the uploaded .glb file.`)) return;
+  bindingsCache.glbs = bindingsCache.glbs.filter((s) => s.id !== scene.id);
+  await persistBindings();
+  if (!bindingsCache.glbs.length) {
+    bindingsCache.glbs.push({ id: Math.random().toString(16).slice(2, 10), name: "Main Scene", url: null, meshBindings: {} });
+    await persistBindings();
+  }
+  await loadGlb3DScene(bindingsCache.glbs[0].id);
+});
+document.getElementById("glb3dEditToggleBtn").addEventListener("click", (ev) => {
+  glb3dEditMode = !glb3dEditMode;
+  ev.target.textContent = `Edit Bindings: ${glb3dEditMode ? "On" : "Off"}`;
+  ev.target.classList.toggle("primary", glb3dEditMode);
+  renderGlb3DHint();
+});
 document.getElementById("glbUploadBtn").addEventListener("click", async () => {
+  const scene = currentGlb3DScene();
+  if (!scene) {
+    alert("Add a scene first");
+    return;
+  }
   const input = document.getElementById("glbUploadInput");
   const file = input.files[0];
   if (!file) {
@@ -1265,10 +1393,105 @@ document.getElementById("glbUploadBtn").addEventListener("click", async () => {
     alert(result.error);
     return;
   }
+  scene.url = result.url;
+  await persistBindings();
   document.getElementById("glbHint").style.display = "none";
   if (!viewer3dInited) await initViewer3DWithRetry();
-  viewer3d.loadGLB(result.url);
+  viewer3d.loadGLB(scene.url);
+  renderGlb3DHint();
 });
+
+// Floating popup positioned at the click point, matching QTI's own
+// openMeshBindPicker exactly (a small anchored popup, not a modal) - the
+// device dropdown is grouped by category the same way the Dashboard tab
+// itself is, sourced straight from bindingsCache so a mesh can only ever
+// be bound to a slot that actually exists.
+let meshBindPopupEl = null;
+function closeMeshBindPopup() {
+  if (meshBindPopupEl) meshBindPopupEl.remove();
+  meshBindPopupEl = null;
+}
+function openMeshBindPicker(meshName, clientX, clientY) {
+  closeMeshBindPopup();
+  const scene = currentGlb3DScene();
+  if (!scene) return;
+  const existing = scene.meshBindings[meshName];
+
+  const popup = document.createElement("div");
+  popup.className = "card";
+  popup.style.cssText = `position:fixed; left:${Math.min(clientX, window.innerWidth - 300)}px; top:${Math.min(clientY, window.innerHeight - 260)}px; width:280px; z-index:500; box-shadow:0 8px 30px rgba(0,0,0,0.35);`;
+
+  const deviceOptions = CATEGORY_ORDER.map((cat) => {
+    const slots = (bindingsCache[cat] || []);
+    if (!slots.length) return "";
+    const opts = slots
+      .map((s) => `<option value="${cat}:${s.id}"${existing && existing.cat === cat && existing.id === s.id ? " selected" : ""}>${s.name}</option>`)
+      .join("");
+    return `<optgroup label="${CATEGORY_LABEL[cat]}">${opts}</optgroup>`;
+  }).join("");
+
+  popup.innerHTML = `
+    <h2 style="font-size:.9rem;">${meshName}</h2>
+    <label><span class="lbl">Device</span>
+      <select id="meshBindDevice"><option value="">— unbound —</option>${deviceOptions}</select>
+    </label>
+    <label><span class="lbl">Animation</span>
+      <select id="meshBindAnim">${ANIM_TYPES.map((a) => `<option value="${a.value}"${existing && existing.animType === a.value ? " selected" : ""}>${a.label}</option>`).join("")}</select>
+    </label>
+    <div class="row" id="meshBindAxisRow" style="display:none;">
+      <label><span class="lbl">Axis</span>
+        <select id="meshBindAxis">${["x", "y", "z"].map((a) => `<option value="${a}"${existing && existing.axis === a ? " selected" : ""}>${a}</option>`).join("")}</select>
+      </label>
+      <label><span class="lbl">Direction</span>
+        <select id="meshBindDir">
+          <option value="1"${!existing || existing.dir === 1 ? " selected" : ""}>+</option>
+          <option value="-1"${existing && existing.dir === -1 ? " selected" : ""}>-</option>
+        </select>
+      </label>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <button class="btn small primary" id="meshBindSaveBtn" type="button">Save</button>
+      <button class="btn small danger" id="meshBindUnbindBtn" type="button">Unbind</button>
+      <button class="btn small" id="meshBindCancelBtn" type="button">Cancel</button>
+    </div>`;
+  document.body.appendChild(popup);
+  meshBindPopupEl = popup;
+
+  const animSel = popup.querySelector("#meshBindAnim");
+  const axisRow = popup.querySelector("#meshBindAxisRow");
+  function syncAxisRow() {
+    axisRow.style.display = AXIS_ANIM_TYPES.has(animSel.value) ? "flex" : "none";
+  }
+  animSel.addEventListener("change", syncAxisRow);
+  syncAxisRow();
+
+  popup.querySelector("#meshBindSaveBtn").addEventListener("click", async () => {
+    const deviceVal = popup.querySelector("#meshBindDevice").value;
+    if (!deviceVal) {
+      delete scene.meshBindings[meshName];
+    } else {
+      const [cat, id] = deviceVal.split(/:(.*)/s);
+      const mb = { cat, id, animType: animSel.value };
+      if (AXIS_ANIM_TYPES.has(mb.animType)) {
+        mb.axis = popup.querySelector("#meshBindAxis").value;
+        mb.dir = Number(popup.querySelector("#meshBindDir").value);
+      }
+      scene.meshBindings[meshName] = mb;
+    }
+    await persistBindings();
+    viewer3d.updateVisuals();
+    renderGlb3DHint();
+    closeMeshBindPopup();
+  });
+  popup.querySelector("#meshBindUnbindBtn").addEventListener("click", async () => {
+    delete scene.meshBindings[meshName];
+    await persistBindings();
+    viewer3d.updateVisuals();
+    renderGlb3DHint();
+    closeMeshBindPopup();
+  });
+  popup.querySelector("#meshBindCancelBtn").addEventListener("click", closeMeshBindPopup);
+}
 
 async function fullRefresh() {
   const list = await listInstances();

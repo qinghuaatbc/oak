@@ -1,0 +1,96 @@
+// Live 3D view: a thin, page-specific wrapper around viewer3d.js's mesh-
+// binding engine, mirroring the shape admin.js's editor uses (see
+// viewer3d.js's header comment for why the viewer itself knows nothing
+// about bindingsData/statesByInstance - both pages hand it callbacks
+// instead). Read-only here - live.js is the customer-facing page, so
+// there's no edit mode; tapping a bound mesh toggles its device exactly
+// like tapping a flat card does, via the `dispatchToggle` callback the
+// host page supplies.
+import { create3DViewer } from "./viewer3d.js";
+import { resolveMeshOnLevel } from "./roles.js";
+
+export function create3DPanel({ sceneSelectId, getBindingsData, getStatesByInstance, dispatchToggle }) {
+  let currentSceneId = null;
+  let inited = false;
+
+  function scenes() {
+    return (getBindingsData().glbs) || [];
+  }
+  function currentScene() {
+    return scenes().find((s) => s.id === currentSceneId);
+  }
+
+  const viewer3d = create3DViewer({
+    editable: () => false,
+    onDeviceClick: (mb) => dispatchToggle(mb),
+    getMeshBindings: () => (currentScene() || {}).meshBindings || {},
+    resolveOnLevel: (mb) => resolveMeshOnLevel(getBindingsData(), getStatesByInstance(), mb),
+  });
+
+  function renderSceneSelect() {
+    const sel = document.getElementById(sceneSelectId);
+    if (!sel) return;
+    const list = scenes();
+    sel.closest(".row").classList.toggle("sky-hidden", list.length < 2);
+    sel.innerHTML = list.map((s) => `<option value="${s.id}"${s.id === currentSceneId ? " selected" : ""}>${s.name}</option>`).join("");
+    sel.value = currentSceneId || "";
+  }
+
+  async function loadCurrentScene() {
+    const scene = currentScene();
+    if (scene && scene.url) viewer3d.loadGLB(scene.url);
+  }
+
+  // Returns whether there's anything to show - the host page uses this
+  // to decide whether the 3D sidebar button appears at all, matching
+  // QTI's own "3D is just another filterable category" treatment.
+  function hasScenes() {
+    return scenes().some((s) => s.url);
+  }
+
+  // Called every time the 3D category becomes/stays active - including
+  // on every refresh() tick while it's already showing, since live.js
+  // doesn't distinguish "just switched to 3D" from "still on 3D, state
+  // changed" at the call site. Only reloads the GLB (a real network
+  // fetch + full mesh re-traversal) on an actual scene change or first
+  // show; otherwise just re-eases toward the latest state, exactly like
+  // repeatedly calling show() while already visible should be free.
+  async function show() {
+    const list = scenes().filter((s) => s.url);
+    if (!list.length) return false;
+    const wantSceneId = currentSceneId && list.some((s) => s.id === currentSceneId) ? currentSceneId : list[0].id;
+    const sceneChanged = wantSceneId !== currentSceneId;
+    currentSceneId = wantSceneId;
+    renderSceneSelect();
+    if (!inited) {
+      await viewer3d.init();
+      inited = true;
+      await loadCurrentScene();
+    } else if (sceneChanged) {
+      await loadCurrentScene();
+    } else {
+      viewer3d.updateVisuals();
+    }
+    return true;
+  }
+
+  // Called on every refresh() tick (state poll/WS push) while the 3D
+  // panel is visible - keeps animated meshes in sync with real device
+  // state the same way the flat card grid does, unconditionally (not
+  // gated to "only if a light changed" the way QTI's own refreshFor once
+  // was - that gate is what left QTI's own door/media meshes stale after
+  // a sysvar push in the past, not worth reproducing here).
+  function refresh() {
+    if (inited) viewer3d.updateVisuals();
+  }
+
+  const sel = document.getElementById(sceneSelectId);
+  if (sel) {
+    sel.addEventListener("change", async (ev) => {
+      currentSceneId = ev.target.value;
+      await loadCurrentScene();
+    });
+  }
+
+  return { show, refresh, hasScenes };
+}
