@@ -22,6 +22,7 @@ let statesByInstance = new Map(); // id -> {key: value}
 let labelByInstance = new Map(); // id -> string|undefined - QTI's own generic "Label (optional, to tell instances apart)" field, e.g. telling two eisy instances apart
 let bindingsCache = null; // {light:[], switch:[], ...} - loaded when the Dashboard tab is opened
 let macrosCache = []; // loaded alongside bindingsCache - macros are a valid On/Off function target
+let configByInstance = new Map(); // instanceId -> getConfig() result, loaded alongside bindingsCache - source of a slot's fixed-argument dropdown (see deviceNameOptionsForSlot)
 
 // Everywhere the UI shows "which instance is this", show the admin's own
 // label if they set one, falling back to the driver's generic
@@ -537,11 +538,80 @@ function fixedParamKeysForSlot(slot) {
   return [...keys];
 }
 
+// Matches QTI's own real behavior (its "Name" field for a function like
+// eisy's Light On is a dropdown, not free text, sourced from the
+// driver's own configured device list) - if the slot's instance has
+// exactly one non-empty `type: "keyvalue"` setting (deviceNames,
+// zoneNames, ...), that's an unambiguous source of "raw id -> friendly
+// name" pairs to offer as a dropdown instead of asking the admin to
+// type/copy a cryptic raw address by hand. Returns null (fall back to a
+// plain text input) when there's no such setting, or when there's more
+// than one and no way to tell which one this fixed argument means (e.g.
+// dsc-powerseries has both zoneNames and partitionNames).
+function deviceNameOptionsForSlot(slot) {
+  const instanceIds = [slot.onFn, slot.offFn, slot.levelFn]
+    .filter((f) => f && f.kind !== "macro")
+    .map((f) => f.instanceId);
+  for (const id of new Set(instanceIds)) {
+    const manifest = manifests.get(id);
+    const cfg = configByInstance.get(id);
+    if (!manifest || !cfg || !cfg.settings) continue;
+    const kvKeys = (manifest.settings || []).filter((s) => s.type === "keyvalue").map((s) => s.key);
+    const nonEmpty = kvKeys.filter((key) => cfg.settings[key] && Object.keys(cfg.settings[key]).length);
+    if (nonEmpty.length === 1) return Object.entries(cfg.settings[nonEmpty[0]]);
+  }
+  return null;
+}
+
 // Builds one On/Off/Level function editor: a "Call a function" vs "Run a
 // macro" choice (allowMacro only), an Instance+Action pair for action
 // mode, or a Macro picker for macro mode - both sub-blocks stay in the
 // DOM and just toggle visibility rather than being destroyed/rebuilt on
 // every kind switch, so listeners only get wired once.
+// Renders the currently-selected action's own fixed params (e.g. a hub's
+// "address"/"zone" param, excluding the live "level" value) INSIDE this
+// function's own box - matching QTI's actual layout (its "Name" field for
+// a function like eisy's Light On sits inside that function's own
+// "Function" box, not in a separate shared section). The underlying value
+// is still ONE shared slot.fixedArgs object, not a per-function copy - so
+// filling in "kitchen" for On also fills it in for Off/Level's own boxes
+// once onChanged() (passed in by buildSlotRow) refreshes every function
+// editor. A dropdown of friendly names replaces free text whenever the
+// instance has a usable device-names setting (see
+// deviceNameOptionsForSlot) - matching QTI's own real behavior, where
+// "Name" is a dropdown sourced from the driver's configured device list,
+// not something you type/copy a raw address into by hand.
+function renderFnParams(paramsBox, slot, instanceId, actionId) {
+  paramsBox.innerHTML = "";
+  const manifest = manifests.get(instanceId);
+  const action = manifest && manifest.actions.find((a) => a.id === actionId);
+  const params = action ? (action.params || []).filter((p) => p.key !== "level") : [];
+  if (!params.length) return;
+  const nameOptions = deviceNameOptionsForSlot(slot);
+  params.forEach((p) => {
+    const wrap = document.createElement("label");
+    const labelEl = document.createElement("span");
+    labelEl.className = "lbl";
+    labelEl.textContent = p.label || p.key;
+    wrap.appendChild(labelEl);
+    const currentValue = (slot.fixedArgs && slot.fixedArgs[p.key]) || "";
+    let input;
+    if (nameOptions && nameOptions.length) {
+      input = document.createElement("select");
+      input.innerHTML =
+        `<option value="">— ${p.label || p.key} —</option>` + nameOptions.map(([raw, name]) => `<option value="${raw}">${name} (${raw})</option>`).join("");
+      input.value = currentValue;
+    } else {
+      input = document.createElement("input");
+      input.placeholder = p.label || p.key;
+      input.value = currentValue;
+    }
+    input.dataset.fixedArgKey = p.key;
+    wrap.appendChild(input);
+    paramsBox.appendChild(wrap);
+  });
+}
+
 function buildFnEditor(container, label, slot, fnKey, allowMacro, onChanged) {
   const wrap = document.createElement("div");
   wrap.className = "slot-fn-group";
@@ -560,7 +630,8 @@ function buildFnEditor(container, label, slot, fnKey, allowMacro, onChanged) {
   const actionBox = document.createElement("div");
   const instSel = document.createElement("select");
   const actSel = document.createElement("select");
-  actionBox.append(instSel, actSel);
+  const paramsBox = document.createElement("div");
+  actionBox.append(instSel, actSel, paramsBox);
 
   const macroBox = document.createElement("div");
   const macroSel = document.createElement("select");
@@ -587,6 +658,7 @@ function buildFnEditor(container, label, slot, fnKey, allowMacro, onChanged) {
     actSel.innerHTML =
       `<option value="">— function —</option>` + (manifest ? manifest.actions.map((a) => `<option value="${a.id}">${a.label} (${a.id})</option>`).join("") : "");
     actSel.value = (f && f.kind !== "macro" && f.actionId) || "";
+    renderFnParams(paramsBox, slot, instSel.value, actSel.value);
   }
   function populateMacros() {
     const f = slot[fnKey];
@@ -614,10 +686,22 @@ function buildFnEditor(container, label, slot, fnKey, allowMacro, onChanged) {
   });
   actSel.addEventListener("change", () => {
     slot[fnKey] = currentValue();
+    populateActions();
     onChanged();
   });
   macroSel.addEventListener("change", () => {
     slot[fnKey] = currentValue();
+    onChanged();
+  });
+  // Delegated (paramsBox's inputs are rebuilt on every populateActions())
+  // rather than bound per-input - simpler than re-attaching a listener
+  // every time renderFnParams() replaces the DOM nodes underneath it.
+  paramsBox.addEventListener("change", (ev) => {
+    const key = ev.target.dataset.fixedArgKey;
+    if (!key) return;
+    slot.fixedArgs = slot.fixedArgs || {};
+    if (ev.target.value) slot.fixedArgs[key] = ev.target.value;
+    else delete slot.fixedArgs[key];
     onChanged();
   });
 
@@ -729,55 +813,12 @@ function buildSlotRow(cat, slot, onDelete, startExpanded) {
   });
   header.append(nameInput, editBtn, delBtn);
 
-  const argsWrap = document.createElement("div");
-  argsWrap.className = "slot-fn-group";
-  const argsLabel = document.createElement("div");
-  argsLabel.className = "lbl";
-  argsLabel.textContent = "Fixed arguments";
-  argsWrap.appendChild(argsLabel);
-
-  function renderArgs() {
-    [...argsWrap.querySelectorAll("input")].forEach((el) => el.remove());
-    const keys = fixedParamKeysForSlot(slot);
-    argsWrap.querySelector("[data-hint]")?.remove();
-    if (!keys.length) {
-      const hint = document.createElement("span");
-      hint.className = "sub";
-      hint.textContent = "none needed";
-      hint.dataset.hint = "1";
-      argsWrap.appendChild(hint);
-      return;
-    }
-    keys.forEach((key) => {
-      const paramMeta = [slot.onFn, slot.offFn, slot.levelFn]
-        .filter((f) => f && f.kind !== "macro")
-        .flatMap((f) => actionParams(manifests.get(f.instanceId), f.actionId))
-        .find((p) => p.key === key);
-      const input = document.createElement("input");
-      input.placeholder = (paramMeta && paramMeta.label) || key;
-      input.value = (slot.fixedArgs && slot.fixedArgs[key]) || "";
-      input.addEventListener("change", () => {
-        slot.fixedArgs = slot.fixedArgs || {};
-        if (input.value) slot.fixedArgs[key] = input.value;
-        else delete slot.fixedArgs[key];
-        persistBindings();
-      });
-      argsWrap.appendChild(input);
-    });
-  }
-  function onFnChanged() {
-    renderArgs();
-    persistBindings();
-  }
-
-  buildFnEditor(body, "On function", slot, "onFn", true, onFnChanged);
-  buildFnEditor(body, "Off function", slot, "offFn", true, onFnChanged);
-  buildFnEditor(body, "Level function", slot, "levelFn", false, onFnChanged);
-  buildStateEditor(body, "On state (for reading current on/off back)", slot, "onState", persistBindings);
-  buildStateEditor(body, "Level state (for reading the current level back)", slot, "levelState", persistBindings);
-
+  // Zone/state suffix is a fallback for 0 or 2+ fixed arguments only - with
+  // exactly one (the common case), it's the same raw value as that one
+  // fixed argument and gets synced automatically by onSlotChanged below,
+  // so there's nothing to separately type here.
   const suffixWrap = document.createElement("label");
-  suffixWrap.innerHTML = `<span class="lbl">Zone / state suffix (only for a hub instance backing multiple slots - must match what the driver reports, e.g. "kitchen")</span>`;
+  suffixWrap.innerHTML = `<span class="lbl">Zone / state suffix (only needed with 0 or 2+ fixed arguments)</span>`;
   const suffixInput = document.createElement("input");
   suffixInput.type = "text";
   suffixInput.value = slot.stateSuffix || "";
@@ -787,8 +828,32 @@ function buildSlotRow(cat, slot, onDelete, startExpanded) {
   });
   suffixWrap.appendChild(suffixInput);
 
-  renderArgs();
-  body.append(argsWrap, suffixWrap);
+  // Every function editor shares the SAME slot.fixedArgs object (see
+  // renderFnParams) - after any of them changes it, every editor needs
+  // to re-render so a value picked in On's own box shows up in Off/
+  // Level's boxes too, matching the "only fill it in once" behavior even
+  // though the field now visually lives inside each function's own box
+  // (QTI's actual layout) rather than one shared section.
+  const fnEditors = [];
+  function onSlotChanged() {
+    fnEditors.forEach((e) => e.refresh());
+    const keys = fixedParamKeysForSlot(slot);
+    suffixWrap.style.display = keys.length === 1 ? "none" : "";
+    if (keys.length === 1 && slot.fixedArgs && slot.fixedArgs[keys[0]]) {
+      slot.stateSuffix = slot.fixedArgs[keys[0]];
+      suffixInput.value = slot.fixedArgs[keys[0]];
+    }
+    persistBindings();
+  }
+
+  fnEditors.push(buildFnEditor(body, "On function", slot, "onFn", true, onSlotChanged));
+  fnEditors.push(buildFnEditor(body, "Off function", slot, "offFn", true, onSlotChanged));
+  fnEditors.push(buildFnEditor(body, "Level function", slot, "levelFn", false, onSlotChanged));
+  body.appendChild(suffixWrap);
+  buildStateEditor(body, "On state (for reading current on/off back)", slot, "onState", persistBindings);
+  buildStateEditor(body, "Level state (for reading the current level back)", slot, "levelState", persistBindings);
+  suffixWrap.style.display = fixedParamKeysForSlot(slot).length === 1 ? "none" : "";
+
   row.append(header, body);
   return row;
 }
@@ -854,7 +919,14 @@ function renderSlotList(cat, list) {
 }
 
 async function renderDashboardTab() {
-  [bindingsCache, macrosCache] = await Promise.all([getBindings(), listMacros()]);
+  const [bindings, macros, configs] = await Promise.all([
+    getBindings(),
+    listMacros(),
+    Promise.all(instanceIds.map(async (id) => [id, await getConfig(id)])),
+  ]);
+  bindingsCache = bindings;
+  macrosCache = macros;
+  configByInstance = new Map(configs);
   const root = document.getElementById("bindingsCategoryCards");
   root.innerHTML = "";
   CATEGORY_ORDER.forEach((cat) => root.appendChild(buildCategoryCard(cat)));
@@ -1257,7 +1329,6 @@ function scheduleRefresh() {
 }
 
 makeCardsCollapsible();
-fullRefresh();
 setupAddInstanceForm();
 renderUploadedDriversList();
 connectLiveSocket((msg) => {
@@ -1270,4 +1341,14 @@ connectLiveSocket((msg) => {
 });
 setInterval(fullRefresh, FALLBACK_POLL_MS);
 
-if (location.hash.slice(1)) activateMainTab(location.hash.slice(1));
+// A cold #dashboard (or any other tab) direct link/bookmark must wait for
+// the FIRST fullRefresh() to populate manifests/instanceIds before
+// activating - the Dashboard slot editor reads them synchronously while
+// building each function's Instance/Function selects, and a page loaded
+// straight into that tab would otherwise render every dropdown empty
+// (manifests.get(id) returning undefined for an instance that genuinely
+// exists, just not fetched yet) - a real, hit-in-practice race, not
+// hypothetical.
+fullRefresh().then(() => {
+  if (location.hash.slice(1)) activateMainTab(location.hash.slice(1));
+});
