@@ -74,7 +74,14 @@ function makeCardsCollapsible() {
     function applyState(collapsed) {
       Array.from(card.children).forEach((child) => {
         if (child === header) return;
-        child.style.display = collapsed ? "none" : "";
+        // Blindly clearing to "" on expand assumes every card child has no
+        // deliberate inline `display` of its own (true for a plain <p>/
+        // <form>, false for a flex/grid wrapper like Layout's palette+
+        // canvas row) - snapshot whatever was there BEFORE this function
+        // ever touched it, once, and restore exactly that on expand
+        // instead of guessing "" is always safe.
+        if (child.dataset.origDisplay === undefined) child.dataset.origDisplay = child.style.display || "";
+        child.style.display = collapsed ? "none" : child.dataset.origDisplay;
       });
       chev.textContent = collapsed ? "▸" : "▾";
     }
