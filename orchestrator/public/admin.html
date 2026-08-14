@@ -114,23 +114,62 @@
   </section>
 
   <section class="page" id="page-automation">
-    <div class="card"><h2>Automation</h2><p class="empty-hint">Coming soon - time/condition-triggered macros aren't built yet.</p></div>
+    <div class="card">
+      <h2>Automation</h2>
+      <div class="sub">Fire one action - or a whole macro - when a device event happens or at a time of day, optionally gated by conditions.</div>
+      <div id="automationsList"></div>
+    </div>
+    <div class="card" data-default-collapsed="true">
+      <h2 id="automationFormTitle">Add automation</h2>
+      <form id="add-automation-form">
+        <label><span class="lbl">Name</span><input type="text" id="automationName" placeholder="e.g. Porch light at sunset" /></label>
+        <div class="lbl" style="margin-top:10px;">Trigger</div>
+        <div id="automationTrigger"></div>
+        <div class="lbl" style="margin-top:10px;">Conditions (all must hold, optional)</div>
+        <div id="automationConditions"></div>
+        <button type="button" class="btn small" id="addAutomationConditionBtn">+ Add condition</button>
+        <div class="lbl" style="margin-top:10px;">Action</div>
+        <div id="automationAction"></div>
+        <div class="row" style="margin-top:10px;">
+          <button type="submit" class="btn small primary">Save automation</button>
+          <button type="button" class="btn small" id="cancelAutomationEditBtn" style="display:none;">Cancel edit</button>
+        </div>
+      </form>
+    </div>
+    <div class="card" data-default-collapsed="true">
+      <h2>Location</h2>
+      <div class="sub">Only needed for sunrise/sunset triggers above.</div>
+      <form id="settings-form">
+        <div class="row">
+          <label><span class="lbl">Latitude</span><input type="number" step="any" id="settingsLat" placeholder="e.g. 49.28" /></label>
+          <label><span class="lbl">Longitude</span><input type="number" step="any" id="settingsLon" placeholder="e.g. -123.12" /></label>
+        </div>
+        <button type="submit" class="btn small primary" style="margin-top:8px;">Save location</button>
+      </form>
+    </div>
   </section>
 
   <section class="page" id="page-macro">
     <div class="card">
       <h2>Macros</h2>
-      <div class="sub">a named sequence of actions across any instances, run as one</div>
+      <div class="sub">A named sequence of steps (call an action, branch on a condition, or delay) across any instances, run as one - can optionally trigger itself on an event/time too, same as an automation.</div>
       <div id="macrosList"></div>
     </div>
     <div class="card" data-default-collapsed="true">
-      <h2>Add macro</h2>
+      <h2 id="macroFormTitle">Add macro</h2>
       <form id="add-macro-form">
         <input type="text" id="macroName" placeholder="Macro name" style="margin-bottom:10px;" />
+        <div class="lbl">Trigger (optional - leave as "Manual only" to run this only on demand)</div>
+        <div id="macroTrigger"></div>
+        <div class="lbl" style="margin-top:10px;">Conditions (all must hold, optional)</div>
+        <div id="macroConditions"></div>
+        <button type="button" class="btn small" id="addMacroConditionBtn">+ Add condition</button>
+        <div class="lbl" style="margin-top:10px;">Steps</div>
         <div id="macroSteps"></div>
         <div class="row" style="margin-top:8px;">
           <button type="button" class="btn small" id="addMacroStepBtn">+ Add step</button>
           <button type="submit" class="btn small primary">Save macro</button>
+          <button type="button" class="btn small" id="cancelMacroEditBtn" style="display:none;">Cancel edit</button>
         </div>
       </form>
     </div>

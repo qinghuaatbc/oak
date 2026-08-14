@@ -117,6 +117,38 @@ export async function runMacro(id) {
   return res.json();
 }
 
+export async function listAutomations() {
+  return (await fetch("/api/automations")).json();
+}
+export async function saveAutomation(automation) {
+  const res = await fetch("/api/automations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(automation),
+  });
+  return res.json();
+}
+export async function deleteAutomation(id) {
+  const res = await fetch(`/api/automations/${encodeURIComponent(id)}`, { method: "DELETE" });
+  return res.json();
+}
+export async function runAutomation(id) {
+  const res = await fetch(`/api/automations/${encodeURIComponent(id)}/run`, { method: "POST" });
+  return res.json();
+}
+
+export async function getSettings() {
+  return (await fetch("/api/settings")).json();
+}
+export async function saveSettings(settings) {
+  const res = await fetch("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  return res.json();
+}
+
 export async function listCameras() {
   return (await fetch("/api/cameras")).json();
 }

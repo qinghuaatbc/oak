@@ -2,6 +2,8 @@ import {
   listInstances, getManifest, getState, callAction, listDrivers, addInstance, deleteInstance,
   getConfig, editInstance, stopInstance, startInstance,
   getHealth, listMacros, saveMacro, deleteMacro, runMacro,
+  listAutomations, saveAutomation, deleteAutomation, runAutomation,
+  getSettings, saveSettings,
   listCameras, addCamera, deleteCamera, uploadGlb,
   uploadDriver, deleteDriverPackage,
   getBindings, saveBindings, autoGenerateBindings,
@@ -605,6 +607,7 @@ function activateMainTab(page) {
   document.getElementById(`page-${page}`).classList.add("active");
   if (page === "dashboard") renderDashboardTab();
   else if (page === "macro") renderMacrosTab();
+  else if (page === "automation") renderAutomationsTab();
   else if (page === "health") renderHealthTab();
   else if (page === "camera") renderCameraTab();
   else if (page === "3d") open3DTab();
@@ -1114,84 +1117,594 @@ document.getElementById("healthRefreshBtn").addEventListener("click", (ev) => {
 // --- Macro: named sequences of {instanceId, actionId, params}, run
 // sequentially server-side. Step-picker UI walks the same manifest/action
 // data already loaded for the Driver tab. ---
+// ---------------------------------------------------------------------
+// Shared builders for Macro/Automation forms - a macro step's "action"
+// type, an automation's action, a condition row, and a trigger are the
+// same underlying shapes in both features (see server.js's header
+// comments on `macros`/`automations`), so one implementation of each
+// backs both UIs rather than two copies drifting apart.
+// ---------------------------------------------------------------------
+
+// Instance + action + per-param inputs (sourced from the action's own
+// manifest.params, same {key,type,label,default} shape the Add Instance
+// form already reads) - used for a macro's "action" step and an
+// automation's direct-call action.
+function buildActionPicker(container, initial) {
+  const instSel = document.createElement("select");
+  instSel.innerHTML = instanceIds.map((id) => `<option value="${id}">${instanceLabel(id)} (${id})</option>`).join("");
+  const actionSel = document.createElement("select");
+  const paramsBox = document.createElement("div");
+  paramsBox.style.marginTop = "4px";
+
+  function renderActions() {
+    const manifest = manifests.get(instSel.value);
+    actionSel.innerHTML = (manifest ? manifest.actions : []).map((a) => `<option value="${a.id}">${a.label}</option>`).join("");
+    if (initial && initial.actionId) actionSel.value = initial.actionId;
+  }
+  function renderParams() {
+    const manifest = manifests.get(instSel.value);
+    const action = manifest && manifest.actions.find((a) => a.id === actionSel.value);
+    const params = (action && action.params) || [];
+    const preset = initial && initial.actionId === actionSel.value ? initial.params : undefined;
+    paramsBox.innerHTML = params
+      .map((p) => {
+        const val = preset && preset[p.key] !== undefined ? preset[p.key] : p.default !== undefined ? p.default : "";
+        return `<label><span class="lbl">${p.label || p.key}</span><input data-param-key="${p.key}" type="${p.type === "number" ? "number" : "text"}" value="${val}" /></label>`;
+      })
+      .join("");
+  }
+  instSel.addEventListener("change", () => {
+    renderActions();
+    renderParams();
+  });
+  actionSel.addEventListener("change", renderParams);
+  if (initial && initial.instanceId) instSel.value = initial.instanceId;
+  renderActions();
+  renderParams();
+
+  const row = document.createElement("div");
+  row.className = "row";
+  row.append(instSel, actionSel);
+  container.append(row, paramsBox);
+
+  return {
+    getValue() {
+      const params = {};
+      paramsBox.querySelectorAll("[data-param-key]").forEach((input) => {
+        params[input.dataset.paramKey] = input.type === "number" ? Number(input.value) : input.value;
+      });
+      return { instanceId: instSel.value, actionId: actionSel.value, params };
+    },
+  };
+}
+
+// A list of {instanceId, stateId, stateSuffix, op, value} rows, AND'd
+// together - used for an automation's/macro's own conditions AND a
+// macro condition-step's nested conditions. stateSuffix is always a
+// plain text input (not a friendly-name dropdown, unlike the Dashboard
+// slot editor's device-name picker) - condition authoring is a less-
+// common, power-user path where the raw suffix value is an acceptable
+// ask, not worth a second elaborate resolver for.
+function buildConditionListEditor(rowsContainer, initialConditions) {
+  function addRow(cond) {
+    cond = cond || {};
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.marginBottom = "6px";
+    const instSel = document.createElement("select");
+    instSel.className = "cond-inst";
+    instSel.innerHTML = instanceIds.map((id) => `<option value="${id}">${instanceLabel(id)} (${id})</option>`).join("");
+    const stateSel = document.createElement("select");
+    stateSel.className = "cond-state";
+    function renderStates() {
+      const manifest = manifests.get(instSel.value);
+      stateSel.innerHTML = (manifest ? manifest.states : []).map((s) => `<option value="${s.id}">${s.id}</option>`).join("");
+      if (cond.stateId) stateSel.value = cond.stateId;
+    }
+    instSel.addEventListener("change", renderStates);
+    if (cond.instanceId) instSel.value = cond.instanceId;
+    renderStates();
+    const suffixInput = document.createElement("input");
+    suffixInput.className = "cond-suffix";
+    suffixInput.placeholder = "suffix (optional)";
+    suffixInput.value = cond.stateSuffix || "";
+    suffixInput.style.width = "120px";
+    const opSel = document.createElement("select");
+    opSel.className = "cond-op";
+    opSel.innerHTML = ["==", "!=", ">", "<", ">=", "<="].map((op) => `<option value="${op}"${cond.op === op ? " selected" : ""}>${op}</option>`).join("");
+    const valInput = document.createElement("input");
+    valInput.className = "cond-value";
+    valInput.placeholder = "value";
+    valInput.value = cond.value !== undefined ? cond.value : "";
+    valInput.style.width = "90px";
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn small danger";
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", () => row.remove());
+    row.append(instSel, stateSel, suffixInput, opSel, valInput, removeBtn);
+    rowsContainer.appendChild(row);
+  }
+  (initialConditions || []).forEach(addRow);
+  return {
+    addRow: () => addRow(),
+    getValue() {
+      return [...rowsContainer.children].map((row) => ({
+        instanceId: row.querySelector(".cond-inst").value,
+        stateId: row.querySelector(".cond-state").value,
+        stateSuffix: row.querySelector(".cond-suffix").value.trim() || undefined,
+        op: row.querySelector(".cond-op").value,
+        value: row.querySelector(".cond-value").value,
+      }));
+    },
+  };
+}
+
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// "Manual only" / "on event" / "at a time" - the same trigger shape an
+// automation and a self-triggering macro both use (see server.js's
+// checkTimeAutomations/runEventAutomations/runEventMacros). Time mode
+// adds sunrise/sunset (+/- offset minutes) on top of a fixed HH:MM, and
+// an optional day-of-week filter (all 7 checked = every day).
+function buildTriggerEditor(container, initial) {
+  const typeSel = document.createElement("select");
+  typeSel.innerHTML = `<option value="">Manual only</option><option value="event">On event</option><option value="time">At a time</option>`;
+  typeSel.value = initial && initial.type ? initial.type : "";
+  const sub = document.createElement("div");
+  sub.style.marginTop = "6px";
+  container.append(typeSel, sub);
+
+  function renderSub() {
+    sub.innerHTML = "";
+    if (typeSel.value === "event") {
+      const instSel = document.createElement("select");
+      instSel.className = "trig-inst";
+      instSel.innerHTML = instanceIds.map((id) => `<option value="${id}">${instanceLabel(id)} (${id})</option>`).join("");
+      const eventSel = document.createElement("select");
+      eventSel.className = "trig-event";
+      function renderEvents() {
+        const manifest = manifests.get(instSel.value);
+        eventSel.innerHTML = (manifest ? manifest.events : []).map((e) => `<option value="${e.id}">${e.label || e.id}</option>`).join("");
+        if (initial && initial.eventId) eventSel.value = initial.eventId;
+      }
+      instSel.addEventListener("change", renderEvents);
+      if (initial && initial.instanceId) instSel.value = initial.instanceId;
+      renderEvents();
+      const row = document.createElement("div");
+      row.className = "row";
+      row.append(instSel, eventSel);
+      sub.appendChild(row);
+    } else if (typeSel.value === "time") {
+      const timeInput = document.createElement("input");
+      timeInput.type = "time";
+      timeInput.className = "trig-time";
+      timeInput.value = (initial && initial.time) || "18:00";
+      const modeSel = document.createElement("select");
+      modeSel.className = "trig-mode";
+      modeSel.innerHTML = `<option value="fixed">Fixed time</option><option value="sunrise">Sunrise</option><option value="sunset">Sunset</option>`;
+      modeSel.value = (initial && initial.mode) || "fixed";
+      const offsetInput = document.createElement("input");
+      offsetInput.type = "number";
+      offsetInput.className = "trig-offset";
+      offsetInput.placeholder = "offset minutes (+/-)";
+      offsetInput.value = (initial && initial.offsetMin) || 0;
+      function syncTimeMode() {
+        timeInput.style.display = modeSel.value === "fixed" ? "" : "none";
+        offsetInput.style.display = modeSel.value === "fixed" ? "none" : "";
+      }
+      modeSel.addEventListener("change", syncTimeMode);
+      syncTimeMode();
+      const row = document.createElement("div");
+      row.className = "row";
+      row.append(timeInput, modeSel, offsetInput);
+
+      const daysRow = document.createElement("div");
+      daysRow.className = "row";
+      daysRow.style.marginTop = "6px";
+      const initialDays = initial && Array.isArray(initial.days) ? initial.days : [0, 1, 2, 3, 4, 5, 6];
+      DAY_LABELS.forEach((label, i) => {
+        const lbl = document.createElement("label");
+        lbl.style.cssText = "display:flex; align-items:center; gap:4px;";
+        lbl.innerHTML = `<input type="checkbox" class="trig-day" value="${i}" ${initialDays.includes(i) ? "checked" : ""}/> ${label}`;
+        daysRow.appendChild(lbl);
+      });
+      sub.append(row, daysRow);
+    }
+  }
+  typeSel.addEventListener("change", renderSub);
+  renderSub();
+
+  return {
+    getValue() {
+      if (!typeSel.value) return undefined;
+      if (typeSel.value === "event") {
+        const instSel = sub.querySelector(".trig-inst");
+        const eventSel = sub.querySelector(".trig-event");
+        if (!instSel || !eventSel || !eventSel.value) return undefined;
+        return { type: "event", instanceId: instSel.value, eventId: eventSel.value };
+      }
+      const days = [...sub.querySelectorAll(".trig-day:checked")].map((c) => Number(c.value));
+      return {
+        type: "time",
+        time: sub.querySelector(".trig-time").value || "00:00",
+        mode: sub.querySelector(".trig-mode").value,
+        offsetMin: Number(sub.querySelector(".trig-offset").value) || 0,
+        days,
+      };
+    },
+  };
+}
+function describeTrigger(trigger) {
+  if (!trigger) return "manual only";
+  if (trigger.type === "event") return `on ${instanceLabel(trigger.instanceId)} → ${trigger.eventId}`;
+  if (trigger.type === "time") {
+    const modeText = trigger.mode === "sunrise" ? "sunrise" : trigger.mode === "sunset" ? "sunset" : trigger.time;
+    const offsetText = trigger.mode && trigger.mode !== "fixed" && trigger.offsetMin ? ` ${trigger.offsetMin > 0 ? "+" : ""}${trigger.offsetMin}min` : "";
+    const daysText = Array.isArray(trigger.days) && trigger.days.length < 7 ? ` (${trigger.days.map((d) => DAY_LABELS[d]).join(",")})` : "";
+    return `at ${modeText}${offsetText}${daysText}`;
+  }
+  return "manual only";
+}
+
+// A macro step list, recursive - a "condition" step's then/else branches
+// are themselves step lists built by calling this function again, so
+// nested branching costs no extra code beyond the top-level case. Steps
+// are ordinary DOM children of `container`, read back in DOM order at
+// getValue() time (add/remove-by-DOM-manipulation, same convention the
+// keyvalue settings editor already uses) - no parallel array to keep in
+// sync.
+function buildStepList(container, initialSteps) {
+  function addStep(initialStep) {
+    let step = initialStep || { type: "action" };
+    const box = document.createElement("div");
+    box.className = "card";
+    box.style.cssText = "margin-bottom:8px; padding:10px;";
+    const typeSel = document.createElement("select");
+    typeSel.innerHTML = `<option value="action">Call action</option><option value="condition">If/else</option><option value="delay">Delay</option>`;
+    typeSel.value = step.type;
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn small danger";
+    removeBtn.textContent = "Remove step";
+    removeBtn.addEventListener("click", () => box.remove());
+    const headerRow = document.createElement("div");
+    headerRow.className = "row";
+    headerRow.append(typeSel, removeBtn);
+    const body = document.createElement("div");
+    body.style.marginTop = "6px";
+    box.append(headerRow, body);
+    container.appendChild(box);
+
+    let actionPicker = null;
+    let conditionEditor = null;
+    let thenList = null;
+    let elseList = null;
+
+    function renderBody() {
+      body.innerHTML = "";
+      actionPicker = conditionEditor = thenList = elseList = null;
+      if (typeSel.value === "action") {
+        actionPicker = buildActionPicker(body, step.type === "action" ? step : undefined);
+      } else if (typeSel.value === "condition") {
+        const condLbl = document.createElement("div");
+        condLbl.className = "lbl";
+        condLbl.textContent = "Conditions";
+        const condRows = document.createElement("div");
+        body.append(condLbl, condRows);
+        conditionEditor = buildConditionListEditor(condRows, step.type === "condition" ? step.conditions : undefined);
+        const addCondBtn = document.createElement("button");
+        addCondBtn.type = "button";
+        addCondBtn.className = "btn small";
+        addCondBtn.textContent = "+ Add condition";
+        addCondBtn.addEventListener("click", () => conditionEditor.addRow());
+        body.appendChild(addCondBtn);
+
+        const thenLbl = document.createElement("div");
+        thenLbl.className = "lbl";
+        thenLbl.style.marginTop = "8px";
+        thenLbl.textContent = "Then";
+        const thenBox = document.createElement("div");
+        body.append(thenLbl, thenBox);
+        thenList = buildStepList(thenBox, step.type === "condition" ? step.then : undefined);
+        const addThenBtn = document.createElement("button");
+        addThenBtn.type = "button";
+        addThenBtn.className = "btn small";
+        addThenBtn.textContent = "+ Add then-step";
+        addThenBtn.addEventListener("click", () => thenList.addStep());
+        body.appendChild(addThenBtn);
+
+        const elseLbl = document.createElement("div");
+        elseLbl.className = "lbl";
+        elseLbl.style.marginTop = "8px";
+        elseLbl.textContent = "Else";
+        const elseBox = document.createElement("div");
+        body.append(elseLbl, elseBox);
+        elseList = buildStepList(elseBox, step.type === "condition" ? step.else : undefined);
+        const addElseBtn = document.createElement("button");
+        addElseBtn.type = "button";
+        addElseBtn.className = "btn small";
+        addElseBtn.textContent = "+ Add else-step";
+        addElseBtn.addEventListener("click", () => elseList.addStep());
+        body.appendChild(addElseBtn);
+      } else if (typeSel.value === "delay") {
+        const msInput = document.createElement("input");
+        msInput.type = "number";
+        msInput.className = "delay-ms";
+        msInput.placeholder = "milliseconds";
+        msInput.value = step.type === "delay" && step.ms !== undefined ? step.ms : 1000;
+        body.appendChild(msInput);
+      }
+    }
+    typeSel.addEventListener("change", () => {
+      step = { type: typeSel.value };
+      renderBody();
+    });
+    renderBody();
+
+    box.__getStep = () => {
+      if (typeSel.value === "action") return { type: "action", ...actionPicker.getValue() };
+      if (typeSel.value === "condition") return { type: "condition", conditions: conditionEditor.getValue(), then: thenList.getValue(), else: elseList.getValue() };
+      if (typeSel.value === "delay") return { type: "delay", ms: Number(body.querySelector(".delay-ms").value) || 0 };
+      return null;
+    };
+  }
+  (initialSteps || []).forEach(addStep);
+  return {
+    addStep: () => addStep(),
+    getValue() {
+      return [...container.children].map((box) => box.__getStep()).filter(Boolean);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------
+// Macros
+// ---------------------------------------------------------------------
+let macroTriggerEditor = null;
+let macroConditionsEditor = null;
+let macroStepsList = null;
+let editingMacroId = null;
+
+function resetMacroForm(macro) {
+  editingMacroId = macro ? macro.id : null;
+  document.getElementById("macroFormTitle").textContent = macro ? `Edit macro "${macro.name}"` : "Add macro";
+  document.getElementById("macroName").value = macro ? macro.name : "";
+  document.getElementById("cancelMacroEditBtn").style.display = macro ? "" : "none";
+
+  const triggerBox = document.getElementById("macroTrigger");
+  triggerBox.innerHTML = "";
+  macroTriggerEditor = buildTriggerEditor(triggerBox, macro && macro.trigger);
+
+  const condBox = document.getElementById("macroConditions");
+  condBox.innerHTML = "";
+  macroConditionsEditor = buildConditionListEditor(condBox, macro && macro.conditions);
+
+  const stepsBox = document.getElementById("macroSteps");
+  stepsBox.innerHTML = "";
+  macroStepsList = buildStepList(stepsBox, macro && macro.steps);
+}
+
 async function renderMacrosTab() {
   const listEl = document.getElementById("macrosList");
-  const macros = await listMacros();
-  if (!macros.length) {
+  const macroList = await listMacros();
+  if (!macroList.length) {
     listEl.innerHTML = `<p class="empty-hint">No macros yet.</p>`;
   } else {
     listEl.innerHTML = "";
-    macros.forEach((m) => {
+    macroList.forEach((m) => {
       const row = document.createElement("div");
       row.className = "instance-row";
-      row.innerHTML = `<div><div class="iname">${m.name}</div><div class="ikey">${m.steps.length} step${m.steps.length === 1 ? "" : "s"}</div></div>`;
+      row.innerHTML = `<div><div class="iname">${m.name}</div><div class="ikey">${m.steps.length} step${m.steps.length === 1 ? "" : "s"} · ${describeTrigger(m.trigger)}</div></div>`;
       const btnRow = document.createElement("div");
       btnRow.className = "row";
       const runBtn = document.createElement("button");
       runBtn.className = "btn small primary";
       runBtn.textContent = "Run";
       runBtn.addEventListener("click", () => runMacro(m.id));
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn small";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => resetMacroForm(m));
       const delBtn = document.createElement("button");
       delBtn.className = "btn small danger";
       delBtn.textContent = "Delete";
       delBtn.addEventListener("click", async () => {
         if (!confirm(`Delete macro "${m.name}"?`)) return;
         await deleteMacro(m.id);
+        if (editingMacroId === m.id) resetMacroForm(null);
         renderMacrosTab();
       });
-      btnRow.append(runBtn, delBtn);
+      btnRow.append(runBtn, editBtn, delBtn);
       row.appendChild(btnRow);
       listEl.appendChild(row);
     });
   }
+  // Rebuilds the add-form's instance/action/event dropdowns against
+  // whatever instanceIds/manifests currently hold - this tab can be
+  // opened before fullRefresh() has ever populated those (a real,
+  // hit-in-practice race the Dashboard tab's own hash-race fix already
+  // dealt with once this session), so the form needs a fresh build on
+  // every visit, not just once at module load. Skipped mid-edit so
+  // switching away and back doesn't silently drop an in-progress edit.
+  if (!editingMacroId) resetMacroForm(null);
 }
 
-function addMacroStepRow() {
-  const stepsRoot = document.getElementById("macroSteps");
-  const row = document.createElement("div");
-  row.className = "row";
-  row.style.marginBottom = "6px";
-  const instSel = document.createElement("select");
-  instSel.innerHTML = instanceIds.map((id) => `<option value="${id}">${instanceLabel(id)} (${id})</option>`).join("");
-  const actionSel = document.createElement("select");
-  function renderActions() {
-    const manifest = manifests.get(instSel.value);
-    actionSel.innerHTML = manifest.actions.map((a) => `<option value="${a.id}">${a.label}</option>`).join("");
-  }
-  instSel.addEventListener("change", renderActions);
-  renderActions();
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "btn small danger";
-  removeBtn.textContent = "×";
-  removeBtn.addEventListener("click", () => row.remove());
-  row.append(instSel, actionSel, removeBtn);
-  stepsRoot.appendChild(row);
-}
+document.getElementById("addMacroConditionBtn").addEventListener("click", (ev) => {
+  ev.stopPropagation();
+  macroConditionsEditor.addRow();
+});
 document.getElementById("addMacroStepBtn").addEventListener("click", (ev) => {
   ev.stopPropagation();
-  addMacroStepRow();
+  macroStepsList.addStep();
 });
+document.getElementById("cancelMacroEditBtn").addEventListener("click", () => resetMacroForm(null));
 document.getElementById("add-macro-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const name = document.getElementById("macroName").value.trim();
   if (!name) return;
-  const steps = [...document.getElementById("macroSteps").children].map((row) => {
-    const [instSel, actionSel] = row.querySelectorAll("select");
-    return { instanceId: instSel.value, actionId: actionSel.value, params: {} };
-  });
+  const steps = macroStepsList.getValue();
   if (!steps.length) {
     alert("Add at least one step");
     return;
   }
-  const result = await saveMacro({ name, steps });
+  const trigger = macroTriggerEditor.getValue();
+  const conditions = macroConditionsEditor.getValue();
+  const result = await saveMacro({ id: editingMacroId || undefined, name, steps, trigger, conditions: conditions.length ? conditions : undefined });
   if (result.error) {
     alert(result.error);
     return;
   }
-  document.getElementById("macroName").value = "";
-  document.getElementById("macroSteps").innerHTML = "";
+  resetMacroForm(null);
   renderMacrosTab();
+});
+
+// ---------------------------------------------------------------------
+// Automation: single action (or a whole macro) gated by trigger+
+// conditions - see server.js's `automations` header comment for the
+// exact shape. Shares buildTriggerEditor/buildConditionListEditor with
+// the macro form above so the two features stay in lockstep.
+// ---------------------------------------------------------------------
+function buildAutomationActionEditor(container, initial) {
+  const kindSel = document.createElement("select");
+  kindSel.innerHTML = `<option value="action">Call one action</option><option value="macro">Run a macro</option>`;
+  kindSel.value = initial && initial.kind === "macro" ? "macro" : "action";
+  const sub = document.createElement("div");
+  sub.style.marginTop = "6px";
+  container.append(kindSel, sub);
+
+  let actionPicker = null;
+  let macroSel = null;
+
+  async function renderSub() {
+    sub.innerHTML = "";
+    if (kindSel.value === "macro") {
+      macroSel = document.createElement("select");
+      const macroList = await listMacros();
+      if (!macroList.length) {
+        sub.innerHTML = `<p class="empty-hint">No macros yet - add one on the Macros tab first.</p>`;
+        macroSel = null;
+        return;
+      }
+      macroSel.innerHTML = macroList.map((m) => `<option value="${m.id}">${m.name}</option>`).join("");
+      if (initial && initial.macroId) macroSel.value = initial.macroId;
+      sub.appendChild(macroSel);
+    } else {
+      actionPicker = buildActionPicker(sub, initial && initial.kind !== "macro" ? initial : undefined);
+    }
+  }
+  kindSel.addEventListener("change", renderSub);
+  renderSub();
+
+  container.__getAutomationAction = () => {
+    if (kindSel.value === "macro") return macroSel ? { kind: "macro", macroId: macroSel.value } : undefined;
+    return { kind: "action", ...actionPicker.getValue() };
+  };
+}
+function describeAction(action) {
+  if (!action) return "";
+  if (action.kind === "macro") return "run macro";
+  return `${instanceLabel(action.instanceId)} → ${action.actionId}`;
+}
+
+let automationTriggerEditor = null;
+let automationConditionsEditor = null;
+let editingAutomationId = null;
+
+function resetAutomationForm(auto) {
+  editingAutomationId = auto ? auto.id : null;
+  document.getElementById("automationFormTitle").textContent = auto ? `Edit automation "${auto.name}"` : "Add automation";
+  document.getElementById("automationName").value = auto ? auto.name : "";
+  document.getElementById("cancelAutomationEditBtn").style.display = auto ? "" : "none";
+
+  const triggerBox = document.getElementById("automationTrigger");
+  triggerBox.innerHTML = "";
+  automationTriggerEditor = buildTriggerEditor(triggerBox, auto && auto.trigger);
+
+  const condBox = document.getElementById("automationConditions");
+  condBox.innerHTML = "";
+  automationConditionsEditor = buildConditionListEditor(condBox, auto && auto.conditions);
+
+  const actionBox = document.getElementById("automationAction");
+  actionBox.innerHTML = "";
+  buildAutomationActionEditor(actionBox, auto && auto.action);
+}
+
+async function renderAutomationsTab() {
+  const listEl = document.getElementById("automationsList");
+  const autos = await listAutomations();
+  if (!autos.length) {
+    listEl.innerHTML = `<p class="empty-hint">No automations yet.</p>`;
+  } else {
+    listEl.innerHTML = "";
+    autos.forEach((a) => {
+      const row = document.createElement("div");
+      row.className = "instance-row";
+      row.innerHTML = `<div><div class="iname">${a.name}</div><div class="ikey">${describeTrigger(a.trigger)} → ${describeAction(a.action)}</div></div>`;
+      const btnRow = document.createElement("div");
+      btnRow.className = "row";
+      const runBtn = document.createElement("button");
+      runBtn.className = "btn small primary";
+      runBtn.textContent = "Test fire";
+      runBtn.addEventListener("click", () => runAutomation(a.id));
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn small";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => resetAutomationForm(a));
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn small danger";
+      delBtn.textContent = "Delete";
+      delBtn.addEventListener("click", async () => {
+        if (!confirm(`Delete automation "${a.name}"?`)) return;
+        await deleteAutomation(a.id);
+        if (editingAutomationId === a.id) resetAutomationForm(null);
+        renderAutomationsTab();
+      });
+      btnRow.append(runBtn, editBtn, delBtn);
+      row.appendChild(btnRow);
+      listEl.appendChild(row);
+    });
+  }
+  const s = await getSettings();
+  document.getElementById("settingsLat").value = s.latitude !== undefined ? s.latitude : "";
+  document.getElementById("settingsLon").value = s.longitude !== undefined ? s.longitude : "";
+  // Same cold-start reasoning as renderMacrosTab's own rebuild - see its comment.
+  if (!editingAutomationId) resetAutomationForm(null);
+}
+
+document.getElementById("addAutomationConditionBtn").addEventListener("click", (ev) => {
+  ev.stopPropagation();
+  automationConditionsEditor.addRow();
+});
+document.getElementById("cancelAutomationEditBtn").addEventListener("click", () => resetAutomationForm(null));
+document.getElementById("add-automation-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const name = document.getElementById("automationName").value.trim();
+  if (!name) return;
+  const trigger = automationTriggerEditor.getValue();
+  if (!trigger) {
+    alert("Pick a trigger (event or time) - an automation with no trigger would never fire");
+    return;
+  }
+  const conditions = automationConditionsEditor.getValue();
+  const action = document.getElementById("automationAction").__getAutomationAction();
+  if (!action) {
+    alert("Add a macro first, or switch the action to Call one action");
+    return;
+  }
+  const result = await saveAutomation({ id: editingAutomationId || undefined, name, trigger, conditions: conditions.length ? conditions : undefined, action });
+  if (result.error) {
+    alert(result.error);
+    return;
+  }
+  resetAutomationForm(null);
+  renderAutomationsTab();
+});
+document.getElementById("settings-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const latitude = document.getElementById("settingsLat").value;
+  const longitude = document.getElementById("settingsLon").value;
+  const result = await saveSettings({ latitude, longitude });
+  if (result.error) alert(result.error);
 });
 
 // --- Camera: RTSP -> ffmpeg -> WS -> MSE, see camera-player.js and
