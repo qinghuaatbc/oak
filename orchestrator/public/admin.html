@@ -228,8 +228,8 @@
         <button class="btn small" id="layoutPreviewBtn" type="button">Preview: Off</button>
       </div>
       <div class="sub">Drag a chip onto the grid to place it. Drag a placed widget to move it, its corner handle to resize, click to edit.</div>
-      <div id="layoutPalette" style="display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 12px;"></div>
-      <div style="display:flex; gap:16px; align-items:flex-start;">
+      <div style="display:flex; gap:16px; align-items:flex-start; margin-top:8px;">
+        <div id="layoutPalette" style="width:200px; flex-shrink:0; display:flex; flex-direction:column; gap:6px; max-height:80vh; overflow-y:auto;"></div>
         <div id="layoutCanvas" class="layout-canvas" style="flex:1; min-width:0;"></div>
         <div id="layoutWidgetEditor" class="card layout-hidden" style="width:260px; flex-shrink:0;"></div>
       </div>

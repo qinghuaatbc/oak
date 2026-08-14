@@ -145,6 +145,7 @@ table th{ color:var(--faint); font-weight:500; }
 .layout-widget .resize-handle{ position:absolute; right:0; bottom:0; width:16px; height:16px; cursor:nwse-resize; opacity:.5; display:flex; align-items:flex-end; justify-content:flex-end; font-size:11px; padding:2px; }
 .layout-hidden{ display:none !important; }
 .layout-drag-ghost{ position:fixed; z-index:1000; pointer-events:none; background:var(--accent); color:var(--accent-ink); padding:6px 10px; border-radius:8px; font-size:.76rem; font-weight:600; opacity:.92; transform:translate(-50%, -50%); }
-.layout-palette-chip{ padding:6px 10px; border-radius:999px; border:1px solid var(--line); background:var(--raised); font-size:.76rem; cursor:grab; user-select:none; touch-action:none; }
-.layout-palette-group-label{ width:100%; font-family:var(--mono); font-size:.68rem; color:var(--faint); text-transform:uppercase; letter-spacing:.04em; margin-top:6px; }
+.layout-palette-chip{ width:100%; box-sizing:border-box; text-align:left; padding:7px 12px; border-radius:8px; border:1px solid var(--line); background:var(--raised); font-size:.76rem; cursor:grab; user-select:none; touch-action:none; }
+.layout-palette-group-label{ font-family:var(--mono); font-size:.68rem; color:var(--faint); text-transform:uppercase; letter-spacing:.04em; margin-top:8px; }
+.layout-palette-group-label:first-child{ margin-top:0; }
 #layoutPreviewFrame{ width:100%; height:70vh; border:1px solid var(--line); border-radius:12px; margin-top:12px; }
