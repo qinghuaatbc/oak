@@ -161,6 +161,28 @@ function buildRingCard(slot, cat) {
   let pendingValue = null;
   let downX = 0;
   let downY = 0;
+  // A drag/tap optimistically paints its own target value immediately,
+  // but the confirmed value (statesByInstance, refreshed via poll/WS
+  // push) only catches up once the real device - eisy or Home Assistant,
+  // both genuine network round trips, not instant like a mock - reports
+  // back. Without this, refresh()'s unconditional apply() call (which can
+  // fire many times a second while a real driver is streaming state
+  // events) paints the stale pre-drag value the instant it arrives,
+  // before the real echo does - a visible snap-back-then-forward "bounce"
+  // on every drag. Held for a grace window (matched by-eye against real
+  // eisy/HA round-trip latency) or until the fetched value actually
+  // agrees, whichever comes first - so a genuinely external change (someone
+  // else, or a physical switch) still wins once it's for real.
+  const OPTIMISTIC_HOLD_MS = 4000;
+  const OPTIMISTIC_AGREE_TOLERANCE = 2;
+  let optimisticValue = null;
+  let optimisticOn = null;
+  let optimisticExpire = 0;
+  function setOptimistic(v, on) {
+    optimisticValue = v;
+    optimisticOn = on;
+    optimisticExpire = Date.now() + OPTIMISTIC_HOLD_MS;
+  }
 
   svg.addEventListener("pointerdown", (ev) => {
     ev.preventDefault();
@@ -178,6 +200,7 @@ function buildRingCard(slot, cat) {
     }
     const v = Math.round(ringProgressFromEvent(svg, ev) * 100);
     applyVisual(v, true);
+    setOptimistic(v, true);
     pendingValue = v;
     if (!throttleTimer) {
       throttleTimer = setTimeout(() => {
@@ -196,11 +219,13 @@ function buildRingCard(slot, cat) {
       if (!fn) return;
       callFn(fn, slot).catch((e) => console.error("action failed", e));
       feedbackToggle(slot.name, turningOn);
+      setOptimistic(turningOn ? 100 : 0, turningOn);
       scheduleRefresh();
       return;
     }
     const v = Math.round(ringProgressFromEvent(svg, ev) * 100);
     applyVisual(v, true);
+    setOptimistic(v, true);
     callAction(slot.levelFn.instanceId, slot.levelFn.actionId, slotCallParams(slot, { level: v })).catch((e) => console.error("level action failed", e));
   });
 
@@ -209,12 +234,28 @@ function buildRingCard(slot, cat) {
     box.classList.toggle("offline", !running);
     offlineEl.classList.toggle("sky-hidden", running);
     offlineEl.textContent = langZh ? "离线" : "offline";
+    // Mid-drag, the pointermove handler above already owns the visual -
+    // overwriting it here with the not-yet-caught-up fetched state is
+    // exactly the bounce this whole optimistic-hold mechanism exists to
+    // prevent.
+    if (dragging) return;
     const onState = slot.onState && (statesByInstance.get(slot.onState.instanceId) || {});
     const levelState = slot.levelState && (statesByInstance.get(slot.levelState.instanceId) || {});
     const onEntry = onState ? slotOnEntry(slot, onState) : undefined;
     const levelValue = levelState ? slotLevelValue(slot, levelState) : undefined;
     const on = onEntry ? onEntry[1] : levelValue > 0;
-    applyVisual(levelValue !== undefined ? levelValue : on ? 100 : 0, on);
+    const fetchedValue = levelValue !== undefined ? levelValue : on ? 100 : 0;
+    if (optimisticValue !== null) {
+      const agrees = Math.abs(fetchedValue - optimisticValue) <= OPTIMISTIC_AGREE_TOLERANCE && on === optimisticOn;
+      if (agrees || Date.now() > optimisticExpire) {
+        optimisticValue = null;
+        optimisticOn = null;
+      } else {
+        applyVisual(optimisticValue, optimisticOn);
+        return;
+      }
+    }
+    applyVisual(fetchedValue, on);
   }
 
   return { el: box, apply, cat };
