@@ -974,6 +974,9 @@ document.getElementById("upload-driver-form").addEventListener("submit", async (
     alert(result.error);
     return;
   }
+  if (result.inferredCategory) {
+    alert(`Uploaded. No category was declared in manifest.json, so it was guessed as "${result.inferredCategory}" from its action roles - edit manifest.json and re-upload to change it.`);
+  }
   document.getElementById("uploadDriverId").value = "";
   document.getElementById("uploadManifestFile").value = "";
   document.getElementById("uploadDriverJsFile").value = "";

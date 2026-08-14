@@ -654,6 +654,27 @@ function listDriverManifests() {
     .map((d) => JSON.parse(fs.readFileSync(path.join(DRIVERS_DIR, d.name, "manifest.json"), "utf8")));
 }
 
+// A driver author who didn't bother declaring `category` still gets a
+// useful default instead of silently landing in "generic" (where the
+// Add-Instance category filter and Dashboard's Auto-generate button would
+// never surface it under Light/Switch/Security). Guessed from the SAME
+// role tags roleActionsForCategory already reads elsewhere, in order of
+// specificity: arm/disarm is unambiguously security; any level-capable
+// on/off is called "light" (the more common case among Oak's own built-in
+// drivers) rather than "media", since nothing in a manifest distinguishes
+// the two without a category the author would have just declared anyway;
+// on/off with no level is a plain switch. This is only ever a starting
+// guess - the author's own explicit `category` always wins, and nothing
+// downstream is locked to it (a slot can bind to any instance regardless
+// of its driver's declared category).
+function inferCategory(manifest) {
+  const roles = new Set(manifest.actions.map((a) => a.role).filter(Boolean));
+  if (roles.has("arm") || roles.has("disarm")) return "security";
+  if (roles.has("level")) return "light";
+  if (roles.has("on") || roles.has("off")) return "switch";
+  return "generic";
+}
+
 // Uploaded drivers are plain text (a manifest.json + a driver.js), not a
 // packaged/encrypted bundle the way an .rtidriver is - Oak has no
 // packaging step at all yet, so this is the honest v1: upload the two
@@ -679,11 +700,19 @@ function uploadDriver(driverId, manifestJson, driverJs) {
     return { error: "manifest.json must have id, displayName, actions[], states[]" };
   }
   if (!driverJs || !driverJs.trim()) return { error: "driver.js is required" };
+  const hasCategory = manifest.category && (!Array.isArray(manifest.category) || manifest.category.length);
+  let savedManifestJson = manifestJson;
+  let inferredCategory = null;
+  if (!hasCategory) {
+    inferredCategory = inferCategory(manifest);
+    manifest.category = inferredCategory;
+    savedManifestJson = JSON.stringify(manifest, null, 2);
+  }
   const dir = path.join(DRIVERS_DIR, safeId);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, "manifest.json"), manifestJson);
+  fs.writeFileSync(path.join(dir, "manifest.json"), savedManifestJson);
   fs.writeFileSync(path.join(dir, "driver.js"), driverJs);
-  return { ok: true, id: safeId };
+  return { ok: true, id: safeId, inferredCategory };
 }
 
 function deleteDriverPackage(driverId) {
