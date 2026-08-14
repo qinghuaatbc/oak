@@ -102,7 +102,7 @@ function renderInstancesList() {
     }</div><div class="ikey">${manifest.id} · ${id}</div></div>`;
     row.addEventListener("click", () => {
       instanceFilter.value = id;
-      renderActivePanel();
+      renderActivePanel({ allowConfigRerender: true });
     });
     const btnRow = document.createElement("div");
     btnRow.className = "row";
@@ -544,13 +544,26 @@ async function renderConfigPanel() {
   }
 }
 
-function renderActivePanel() {
+// configSubPanel is deliberately excluded from the live/poll refresh path
+// below - it's an editor, not a live-state view, same reasoning as the
+// Dashboard tab (see fullRefresh()'s comment). A driver streaming frequent
+// state events (e.g. Home Assistant's state_changed subscription) fires
+// scheduleRefresh() -> fullRefresh() -> renderActivePanel() many times a
+// minute; if that rebuilt the config panel's innerHTML each time, it would
+// wipe out an in-progress "+ Add" keyvalue row (or any typed-but-unsaved
+// text in it) before the admin could ever finish it - confirmed as a real,
+// hit-in-practice bug, not hypothetical. It's (re)rendered explicitly
+// instead: once when the tab/instance is opened, and after actions that
+// are known to change what it should show (save, discover-import,
+// start/stop already call fullRefresh() themselves post-action).
+function renderActivePanel({ allowConfigRerender = false } = {}) {
   renderInstanceFilter();
   const activePanel = document.querySelector(".subtabs .st.active").dataset.panel;
   if (activePanel === "stateSubPanel") renderStatePanel();
   else if (activePanel === "actionsSubPanel") renderActionsPanel();
-  else if (activePanel === "configSubPanel") renderConfigPanel();
-  else renderEventsPanel();
+  else if (activePanel === "configSubPanel") {
+    if (allowConfigRerender) renderConfigPanel();
+  } else renderEventsPanel();
 }
 
 document.querySelectorAll(".subtabs .st").forEach((tab) => {
@@ -559,10 +572,10 @@ document.querySelectorAll(".subtabs .st").forEach((tab) => {
     document.querySelectorAll(".subpanel").forEach((p) => p.classList.remove("active"));
     tab.classList.add("active");
     document.getElementById(tab.dataset.panel).classList.add("active");
-    renderActivePanel();
+    renderActivePanel({ allowConfigRerender: true });
   });
 });
-instanceFilter.addEventListener("change", renderActivePanel);
+instanceFilter.addEventListener("change", () => renderActivePanel({ allowConfigRerender: true }));
 
 // --- Main tabs (Driver/Dashboard/Camera/Automation/Macro/Scenes/Trends/3D/
 // Layout/Templates/Health/Customers), same lazy-render-on-click pattern as
