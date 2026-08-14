@@ -342,14 +342,7 @@ async function runMacro(macro) {
 }
 
 for (const inst of config.instances)
-  addInstance(inst.id, {
-    driver: inst.driver,
-    connection: inst.connection,
-    settings: inst.settings,
-    categoryOverride: inst.categoryOverride,
-    dashboardHidden: inst.dashboardHidden,
-    dashboardLabel: inst.dashboardLabel,
-  });
+  addInstance(inst.id, { driver: inst.driver, connection: inst.connection, settings: inst.settings });
 
 function stopInstance(id) {
   const entry = instances.get(id);
@@ -379,29 +372,12 @@ function removeInstance(id) {
 // Editing a live connection's config out from under it isn't safe (e.g. a
 // TCP socket already open to the OLD host/port) - requiring stop-first
 // keeps this simple and correct instead of trying to hot-reconfigure a
-// running driver. categoryOverride/dashboardHidden/dashboardLabel are pure
-// presentation metadata (which Dashboard/Live sections this instance shows
-// up under, and how it's labeled there) - none of it touches the runtime,
-// so all of it is editable regardless of running state, unlike
-// connection/settings. Dashboard tiles are auto-generated from the driver's
-// own manifest by default (name, category) but an admin can hide an
-// instance from the Dashboard entirely or give its tile a custom label,
-// same "auto by default, manual override always wins" pattern as
-// categoryOverride - mirrors QTI's own editable-Dashboard UX without
-// QTI's fully-manual slot-binding model, since Oak's tiles are already
-// tied 1:1 to instances rather than freely-composed bindings.
+// running driver. Dashboard presentation (name, category, which function
+// is on/off/level) lives entirely in bindings.json now, not on the
+// instance spec - see loadBindings/saveBindings/autoGenerateBindings below.
 function editInstance(id, updates) {
   const entry = instances.get(id);
   if (!entry) return { error: "No such instance" };
-  if (updates.categoryOverride !== undefined) {
-    entry.spec.categoryOverride = updates.categoryOverride && updates.categoryOverride.length ? updates.categoryOverride : undefined;
-  }
-  if (updates.dashboardHidden !== undefined) {
-    entry.spec.dashboardHidden = Boolean(updates.dashboardHidden);
-  }
-  if (updates.dashboardLabel !== undefined) {
-    entry.spec.dashboardLabel = updates.dashboardLabel ? String(updates.dashboardLabel).slice(0, 60) : undefined;
-  }
   if (updates.connection || updates.settings) {
     if (entry.running) return { error: "Stop the instance before editing its connection/settings" };
     if (updates.connection) entry.spec.connection = { ...entry.spec.connection, ...updates.connection };
@@ -421,12 +397,147 @@ function persistConfig() {
       driver: entry.spec.driver,
       connection: entry.spec.connection,
       settings: entry.spec.settings,
-      categoryOverride: entry.spec.categoryOverride,
-      dashboardHidden: entry.spec.dashboardHidden,
-      dashboardLabel: entry.spec.dashboardLabel,
     })),
   };
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(data, null, 2));
+}
+
+// --- Dashboard bindings: QTI's own model, ported directly rather than
+// Oak's earlier (now removed) 1-card-per-instance approach. A binding
+// "slot" is NOT the same thing as a driver instance - one hub-style
+// instance (e.g. a multi-zone controller) can back many slots, each
+// naming a specific zone/device and picking which of that instance's
+// exported actions is its on/off/level function, with fixedArgs merged
+// into every call (e.g. {zone:"kitchen"}) - this is what lets "kitchen
+// light" and "living room light" both be slots against the SAME instance.
+// Grouped by category so the Dashboard/Live UI can render one section per
+// category the same way QTI's admin does (Lights, Switches, ...).
+const BINDINGS_PATH = process.env.OAK_BINDINGS || path.join(__dirname, "bindings.json");
+const BINDING_CATEGORIES = ["light", "switch", "climate", "security", "media", "sensor", "generic"];
+function bindingsDefaults() {
+  const obj = {};
+  for (const c of BINDING_CATEGORIES) obj[c] = [];
+  return obj;
+}
+function loadBindings() {
+  if (!fs.existsSync(BINDINGS_PATH)) return bindingsDefaults();
+  try {
+    const raw = JSON.parse(fs.readFileSync(BINDINGS_PATH, "utf8"));
+    const out = bindingsDefaults();
+    for (const c of BINDING_CATEGORIES) if (Array.isArray(raw[c])) out[c] = raw[c];
+    return out;
+  } catch (e) {
+    console.error(`Failed to read ${BINDINGS_PATH}:`, e.message);
+    return bindingsDefaults();
+  }
+}
+let bindings = loadBindings();
+function saveBindings() {
+  fs.writeFileSync(BINDINGS_PATH, JSON.stringify(bindings, null, 2));
+}
+
+// Sanitizes a client-submitted bindings object the same defensive,
+// field-by-field way QTI's own saveBindings handler does (server.js:
+// 1802-1821 in QTI) rather than trusting the body shape wholesale.
+function sanitizeSlot(s) {
+  if (!s || typeof s !== "object") return null;
+  const slot = {
+    id: typeof s.id === "string" && s.id ? s.id : crypto.randomBytes(4).toString("hex"),
+    name: typeof s.name === "string" ? s.name.slice(0, 60) : "Untitled",
+    instanceId: typeof s.instanceId === "string" ? s.instanceId : undefined,
+    onActionId: typeof s.onActionId === "string" ? s.onActionId : undefined,
+    offActionId: typeof s.offActionId === "string" ? s.offActionId : undefined,
+    levelActionId: typeof s.levelActionId === "string" ? s.levelActionId : undefined,
+    onStateId: typeof s.onStateId === "string" ? s.onStateId : undefined,
+    levelStateId: typeof s.levelStateId === "string" ? s.levelStateId : undefined,
+    fixedArgs: s.fixedArgs && typeof s.fixedArgs === "object" ? s.fixedArgs : {},
+    stateSuffix: typeof s.stateSuffix === "string" && s.stateSuffix ? s.stateSuffix : undefined,
+  };
+  return slot;
+}
+function sanitizeBindings(raw) {
+  const out = bindingsDefaults();
+  if (!raw || typeof raw !== "object") return out;
+  for (const c of BINDING_CATEGORIES) {
+    if (!Array.isArray(raw[c])) continue;
+    out[c] = raw[c].map(sanitizeSlot).filter(Boolean);
+  }
+  return out;
+}
+
+// Explicit, opt-in convenience (a button in the UI), not a silent side
+// effect of adding an instance - QTI reached the same conclusion for its
+// own "binding templates" feature. Idempotent: running it twice in a row
+// adds nothing new, since it skips any category where the instance
+// already has an un-zoned (fixedArgs-less) default slot.
+// Role lookups are scoped per category, not a single manifest-wide find()
+// - a hub manifest can have DIFFERENT actions plausibly matching the same
+// role in different subsystems (e.g. zone-hub's lightSetLevel is role
+// "level" for its light zones, but that must never get picked as the
+// climate zone's target-temperature function just because both are role
+// "level" scans over the same actions array). Security uses arm/disarm
+// instead of on/off; climate has no settled on/off/level role vocabulary
+// yet, so its default slot is left with no functions bound at all -
+// skipped entirely rather than creating an empty, unusable slot - and the
+// admin binds it by hand (exactly what the zone-hub example driver is
+// for: proving the manual path works, not just the auto-generated one).
+function roleActionsForCategory(manifest, cat) {
+  if (cat === "security") {
+    return { onAction: manifest.actions.find((a) => a.role === "arm"), offAction: manifest.actions.find((a) => a.role === "disarm"), levelAction: undefined };
+  }
+  if (cat === "climate" || cat === "sensor") {
+    return { onAction: undefined, offAction: undefined, levelAction: undefined };
+  }
+  return {
+    onAction: manifest.actions.find((a) => a.role === "on"),
+    offAction: manifest.actions.find((a) => a.role === "off"),
+    levelAction: manifest.actions.find((a) => a.role === "level"),
+  };
+}
+// Mirrors roleActionsForCategory's category-scoping for STATES - a blind
+// manifest-wide "find the state with role=level" has the exact same
+// cross-subsystem collision problem actions have (zone-hub's light.level
+// and a hypothetical climate state could both plausibly want role
+// "level"), so this stays in lockstep with which category is being
+// generated for rather than scanning independently.
+function roleStatesForCategory(manifest, cat) {
+  if (cat === "security" || cat === "climate" || cat === "sensor") {
+    // No settled role vocabulary for a security/climate/sensor readout
+    // state yet (arm/disarm doesn't have a simple boolean "on" state the
+    // way a light does) - left unbound, same as their actions above; a
+    // plain card without a level function never reads levelState anyway.
+    return { onState: undefined, levelState: undefined };
+  }
+  return { onState: manifest.states.find((s) => s.role === "on"), levelState: manifest.states.find((s) => s.role === "level") };
+}
+function autoGenerateBindings() {
+  let added = 0;
+  for (const [id, entry] of instances) {
+    const manifest = entry.manifest;
+    const cats = Array.isArray(manifest.category) ? manifest.category : [manifest.category || "generic"];
+    for (const cat of cats) {
+      if (!BINDING_CATEGORIES.includes(cat)) continue;
+      const hasDefault = bindings[cat].some((s) => s.instanceId === id && (!s.fixedArgs || Object.keys(s.fixedArgs).length === 0));
+      if (hasDefault) continue;
+      const { onAction, offAction, levelAction } = roleActionsForCategory(manifest, cat);
+      if (!onAction && !offAction && !levelAction) continue;
+      const { onState, levelState } = roleStatesForCategory(manifest, cat);
+      bindings[cat].push({
+        id: crypto.randomBytes(4).toString("hex"),
+        name: manifest.displayName,
+        instanceId: id,
+        onActionId: onAction ? onAction.id : undefined,
+        offActionId: offAction ? offAction.id : undefined,
+        levelActionId: levelAction ? levelAction.id : undefined,
+        onStateId: onState ? onState.id : undefined,
+        levelStateId: levelState ? levelState.id : undefined,
+        fixedArgs: {},
+      });
+      added++;
+    }
+  }
+  if (added) saveBindings();
+  return added;
 }
 
 // Ported directly from QTI's own server.js startCameraFfmpeg - the ffmpeg
@@ -726,6 +837,26 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, { ok: true });
   }
 
+  if (parts[1] === "bindings" && parts.length === 2 && req.method === "GET") {
+    return sendJson(res, 200, bindings);
+  }
+  if (parts[1] === "bindings" && parts.length === 2 && req.method === "PUT") {
+    try {
+      const body = await readJsonBody(req);
+      bindings = sanitizeBindings(body);
+      saveBindings();
+      broadcast({ type: "bindings", bindings });
+      return sendJson(res, 200, { ok: true });
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
+  }
+  if (parts[1] === "bindings" && parts.length === 3 && parts[2] === "auto-generate" && req.method === "POST") {
+    const added = autoGenerateBindings();
+    broadcast({ type: "bindings", bindings });
+    return sendJson(res, 200, { ok: true, added });
+  }
+
   if (parts[1] === "glb" && parts.length === 2 && req.method === "GET") {
     const files = fs.readdirSync(MODELS_DIR).filter((f) => f.toLowerCase().endsWith(".glb"));
     return sendJson(res, 200, files.map((f) => ({ name: f, url: `/models/${f}` })));
@@ -756,9 +887,6 @@ const server = http.createServer(async (req, res) => {
       displayName: entry.manifest.displayName,
       running: entry.running,
       category: entry.manifest.category,
-      categoryOverride: entry.spec.categoryOverride,
-      dashboardHidden: Boolean(entry.spec.dashboardHidden),
-      dashboardLabel: entry.spec.dashboardLabel,
       actions: entry.manifest.actions.map((a) => a.id),
       events: entry.manifest.events.map((e) => e.id),
     }));
@@ -770,14 +898,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       if (!body.id || !body.driver) return sendJson(res, 400, { error: "id and driver are required" });
       if (instances.has(body.id)) return sendJson(res, 400, { error: `Instance "${body.id}" already exists` });
-      addInstance(body.id, {
-        driver: body.driver,
-        connection: body.connection || {},
-        settings: body.settings || {},
-        categoryOverride: body.categoryOverride,
-        dashboardHidden: body.dashboardHidden,
-        dashboardLabel: body.dashboardLabel,
-      });
+      addInstance(body.id, { driver: body.driver, connection: body.connection || {}, settings: body.settings || {} });
       persistConfig();
       broadcast({ type: "instanceAdded", instanceId: body.id });
       return sendJson(res, 200, { ok: true });
@@ -834,9 +955,6 @@ const server = http.createServer(async (req, res) => {
       settings: entry.spec.settings,
       running: entry.running,
       category: entry.manifest.category,
-      categoryOverride: entry.spec.categoryOverride,
-      dashboardHidden: Boolean(entry.spec.dashboardHidden),
-      dashboardLabel: entry.spec.dashboardLabel,
     });
   }
 

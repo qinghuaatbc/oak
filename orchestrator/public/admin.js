@@ -4,6 +4,7 @@ import {
   getHealth, listMacros, saveMacro, deleteMacro, runMacro,
   listCameras, addCamera, deleteCamera, listGlbModels, uploadGlb,
   uploadDriver, deleteDriverPackage,
+  getBindings, saveBindings, autoGenerateBindings,
 } from "./api.js";
 import { connectLiveSocket } from "./live-socket.js";
 import { attachCameraPlayer } from "./camera-player.js";
@@ -18,9 +19,7 @@ let manifests = new Map(); // id -> manifest
 let instanceIds = [];
 let runningByInstance = new Map(); // id -> boolean
 let statesByInstance = new Map(); // id -> {key: value}
-let categoriesByInstance = new Map(); // id -> string[] (effective, override-aware)
-let dashboardMetaByInstance = new Map(); // id -> {hidden: boolean, label: string|undefined}
-let dashboardCat = "__all__";
+let bindingsCache = null; // {light:[], switch:[], ...} - loaded when the Dashboard tab is opened
 const logBuffer = []; // {instanceId, label, text} - fed live by WS "event" messages
 
 const countPill = document.getElementById("countPill");
@@ -36,6 +35,7 @@ const eventsLog = document.getElementById("eventsLog");
 // not QTI-specific. ---
 function makeCardsCollapsible() {
   document.querySelectorAll(".card").forEach((card) => {
+    if (card.__setCollapsed) return; // already wired - avoid duplicate chevrons/listeners on re-render
     const header = card.firstElementChild;
     if (!header) return;
     const h2 = header.tagName === "H2" ? header : header.querySelector("h2");
@@ -309,27 +309,9 @@ async function renderConfigPanel() {
     .join("");
   const settingFields = (driverManifest.settings || []).map((f) => fieldInput("settings", f, cfg.settings[f.key])).join("");
 
-  // Category is pure presentation metadata (which Dashboard/Live sections
-  // this instance shows up under) - editable regardless of running state,
-  // unlike connection/settings which need the instance stopped first. The
-  // manifest's own declared default is shown even when overridden, so
-  // "reset to default" is just unchecking back to that set.
-  const defaultCats = Array.isArray(driverManifest.category) ? driverManifest.category : [driverManifest.category || "generic"];
-  const activeCats = effectiveCategories(manifest, cfg.categoryOverride);
-  const catCheckboxes = CATEGORY_ORDER.map(
-    (c) =>
-      `<label style="display:inline-flex; align-items:center; gap:4px; margin-right:12px;"><input type="checkbox" name="cat" value="${c}" ${
-        activeCats.includes(c) ? "checked" : ""
-      } />${CATEGORY_ICON[c]} ${CATEGORY_LABEL[c]}${defaultCats.includes(c) ? " (default)" : ""}</label>`
-  ).join("");
-
   configPanel.innerHTML = `
     <p class="sub">instance "${id}" · driver ${manifest.id} · ${running ? "running" : "stopped"}</p>
-    <form id="editCategoryForm" class="config-form">
-      <span class="lbl">Dashboard/Live categories</span>
-      <div style="margin:6px 0 10px;">${catCheckboxes}</div>
-      <button class="btn small primary" type="submit">Save categories</button>
-    </form>
+    <p class="sub">Dashboard presentation (name, category, which function is On/Off/Level) is configured on the <a href="#dashboard" onclick="location.hash='dashboard'">Dashboard</a> tab, not here - it's a binding, not part of this instance's connection.</p>
     ${
       running
         ? `<p class="empty-hint">Stop this instance before editing its connection/settings - editing a live connection out from under it isn't safe.</p>`
@@ -350,30 +332,12 @@ async function renderConfigPanel() {
     fullRefresh();
   });
 
-  document.getElementById("editCategoryForm").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    const checked = [...ev.target.querySelectorAll('input[name="cat"]:checked')].map((i) => i.value);
-    // An override that exactly matches the manifest's own default is the
-    // same as no override at all - clearing it (rather than persisting a
-    // redundant copy) means a future driver update to its own default
-    // category keeps applying, instead of being silently frozen out by a
-    // stale override nobody meant to set in stone.
-    const sameAsDefault = checked.length === defaultCats.length && checked.every((c) => defaultCats.includes(c));
-    const result = await editInstance(id, { categoryOverride: sameAsDefault ? [] : checked });
-    if (result.error) {
-      alert(result.error);
-      return;
-    }
-    fullRefresh();
-  });
-
   if (!running) {
     document.getElementById("editInstanceForm").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const connection = {};
       const settings = {};
       ev.target.querySelectorAll("input").forEach((input) => {
-        if (input.name === "cat") return;
         const [group, key] = input.name.split(".");
         const value = input.type === "number" ? Number(input.value) : input.value;
         if (group === "connection") connection[key] = value;
@@ -423,7 +387,7 @@ function activateMainTab(page) {
   document.querySelectorAll("main .page").forEach((p) => p.classList.remove("active"));
   tab.classList.add("active");
   document.getElementById(`page-${page}`).classList.add("active");
-  if (page === "dashboard") renderDashboard();
+  if (page === "dashboard") renderDashboardTab();
   else if (page === "macro") renderMacrosTab();
   else if (page === "health") renderHealthTab();
   else if (page === "camera") renderCameraTab();
@@ -440,145 +404,284 @@ function activeMainTab() {
   return document.querySelector("nav.maintabs .mt.active").dataset.page;
 }
 
-// --- Dashboard: category is the tab - each category present across the
-// configured instances gets its own subtab (same subtabs widget the
-// Driver tab's State/Actions/Events/Config already use), not just a
-// heading in one long scroll. An instance with multiple declared
-// categories (a hub-style driver, e.g. a real Eisy-equivalent controlling
-// both lights and a thermostat through one instance) appears under every
-// one of them - Oak has no driver yet whose actions/states are annotated
-// finely enough to split a single instance's controls into separate per-
-// category widgets, so showing the whole instance card in each relevant
-// tab is the honest v1 scope. ---
-function renderDashboardCatTabs() {
-  const tabsEl = document.getElementById("dashboardCatTabs");
-  const present = new Set();
-  instanceIds.forEach((id) => (categoriesByInstance.get(id) || []).forEach((c) => present.add(c)));
-  const cats = CATEGORY_ORDER.filter((c) => present.has(c));
-  if (!cats.some((c) => c === dashboardCat) && dashboardCat !== "__all__") dashboardCat = "__all__";
-  const allTab = `<div class="st${dashboardCat === "__all__" ? " active" : ""}" data-cat="__all__">All</div>`;
-  const catTabs = cats
-    .map((c) => `<div class="st${dashboardCat === c ? " active" : ""}" data-cat="${c}">${CATEGORY_ICON[c] || "⚙️"} ${CATEGORY_LABEL[c] || c}</div>`)
-    .join("");
-  tabsEl.innerHTML = allTab + catTabs;
-  tabsEl.querySelectorAll(".st").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      dashboardCat = tab.dataset.cat;
-      renderDashboard();
+// --- Dashboard: QTI's own binding-editor model, ported directly rather
+// than Oak's earlier (now removed) 1-tile-per-instance approach. A
+// "slot" names a device (e.g. "kitchen light") and picks ONE instance
+// plus which of that instance's actions is its On/Off/Level function -
+// this is what lets a single hub-style instance (e.g. a real multi-zone
+// controller) back MANY slots, each with its own fixed call arguments
+// (e.g. {zone:"kitchen"}) - "kitchen light" and "living room light" can
+// both point at the same instance's same lightOn/lightOff/lightSetLevel
+// actions, just with a different fixed zone value. This tab is purely an
+// editor - live state/toggling happens on live.html, same split QTI
+// itself has between its admin bindings editor and its live pages.
+//
+// Simplification vs QTI: a slot's On/Off/Level functions all reference
+// the SAME instance (QTI allows each to reference an independent
+// instance+function) - every Oak driver built so far only ever needs one
+// instance per slot, so this isn't a real limitation yet, just an honest
+// scope note.
+//
+// Convention: a param literally named "level" on an action is the LIVE
+// value (set by a drag/slider), never a fixed argument - every other
+// param on the slot's chosen on/off/level actions (e.g. "zone") is
+// editable as a fixed argument in the "Fixed arguments" box.
+function actionParams(manifest, actionId) {
+  const action = manifest && manifest.actions.find((a) => a.id === actionId);
+  return action ? action.params || [] : [];
+}
+function fixedParamKeysForSlot(manifest, slot) {
+  const keys = new Set();
+  [slot.onActionId, slot.offActionId, slot.levelActionId].forEach((actionId) => {
+    actionParams(manifest, actionId).forEach((p) => {
+      if (p.key !== "level") keys.add(p.key);
     });
   });
+  return [...keys];
 }
 
-function dashboardLabelFor(id) {
-  const meta = dashboardMetaByInstance.get(id);
-  return (meta && meta.label) || manifests.get(id).displayName;
-}
+function buildFnSelect(container, label, slot, fieldKey, onChanged) {
+  const wrap = document.createElement("div");
+  wrap.className = "slot-fn-group";
+  const labelEl = document.createElement("div");
+  labelEl.className = "lbl";
+  labelEl.textContent = label;
+  const actSel = document.createElement("select");
+  wrap.append(labelEl, actSel);
+  container.appendChild(wrap);
 
-// Tiles are auto-generated from the driver's own manifest by default (same
-// name/category the driver declares), but each one carries two small,
-// presentation-only overrides an admin can set without touching the
-// instance's connection/settings: a custom tile label, and hide-from-
-// dashboard (the instance keeps running, it's just not shown here). This is
-// the "auto-generate, but editable" middle ground between Oak's own
-// auto-category tiles and QTI's fully-manual, freely add/delete-able slot
-// system - Oak doesn't have freeform unbound slots, so "add" here means
-// "un-hide", not "create a tile with no backing instance".
-function renderDashboard() {
-  renderDashboardCatTabs();
-  const grid = document.getElementById("dashboardGrid");
-  grid.innerHTML = "";
-  const inCat = (id) => dashboardCat === "__all__" || (categoriesByInstance.get(id) || []).includes(dashboardCat);
-  const candidates = instanceIds.filter(inCat);
-  const visible = candidates.filter((id) => !(dashboardMetaByInstance.get(id) || {}).hidden);
-  const hidden = candidates.filter((id) => (dashboardMetaByInstance.get(id) || {}).hidden);
-  if (!visible.length) {
-    grid.innerHTML = `<p class="empty-hint">No instances in this category.</p>`;
+  function populate() {
+    const manifest = manifests.get(slot.instanceId);
+    actSel.innerHTML =
+      `<option value="">— none —</option>` + (manifest ? manifest.actions.map((a) => `<option value="${a.id}">${a.label} (${a.id})</option>`).join("") : "");
+    actSel.value = slot[fieldKey] || "";
   }
-  visible.forEach((id) => {
-    const manifest = manifests.get(id);
-    const running = runningByInstance.get(id);
-    const state = statesByInstance.get(id) || {};
-    const label = dashboardLabelFor(id);
-    const wrap = document.createElement("div");
-    wrap.className = "tile";
-    const editHtml = `<span class="tile-edit-btns" onclick="event.stopPropagation()">
-      <button class="icon-btn" data-edit-label="${id}" title="Rename tile">✎</button>
-      <button class="icon-btn" data-hide-tile="${id}" title="Remove from dashboard">✕</button>
-    </span>`;
-    if (!running) {
-      wrap.innerHTML = `<div class="row" style="justify-content:space-between;"><div class="tname">${label}</div>${editHtml}</div><div class="tstate">stopped</div>`;
-      grid.appendChild(wrap);
+  actSel.addEventListener("change", () => {
+    slot[fieldKey] = actSel.value || undefined;
+    onChanged();
+  });
+  populate();
+  return { populate };
+}
+
+// Same pattern as buildFnSelect but over manifest.states, for the
+// slot's onStateId/levelStateId - kept explicit (not inferred from the
+// chosen action) for the same reason server.js's roleStatesForCategory
+// exists: a hub manifest can have two states plausibly matching the same
+// role (zone-hub's light.level vs its unrated climate.target), so the
+// slot must say which one it actually means.
+function buildStateSelect(container, label, slot, fieldKey, onChanged) {
+  const wrap = document.createElement("div");
+  wrap.className = "slot-fn-group";
+  const labelEl = document.createElement("div");
+  labelEl.className = "lbl";
+  labelEl.textContent = label;
+  const sel = document.createElement("select");
+  wrap.append(labelEl, sel);
+  container.appendChild(wrap);
+
+  function populate() {
+    const manifest = manifests.get(slot.instanceId);
+    sel.innerHTML =
+      `<option value="">— none —</option>` + (manifest ? manifest.states.map((s) => `<option value="${s.id}">${s.id} (${s.type})</option>`).join("") : "");
+    sel.value = slot[fieldKey] || "";
+  }
+  sel.addEventListener("change", () => {
+    slot[fieldKey] = sel.value || undefined;
+    onChanged();
+  });
+  populate();
+  return { populate };
+}
+
+// Builds one slot's expandable editor: Name, an instance picker shared by
+// all three functions, On/Off/Level function pickers (each scoped to
+// that one instance's actions), and a "Fixed arguments" box covering
+// every non-"level" param any of the three chosen actions declare (the
+// zone/name selector for a hub driver). Mutates `slot` in place; the
+// caller is responsible for persisting bindingsCache after a change.
+function buildSlotRow(cat, slot, onDelete) {
+  const row = document.createElement("div");
+  row.className = "slot-row";
+
+  const header = document.createElement("div");
+  header.className = "slot-row-header";
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.value = slot.name || "";
+  nameInput.placeholder = "Name (e.g. kitchen)";
+  nameInput.addEventListener("click", (ev) => ev.stopPropagation());
+  nameInput.addEventListener("change", () => {
+    slot.name = nameInput.value.trim() || "Untitled";
+    persistBindings();
+  });
+  const delBtn = document.createElement("button");
+  delBtn.className = "btn small danger";
+  delBtn.textContent = "Delete";
+  delBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    onDelete();
+  });
+  header.append(nameInput, delBtn);
+
+  const body = document.createElement("div");
+  body.className = "slot-row-body hidden";
+  header.addEventListener("click", () => body.classList.toggle("hidden"));
+
+  const instWrap = document.createElement("label");
+  instWrap.innerHTML = `<span class="lbl">Instance</span>`;
+  const instSel = document.createElement("select");
+  instWrap.appendChild(instSel);
+
+  const argsWrap = document.createElement("div");
+  argsWrap.className = "slot-fn-group";
+  const argsLabel = document.createElement("div");
+  argsLabel.className = "lbl";
+  argsLabel.textContent = "Fixed arguments";
+  argsWrap.appendChild(argsLabel);
+
+  function renderArgs() {
+    [...argsWrap.querySelectorAll("input")].forEach((el) => el.remove());
+    const manifest = manifests.get(slot.instanceId);
+    const keys = fixedParamKeysForSlot(manifest, slot);
+    if (!keys.length) {
+      const hint = document.createElement("span");
+      hint.className = "sub";
+      hint.textContent = "none needed";
+      hint.dataset.hint = "1";
+      argsWrap.appendChild(hint);
       return;
     }
-    const togglePair = getOnOffPair(manifest);
-    const boolEntry = Object.entries(state).find(([, v]) => typeof v === "boolean");
-    const useToggle = Boolean(togglePair && boolEntry);
-    const switchHtml = useToggle
-      ? `<label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${
-          boolEntry[1] ? "checked" : ""
-        } data-instance="${id}" data-on-action="${togglePair[0]}" data-off-action="${togglePair[1]}" /><span class="slider-track"></span></label>`
-      : "";
-    const stateText = Object.entries(state)
-      .map(([k, v]) => (typeof v === "boolean" ? (v ? "ON" : "OFF") : String(v)))
-      .join(" · ");
-    wrap.innerHTML = `
-      <div class="row" style="justify-content:space-between;">
-        <span class="tname">${label}</span>
-        ${editHtml}
-      </div>
-      <div class="row">
-        ${switchHtml}
-      </div>
-      <div class="tstate">${stateText || "—"}</div>`;
-    grid.appendChild(wrap);
-  });
-  if (hidden.length) {
-    const hiddenWrap = document.createElement("div");
-    hiddenWrap.style.cssText = "grid-column:1/-1; margin-top:14px; padding-top:10px; border-top:1px solid var(--line);";
-    hiddenWrap.innerHTML = `<div class="sub" style="margin-bottom:8px;">Hidden from dashboard</div>`;
-    hidden.forEach((id) => {
-      const row = document.createElement("span");
-      row.style.cssText = "display:inline-flex; align-items:center; gap:6px; margin:0 12px 8px 0;";
-      row.innerHTML = `<span class="sub">${dashboardLabelFor(id)}</span><button class="btn small" data-show-tile="${id}">+ Add to dashboard</button>`;
-      hiddenWrap.appendChild(row);
+    argsWrap.querySelector("[data-hint]")?.remove();
+    keys.forEach((key) => {
+      const paramMeta = [slot.onActionId, slot.offActionId, slot.levelActionId]
+        .flatMap((aid) => actionParams(manifest, aid))
+        .find((p) => p.key === key);
+      const input = document.createElement("input");
+      input.placeholder = (paramMeta && paramMeta.label) || key;
+      input.value = (slot.fixedArgs && slot.fixedArgs[key]) || "";
+      input.addEventListener("change", () => {
+        slot.fixedArgs = slot.fixedArgs || {};
+        if (input.value) slot.fixedArgs[key] = input.value;
+        else delete slot.fixedArgs[key];
+        persistBindings();
+      });
+      argsWrap.appendChild(input);
     });
-    grid.appendChild(hiddenWrap);
   }
-  grid.querySelectorAll("input[type=checkbox][data-on-action]").forEach((input) => {
-    input.addEventListener("change", async () => {
-      const action = input.checked ? input.dataset.onAction : input.dataset.offAction;
-      try {
-        await callAction(input.dataset.instance, action, {});
-      } catch (err) {
-        console.error("action failed", err);
-      }
-    });
+  function onFnChanged() {
+    renderArgs();
+    persistBindings();
+  }
+
+  const onGroup = buildFnSelect(body, "On function", slot, "onActionId", onFnChanged);
+  const offGroup = buildFnSelect(body, "Off function", slot, "offActionId", onFnChanged);
+  const levelGroup = buildFnSelect(body, "Level function", slot, "levelActionId", onFnChanged);
+  const onStateGroup = buildStateSelect(body, "On state (for reading current on/off back)", slot, "onStateId", persistBindings);
+  const levelStateGroup = buildStateSelect(body, "Level state (for reading the current level back)", slot, "levelStateId", persistBindings);
+
+  const suffixWrap = document.createElement("label");
+  suffixWrap.innerHTML = `<span class="lbl">Zone / state suffix (only for a hub instance backing multiple slots - must match what the driver reports, e.g. "kitchen")</span>`;
+  const suffixInput = document.createElement("input");
+  suffixInput.type = "text";
+  suffixInput.value = slot.stateSuffix || "";
+  suffixInput.addEventListener("change", () => {
+    slot.stateSuffix = suffixInput.value.trim() || undefined;
+    persistBindings();
   });
-  grid.querySelectorAll("[data-hide-tile]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      await editInstance(btn.dataset.hideTile, { dashboardHidden: true });
-      await fullRefresh();
-    });
+  suffixWrap.appendChild(suffixInput);
+
+  function populateInstances() {
+    instSel.innerHTML =
+      `<option value="">— none —</option>` +
+      instanceIds.map((id) => `<option value="${id}">${(manifests.get(id) || {}).displayName || id} (${id})</option>`).join("");
+    instSel.value = slot.instanceId || "";
+  }
+  instSel.addEventListener("change", () => {
+    slot.instanceId = instSel.value || undefined;
+    slot.onActionId = slot.offActionId = slot.levelActionId = slot.onStateId = slot.levelStateId = undefined;
+    onGroup.populate();
+    offGroup.populate();
+    levelGroup.populate();
+    onStateGroup.populate();
+    levelStateGroup.populate();
+    renderArgs();
+    persistBindings();
   });
-  grid.querySelectorAll("[data-show-tile]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      await editInstance(btn.dataset.showTile, { dashboardHidden: false });
-      await fullRefresh();
-    });
+  populateInstances();
+  renderArgs();
+
+  body.append(instWrap, argsWrap, suffixWrap);
+  row.append(header, body);
+  return row;
+}
+
+async function persistBindings() {
+  const result = await saveBindings(bindingsCache);
+  if (result.error) alert(result.error);
+}
+
+const CATEGORY_LABEL_PLURAL = {
+  light: "Lights", switch: "Switches", security: "Securities", climate: "Climates", media: "Media", sensor: "Sensors", generic: "Generics",
+};
+
+function buildCategoryCard(cat) {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.dataset.defaultCollapsed = cat === "generic" ? "true" : "false";
+  const h2 = document.createElement("h2");
+  h2.textContent = `${CATEGORY_ICON[cat]} ${CATEGORY_LABEL_PLURAL[cat] || CATEGORY_LABEL[cat] + "s"}`;
+  const addBtn = document.createElement("button");
+  addBtn.className = "btn small";
+  addBtn.style.marginLeft = "auto";
+  addBtn.textContent = `+ Add ${CATEGORY_LABEL[cat]}`;
+  addBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    bindingsCache[cat].push({ id: Math.random().toString(16).slice(2, 10), name: `New ${CATEGORY_LABEL[cat]}`, fixedArgs: {} });
+    persistBindings();
+    renderSlotList(cat, list);
   });
-  grid.querySelectorAll("[data-edit-label]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const id = btn.dataset.editLabel;
-      const current = dashboardLabelFor(id);
-      const next = prompt("Dashboard tile label:", current);
-      if (next === null) return;
-      const trimmed = next.trim();
-      const isDefault = trimmed === manifests.get(id).displayName;
-      await editInstance(id, { dashboardLabel: isDefault ? "" : trimmed });
-      await fullRefresh();
+  h2.appendChild(addBtn);
+  const list = document.createElement("div");
+  list.id = `slotList-${cat}`;
+  card.append(h2, list);
+  renderSlotList(cat, list);
+  return card;
+}
+
+function renderSlotList(cat, list) {
+  list.innerHTML = "";
+  const slots = bindingsCache[cat] || [];
+  if (!slots.length) {
+    list.innerHTML = `<p class="empty-hint">No ${(CATEGORY_LABEL_PLURAL[cat] || CATEGORY_LABEL[cat] + "s").toLowerCase()} yet - "+ Add ${CATEGORY_LABEL[cat]}" or Auto-generate above.</p>`;
+    return;
+  }
+  slots.forEach((slot) => {
+    const row = buildSlotRow(cat, slot, () => {
+      bindingsCache[cat] = bindingsCache[cat].filter((s) => s !== slot);
+      persistBindings();
+      renderSlotList(cat, list);
     });
+    list.appendChild(row);
   });
 }
+
+async function renderDashboardTab() {
+  bindingsCache = await getBindings();
+  const root = document.getElementById("bindingsCategoryCards");
+  root.innerHTML = "";
+  CATEGORY_ORDER.forEach((cat) => root.appendChild(buildCategoryCard(cat)));
+  makeCardsCollapsible();
+}
+document.getElementById("autoGenBindingsBtn").addEventListener("click", async () => {
+  const result = await autoGenerateBindings();
+  if (result.error) {
+    alert(result.error);
+    return;
+  }
+  alert(result.added ? `Added ${result.added} slot(s).` : "Nothing new to add - every instance with a role-tagged on/off/level action already has a default slot.");
+  renderDashboardTab();
+});
 
 // --- Health: per-instance running/error status + orchestrator uptime,
 // ported in spirit from QTI's getHealthSnapshot/refreshHealthPanel. ---
@@ -794,17 +897,18 @@ async function fullRefresh() {
     list.map(async (summary) => {
       if (!manifests.has(summary.id)) manifests.set(summary.id, await getManifest(summary.id));
       runningByInstance.set(summary.id, summary.running);
-      categoriesByInstance.set(summary.id, effectiveCategories(manifests.get(summary.id), summary.categoryOverride));
-      dashboardMetaByInstance.set(summary.id, { hidden: Boolean(summary.dashboardHidden), label: summary.dashboardLabel });
       statesByInstance.set(summary.id, await getState(summary.id));
     })
   );
   updateCountPill();
   renderInstancesList();
   renderActivePanel();
+  // Dashboard is a local editor now (bindings.json), not a live-state view
+  // - it deliberately does NOT re-render on every poll tick the way it
+  // used to, since that would blow away an in-progress edit out from
+  // under the admin. It (re)loads once when the tab is opened instead.
   const mainTab = activeMainTab();
-  if (mainTab === "dashboard") renderDashboard();
-  else if (mainTab === "health") renderHealthTab();
+  if (mainTab === "health") renderHealthTab();
 }
 
 // Category first, then driver (filtered to that category) - a flat driver

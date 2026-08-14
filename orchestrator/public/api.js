@@ -71,6 +71,22 @@ export async function getHealth() {
   return (await fetch("/api/health")).json();
 }
 
+export async function getBindings() {
+  return (await fetch("/api/bindings")).json();
+}
+export async function saveBindings(bindings) {
+  const res = await fetch("/api/bindings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bindings),
+  });
+  return res.json();
+}
+export async function autoGenerateBindings() {
+  const res = await fetch("/api/bindings/auto-generate", { method: "POST" });
+  return res.json();
+}
+
 export async function listMacros() {
   return (await fetch("/api/macros")).json();
 }

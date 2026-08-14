@@ -90,11 +90,15 @@
 
   <section class="page" id="page-dashboard">
     <div class="card">
-      <h2>Dashboard</h2>
-      <div class="sub">organized by category - a driver instance appears under every category it declares</div>
-      <div class="subtabs" id="dashboardCatTabs"></div>
-      <div class="tile-grid" id="dashboardGrid" style="margin-top:12px;"></div>
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <h2>Dashboard</h2>
+          <div class="sub">bindings, not instances - a slot names a device (e.g. "kitchen") and picks which instance/function is its On, Off, and Level - one hub-style instance can back many slots.</div>
+        </div>
+        <button class="btn small primary" id="autoGenBindingsBtn">⚡ Auto-generate</button>
+      </div>
     </div>
+    <div id="bindingsCategoryCards"></div>
   </section>
 
   <section class="page" id="page-camera">

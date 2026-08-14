@@ -1,24 +1,30 @@
 // Live view: category sidebar + frosted-glass sky-card grid, ported from
 // QTI's own live.js/live.html structure (sky-wrap/sky-sidebar/sky-card,
-// ring-dial geometry). Cards are built once per instance and updated in
-// place afterward (cardEls Map), not rebuilt from scratch on every
-// refresh - QTI's own shared.js has a direct comment on why: a full
-// rebuild mid-drag is exactly the bug that bit its admin tile grid once
-// already, and the ring widget below needs real dragging to work at all.
-import { listInstances, getManifest, getState, callAction } from "./api.js";
+// ring-dial geometry). Cards render bindings.json SLOTS now, not driver
+// instances directly - a slot names a device (e.g. "kitchen") and picks
+// one instance + its on/off/level functions, so one hub-style instance
+// can back many cards (see roles.js's header comment). Cards are built
+// once per slot and updated in place afterward (cardEls Map), not
+// rebuilt from scratch on every refresh - QTI's own shared.js has a
+// direct comment on why: a full rebuild mid-drag is exactly the bug that
+// bit its admin tile grid once already, and the ring widget below needs
+// real dragging to work at all.
+import { listInstances, getManifest, getState, callAction, getBindings } from "./api.js";
 import { connectWS } from "./live-socket.js";
 import { createCommPanel } from "./comm.js";
-import { CATEGORY_ICON, CATEGORY_LABEL, CATEGORY_ORDER, effectiveCategories, getOnOffPair, getLevelAction, getOnState, getLevelState } from "./roles.js";
+import { CATEGORY_ICON, CATEGORY_LABEL, CATEGORY_ORDER, slotOnState, slotLevelState, slotCallParams } from "./roles.js";
 
 const FALLBACK_POLL_MS = 10000;
 const REFRESH_DEBOUNCE_MS = 150;
 
 const grid = document.getElementById("skyGrid");
 const sidebar = document.getElementById("skySidebar");
-let manifests = new Map(); // id -> manifest
+let manifests = new Map(); // instanceId -> manifest
 let instanceIds = [];
-let categoriesByInstance = new Map(); // id -> string[]
-let cardEls = new Map(); // id -> {el, apply(state, running)}
+let runningByInstance = new Map(); // instanceId -> boolean
+let statesByInstance = new Map(); // instanceId -> {key: value}
+let bindingsData = Object.fromEntries(CATEGORY_ORDER.map((c) => [c, []])); // cat -> slot[]
+let cardEls = new Map(); // slotId -> {el, apply(state, running), cat}
 let activeCat = "__all__";
 
 // ---------------------------------------------------------------------
@@ -57,18 +63,17 @@ function ringProgressFromEvent(svgEl, evt) {
   return ringAngleToProgress(raw);
 }
 
-// A ring-dial card for a light/media-category instance with a role-tagged
-// "level" action - tap toggles on/off (via the on/off role pair, if any),
-// drag sets level. hasDial=false (level role present but no on/off pair)
-// still shows the ring, drag-only, no tap-toggle.
-function buildRingCard(instanceId, manifest, categories) {
-  const onOffPair = getOnOffPair(manifest);
-  const levelAction = getLevelAction(manifest);
-  const hasDial = Boolean(levelAction);
+// A ring-dial card for any slot with a Level function bound - tap toggles
+// on/off (via the slot's On/Off functions, if either is bound), drag sets
+// level. The center glyph follows the slot's own category, not a
+// hardcoded light bulb - a climate slot's ring shows 🌡️, a media slot 🎬,
+// etc., so this one widget works for any category with a live-adjustable
+// value, not just dimmers.
+function buildRingCard(slot, manifest, cat) {
+  const hasToggle = Boolean(slot.onActionId || slot.offActionId);
 
   const box = document.createElement("div");
   box.className = "sky-card";
-  box.dataset.categories = JSON.stringify(categories);
   box.dataset.on = "0";
 
   const svg = document.createElementNS(SVG_NS, "svg");
@@ -86,7 +91,7 @@ function buildRingCard(instanceId, manifest, categories) {
   bulb.setAttribute("class", "ring-bulb");
   bulb.setAttribute("x", "80");
   bulb.setAttribute("y", "88");
-  bulb.textContent = categories.includes("media") ? "🔊" : "💡";
+  bulb.textContent = CATEGORY_ICON[cat] || "⚙️";
   svg.append(track, val, thumb, bulb);
   box.appendChild(svg);
 
@@ -94,7 +99,7 @@ function buildRingCard(instanceId, manifest, categories) {
   valueEl.className = "sky-value";
   const labelEl = document.createElement("div");
   labelEl.className = "sky-label";
-  labelEl.textContent = manifest.displayName;
+  labelEl.textContent = slot.name;
   const offlineEl = document.createElement("div");
   offlineEl.className = "sky-offline-badge sky-hidden";
   box.append(valueEl, labelEl, offlineEl);
@@ -121,7 +126,6 @@ function buildRingCard(instanceId, manifest, categories) {
   let pendingValue = null;
   let downX = 0;
   let downY = 0;
-  let currentOn = false;
 
   svg.addEventListener("pointerdown", (ev) => {
     ev.preventDefault();
@@ -132,7 +136,7 @@ function buildRingCard(instanceId, manifest, categories) {
     svg.setPointerCapture(ev.pointerId);
   });
   svg.addEventListener("pointermove", (ev) => {
-    if (!dragging || !hasDial) return;
+    if (!dragging) return;
     if (!didDrag) {
       if (Math.hypot(ev.clientX - downX, ev.clientY - downY) < DRAG_THRESHOLD_PX) return;
       didDrag = true;
@@ -143,52 +147,54 @@ function buildRingCard(instanceId, manifest, categories) {
     if (!throttleTimer) {
       throttleTimer = setTimeout(() => {
         throttleTimer = null;
-        callAction(instanceId, levelAction.id, { [levelAction.params && levelAction.params[0] ? levelAction.params[0].key : "level"]: pendingValue }).catch((e) =>
-          console.error("level action failed", e)
-        );
+        callAction(slot.instanceId, slot.levelActionId, slotCallParams(slot, { level: pendingValue })).catch((e) => console.error("level action failed", e));
       }, 200);
     }
   });
   svg.addEventListener("pointerup", (ev) => {
     if (!dragging) return;
     dragging = false;
-    if (!hasDial || !didDrag) {
-      if (!onOffPair) return;
+    if (!didDrag) {
+      if (!hasToggle) return;
       const turningOn = box.dataset.on !== "1";
-      callAction(instanceId, turningOn ? onOffPair[0] : onOffPair[1], {}).catch((e) => console.error("action failed", e));
-      feedbackToggle(manifest.displayName, turningOn);
+      const actionId = turningOn ? slot.onActionId : slot.offActionId;
+      if (!actionId) return;
+      callAction(slot.instanceId, actionId, slotCallParams(slot)).catch((e) => console.error("action failed", e));
+      feedbackToggle(slot.name, turningOn);
       scheduleRefresh();
       return;
     }
     const v = Math.round(ringProgressFromEvent(svg, ev) * 100);
     applyVisual(v, true);
-    const paramKey = levelAction.params && levelAction.params[0] ? levelAction.params[0].key : "level";
-    callAction(instanceId, levelAction.id, { [paramKey]: v }).catch((e) => console.error("level action failed", e));
+    callAction(slot.instanceId, slot.levelActionId, slotCallParams(slot, { level: v })).catch((e) => console.error("level action failed", e));
   });
 
   function apply(state, running) {
     box.classList.toggle("offline", !running);
     offlineEl.classList.toggle("sky-hidden", running);
     offlineEl.textContent = langZh ? "离线" : "offline";
-    const onEntry = getOnState(manifest, state);
-    const levelValue = getLevelState(manifest, state);
-    currentOn = onEntry ? onEntry[1] : levelValue > 0;
-    applyVisual(levelValue !== undefined ? levelValue : currentOn ? 100 : 0, currentOn);
+    const onEntry = slotOnState(manifest, state, slot);
+    const levelValue = slotLevelState(manifest, state, slot);
+    const on = onEntry ? onEntry[1] : levelValue > 0;
+    applyVisual(levelValue !== undefined ? levelValue : on ? 100 : 0, on);
   }
 
-  return { el: box, apply, categories };
+  return { el: box, apply, cat };
 }
 
-// Plain card (icon + value text + action buttons) for everything without
-// a level role - switches, security, sensors, and any driver action set
-// too varied for a single ring to represent.
-function buildPlainCard(instanceId, manifest, categories) {
-  const icon = CATEGORY_ICON[categories[0]] || "⚙️";
-  const onOffPair = getOnOffPair(manifest);
+// Plain card (icon + value text + one On/Off button) for a slot with no
+// Level function bound - switches, security arm/disarm, and anything
+// else where a single toggle covers it. A slot's binding is only ever
+// on/off/level (unlike Oak's earlier instance-tile model, which could
+// show a driver's ENTIRE action list as separate buttons) - other
+// actions on the underlying driver are reachable from the admin's Driver
+// tab, not from a Dashboard slot.
+function buildPlainCard(slot, manifest, cat) {
+  const icon = CATEGORY_ICON[cat] || "⚙️";
+  const hasToggle = Boolean(slot.onActionId || slot.offActionId);
 
   const card = document.createElement("div");
   card.className = "sky-card";
-  card.dataset.categories = JSON.stringify(categories);
   card.dataset.on = "0";
 
   const iconEl = document.createElement("div");
@@ -198,31 +204,30 @@ function buildPlainCard(instanceId, manifest, categories) {
   valueEl.className = "sky-value";
   const labelEl = document.createElement("div");
   labelEl.className = "sky-label";
-  labelEl.textContent = manifest.displayName;
+  labelEl.textContent = slot.name;
   const offlineEl = document.createElement("div");
   offlineEl.className = "sky-offline-badge sky-hidden";
   const actionsEl = document.createElement("div");
   actionsEl.className = "sky-actions";
 
-  manifest.actions.forEach((a) => {
-    if (onOffPair && a.id === onOffPair[1]) return; // toggle pair -> one tap target, not two buttons
+  if (hasToggle) {
     const btn = document.createElement("button");
-    btn.className = "sky-action-btn" + (onOffPair && a.id === onOffPair[0] ? " primary" : "");
+    btn.className = "sky-action-btn primary";
     btn.addEventListener("click", async (ev) => {
       ev.stopPropagation();
-      const isToggle = onOffPair && a.id === onOffPair[0];
       const on = card.dataset.on === "1";
-      const actionId = isToggle ? (on ? onOffPair[1] : onOffPair[0]) : a.id;
+      const actionId = on ? slot.offActionId : slot.onActionId;
+      if (!actionId) return;
       try {
-        await callAction(instanceId, actionId, {});
+        await callAction(slot.instanceId, actionId, slotCallParams(slot));
       } catch (err) {
         console.error("action failed", err);
       }
-      feedbackToggle(a.label, isToggle ? !on : undefined);
+      feedbackToggle(slot.name, !on);
       scheduleRefresh();
     });
     actionsEl.appendChild(btn);
-  });
+  }
 
   card.append(iconEl, valueEl, labelEl, offlineEl, actionsEl);
 
@@ -231,33 +236,20 @@ function buildPlainCard(instanceId, manifest, categories) {
     offlineEl.classList.toggle("sky-hidden", running);
     offlineEl.textContent = langZh ? "离线" : "offline";
     actionsEl.classList.toggle("sky-hidden", !running);
-    const onEntry = getOnState(manifest, state);
+    const onEntry = slotOnState(manifest, state, slot);
     const on = onEntry ? onEntry[1] : false;
     card.dataset.on = on ? "1" : "0";
-    valueEl.textContent = Object.keys(state).length
-      ? Object.entries(state)
-          .map(([, v]) => (typeof v === "boolean" ? (v ? (langZh ? "开" : "ON") : langZh ? "关" : "OFF") : String(v)))
-          .join(" · ")
-      : "—";
-    // Relabel the toggle button (On/Off text follows current state) and
-    // every plain button's own label - simplest correct approach given
-    // button count/order is fixed once at build time.
-    let bi = 0;
-    manifest.actions.forEach((a) => {
-      if (onOffPair && a.id === onOffPair[1]) return;
-      const btn = actionsEl.children[bi++];
-      if (!btn) return;
-      btn.textContent = onOffPair && a.id === onOffPair[0] ? (on ? (langZh ? "关闭" : "Turn Off") : langZh ? "开启" : "Turn On") : a.label;
-    });
+    valueEl.textContent = onEntry ? (on ? (langZh ? "开" : "ON") : langZh ? "关" : "OFF") : "—";
+    if (actionsEl.firstChild) {
+      actionsEl.firstChild.textContent = on ? (langZh ? "关闭" : "Turn Off") : langZh ? "开启" : "Turn On";
+    }
   }
 
-  return { el: card, apply, categories };
+  return { el: card, apply, cat };
 }
 
 function renderSidebar() {
-  const present = new Set();
-  instanceIds.forEach((id) => (categoriesByInstance.get(id) || []).forEach((c) => present.add(c)));
-  const cats = CATEGORY_ORDER.filter((c) => present.has(c));
+  const cats = CATEGORY_ORDER.filter((c) => (bindingsData[c] || []).length > 0);
 
   sidebar.innerHTML = "";
   const allBtn = document.createElement("button");
@@ -284,11 +276,11 @@ function setActiveCategory(cat) {
   applyCategoryVisibility();
 }
 function applyCategoryVisibility() {
-  cardEls.forEach(({ el, categories }) => {
-    el.classList.toggle("sky-hidden", activeCat !== "__all__" && !categories.includes(activeCat));
+  cardEls.forEach(({ el, cat }) => {
+    el.classList.toggle("sky-hidden", activeCat !== "__all__" && cat !== activeCat);
   });
   grid.querySelector(".empty")?.remove();
-  if (![...cardEls.values()].some(({ categories }) => activeCat === "__all__" || categories.includes(activeCat))) {
+  if (![...cardEls.values()].some(({ cat }) => activeCat === "__all__" || cat === activeCat)) {
     const p = document.createElement("p");
     p.className = "empty";
     p.textContent = langZh ? "没有可显示的实例。" : "No instances to show.";
@@ -296,29 +288,37 @@ function applyCategoryVisibility() {
   }
 }
 
+// Iterates bindings.json's slots, not driver instances directly - one
+// hub-style instance can back many slots (see roles.js). Instance
+// manifest/state is still fetched once per unique instance (not once per
+// slot) to avoid redundant requests when several slots share one hub.
 async function refresh() {
   const list = await listInstances();
   instanceIds = list.map((s) => s.id);
+  await Promise.all(
+    list.map(async (summary) => {
+      if (!manifests.has(summary.id)) manifests.set(summary.id, await getManifest(summary.id));
+      runningByInstance.set(summary.id, summary.running);
+      statesByInstance.set(summary.id, await getState(summary.id));
+    })
+  );
+
   const seen = new Set();
-
-  for (const summary of list) {
-    seen.add(summary.id);
-    if (!manifests.has(summary.id)) manifests.set(summary.id, await getManifest(summary.id));
-    const manifest = manifests.get(summary.id);
-    const categories = effectiveCategories(manifest, summary.categoryOverride);
-    categoriesByInstance.set(summary.id, categories);
-    const state = await getState(summary.id);
-
-    if (!cardEls.has(summary.id)) {
-      const useRing = categories.some((c) => c === "light" || c === "media") && Boolean(getLevelAction(manifest));
-      const card = useRing ? buildRingCard(summary.id, manifest, categories) : buildPlainCard(summary.id, manifest, categories);
-      cardEls.set(summary.id, card);
-      grid.appendChild(card.el);
+  for (const cat of CATEGORY_ORDER) {
+    for (const slot of bindingsData[cat] || []) {
+      const manifest = manifests.get(slot.instanceId);
+      if (!manifest || !(slot.onActionId || slot.offActionId || slot.levelActionId)) continue; // dangling or unconfigured - nothing to show
+      seen.add(slot.id);
+      if (!cardEls.has(slot.id)) {
+        const card = slot.levelActionId ? buildRingCard(slot, manifest, cat) : buildPlainCard(slot, manifest, cat);
+        cardEls.set(slot.id, card);
+        grid.appendChild(card.el);
+      }
+      cardEls.get(slot.id).apply(statesByInstance.get(slot.instanceId) || {}, Boolean(runningByInstance.get(slot.instanceId)));
     }
-    cardEls.get(summary.id).apply(state, summary.running);
   }
 
-  // Drop cards for instances removed since the last refresh.
+  // Drop cards for slots removed (or unconfigured/dangling) since the last refresh.
   for (const [id, card] of [...cardEls.entries()]) {
     if (!seen.has(id)) {
       card.el.remove();
@@ -508,31 +508,17 @@ cmdBtn.addEventListener("click", () => {
   recognizer.start();
 });
 
-function findNamedInstance(cmdLower, cmdRaw) {
-  const named = instanceIds
-    .map((id) => ({ id, manifest: manifests.get(id) }))
-    .filter(({ manifest }) => manifest.displayName && (cmdRaw.includes(manifest.displayName) || cmdLower.includes(manifest.displayName.toLowerCase())));
-  if (named.length) return named.sort((a, b) => b.manifest.displayName.length - a.manifest.displayName.length)[0];
-  return instanceIds.length === 1 ? { id: instanceIds[0], manifest: manifests.get(instanceIds[0]) } : null;
-}
-
-function findMatchingAction(manifest, cmdLower, wantsOn, wantsOff) {
-  const onOffPair = getOnOffPair(manifest);
-  if (onOffPair) {
-    if (wantsOn) return manifest.actions.find((a) => a.id === onOffPair[0]);
-    if (wantsOff) return manifest.actions.find((a) => a.id === onOffPair[1]);
-  }
-  let best = null;
-  let bestScore = 0;
-  manifest.actions.forEach((a) => {
-    const words = a.label.toLowerCase().split(/\s+/);
-    const score = words.filter((w) => w.length > 1 && cmdLower.includes(w)).length;
-    if (score > bestScore) {
-      bestScore = score;
-      best = a;
-    }
-  });
-  return best;
+// Matches a voice command against slot NAMES ("kitchen", "living room"),
+// not driver instance names - this is what makes "turn on kitchen light"
+// resolve to the right zone on a shared hub instance instead of only ever
+// being able to name the hub itself. Falls back to "the only slot that
+// exists" when nothing named matches, same single-device convenience the
+// old instance-based version had.
+function findNamedSlot(cmdLower, cmdRaw) {
+  const all = CATEGORY_ORDER.flatMap((cat) => (bindingsData[cat] || []).map((slot) => ({ slot, cat })));
+  const named = all.filter(({ slot }) => slot.name && (cmdRaw.includes(slot.name) || cmdLower.includes(slot.name.toLowerCase())));
+  if (named.length) return named.sort((a, b) => b.slot.name.length - a.slot.name.length)[0];
+  return all.length === 1 ? all[0] : null;
 }
 
 async function executeCommand(raw) {
@@ -542,16 +528,17 @@ async function executeCommand(raw) {
   const wantsOff = /关闭|关掉|turn off|switch off|\boff\b/.test(lower) || (cmd.includes("关") && !cmd.includes("开"));
   const wantsOn = !wantsOff && (/打开|开启|turn on|switch on|\bon\b/.test(lower) || cmd.includes("开"));
 
-  const found = findNamedInstance(lower, cmd);
+  const found = findNamedSlot(lower, cmd);
   let feedback = langZh ? "无法识别指令，或没有匹配到对应的设备名称" : "not understood, or no matching device name in that command";
   let acted = false;
 
   if (found) {
-    const action = findMatchingAction(found.manifest, lower, wantsOn, wantsOff);
-    if (action) {
+    const { slot } = found;
+    const actionId = wantsOff ? slot.offActionId : wantsOn ? slot.onActionId : slot.onActionId || slot.offActionId;
+    if (actionId) {
       try {
-        await callAction(found.id, action.id, {});
-        feedback = langZh ? found.manifest.displayName + " " + action.label : action.label + " " + found.manifest.displayName;
+        await callAction(slot.instanceId, actionId, slotCallParams(slot));
+        feedback = langZh ? slot.name + " " + (wantsOff ? "关闭" : "打开") : (wantsOff ? "Turned off " : "Turned on ") + slot.name;
         acted = true;
       } catch (e) {
         feedback = langZh ? "操作失败：" + e.message : "Action failed: " + e.message;
@@ -581,8 +568,19 @@ applyLang();
 const WS = connectWS();
 const comm = createCommPanel({ WS, langZh: () => langZh });
 
-refresh();
-WS.onPush(() => scheduleRefresh());
+async function bootstrapAndRefresh() {
+  bindingsData = await getBindings();
+  refresh();
+}
+bootstrapAndRefresh();
+WS.onPush((msg) => {
+  // A bindings save (from an admin editing Dashboard in another tab)
+  // arrives with the new data already in the message - use it directly
+  // instead of a redundant GET before the same refresh() we're about to
+  // schedule anyway.
+  if (msg.type === "bindings" && msg.bindings) bindingsData = msg.bindings;
+  scheduleRefresh();
+});
 WS.onStatus((connected) => {
   connEl.classList.toggle("connected", connected);
   updateConnLabel();

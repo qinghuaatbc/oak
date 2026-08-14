@@ -1,5 +1,6 @@
 node_modules/
 orchestrator/config.json
+orchestrator/bindings.json
 orchestrator/macros.json
 orchestrator/cameras.json
 orchestrator/models/
