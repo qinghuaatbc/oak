@@ -515,6 +515,16 @@ function buildSlotRow(cat, slot, onDelete) {
     slot.name = nameInput.value.trim() || "Untitled";
     persistBindings();
   });
+  const body = document.createElement("div");
+  body.className = "slot-row-body hidden";
+  const editBtn = document.createElement("button");
+  editBtn.className = "btn small";
+  editBtn.textContent = "Edit";
+  editBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    body.classList.toggle("hidden");
+    editBtn.textContent = body.classList.contains("hidden") ? "Edit" : "Close";
+  });
   const delBtn = document.createElement("button");
   delBtn.className = "btn small danger";
   delBtn.textContent = "Delete";
@@ -522,11 +532,7 @@ function buildSlotRow(cat, slot, onDelete) {
     ev.stopPropagation();
     onDelete();
   });
-  header.append(nameInput, delBtn);
-
-  const body = document.createElement("div");
-  body.className = "slot-row-body hidden";
-  header.addEventListener("click", () => body.classList.toggle("hidden"));
+  header.append(nameInput, editBtn, delBtn);
 
   const instWrap = document.createElement("label");
   instWrap.innerHTML = `<span class="lbl">Instance</span>`;
