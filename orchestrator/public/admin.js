@@ -2575,6 +2575,12 @@ async function fullRefresh() {
 // to clean up re-uploads). Deleting a driver a running instance still
 // uses, or one of Oak's own 4 built-in drivers, is rejected server-side
 // with a clear reason rather than silently refused here. ---
+// Grouped by category (same CATEGORY_ORDER/CATEGORY_LABEL every other
+// grouped list in this file already uses - the Dashboard tab's category
+// cards, the Layout palette) rather than one flat list - with 19+ built-in
+// drivers now, a flat list stopped being easy to scan. A driver with
+// multiple declared categories (e.g. zone-hub's light+climate) is only
+// listed once, under its first one, so it doesn't visually appear twice.
 async function renderUploadedDriversList() {
   const listEl = document.getElementById("uploadedDriversList");
   const drivers = await listDrivers();
@@ -2583,25 +2589,40 @@ async function renderUploadedDriversList() {
     return;
   }
   listEl.innerHTML = "";
+  const byCategory = new Map(CATEGORY_ORDER.map((c) => [c, []]));
   drivers.forEach((d) => {
-    const row = document.createElement("div");
-    row.className = "instance-row";
-    row.innerHTML = `<div><div class="iname">${d.displayName}</div><div class="ikey">${d.id}</div></div>`;
-    const delBtn = document.createElement("button");
-    delBtn.className = "btn small danger";
-    delBtn.textContent = "Delete";
-    delBtn.addEventListener("click", async () => {
-      if (!confirm(`Delete driver "${d.displayName}" permanently? The files are removed from disk.`)) return;
-      const result = await deleteDriverPackage(d.id);
-      if (result.error) {
-        alert(result.error);
-        return;
-      }
-      renderUploadedDriversList();
-    });
-    row.appendChild(delBtn);
-    listEl.appendChild(row);
+    const cat = effectiveCategories(d)[0];
+    if (!byCategory.has(cat)) byCategory.set(cat, []);
+    byCategory.get(cat).push(d);
   });
+  for (const cat of [...byCategory.keys()]) {
+    const group = byCategory.get(cat);
+    if (!group.length) continue;
+    const groupLabel = document.createElement("div");
+    groupLabel.className = "layout-palette-group-label";
+    groupLabel.style.marginTop = "10px";
+    groupLabel.textContent = `${CATEGORY_ICON[cat] || "⚙️"} ${CATEGORY_LABEL[cat] || cat}`;
+    listEl.appendChild(groupLabel);
+    group.forEach((d) => {
+      const row = document.createElement("div");
+      row.className = "instance-row";
+      row.innerHTML = `<div><div class="iname">${CATEGORY_ICON[cat] || "⚙️"} ${d.displayName}</div><div class="ikey">${d.id}</div></div>`;
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn small danger";
+      delBtn.textContent = "Delete";
+      delBtn.addEventListener("click", async () => {
+        if (!confirm(`Delete driver "${d.displayName}" permanently? The files are removed from disk.`)) return;
+        const result = await deleteDriverPackage(d.id);
+        if (result.error) {
+          alert(result.error);
+          return;
+        }
+        renderUploadedDriversList();
+      });
+      row.appendChild(delBtn);
+      listEl.appendChild(row);
+    });
+  }
 }
 
 function readFileAsText(file) {
