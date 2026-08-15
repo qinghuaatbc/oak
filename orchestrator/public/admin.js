@@ -106,7 +106,13 @@ function updateCountPill() {
   countPill.className = "status-pill " + (n === 0 ? "off" : "on");
 }
 
+// Same tile-grid language as Uploaded Drivers / Add Instance's driver
+// picker - a running instance gets its driver's own icon, plus an on/off-
+// style ring (via the existing .tile[data-on] convention... no such
+// convention here, so a simple border/opacity cue on .stopped) instead of
+// the flat instance-row list.
 function renderInstancesList() {
+  instancesListEl.className = "tile-grid";
   instancesListEl.innerHTML = "";
   if (!instanceIds.length) {
     instancesListEl.innerHTML = `<p class="empty-hint">No driver instances yet.</p>`;
@@ -115,18 +121,22 @@ function renderInstancesList() {
   instanceIds.forEach((id) => {
     const manifest = manifests.get(id);
     const running = runningByInstance.get(id);
-    const row = document.createElement("div");
-    row.className = "instance-row" + (running ? "" : " stopped");
-    row.title = "Click to view/edit this instance in State/Actions/Events/Config";
-    row.innerHTML = `<div><div class="iname">${instanceLabel(id)}${
-      running ? "" : ' <span class="istatus">stopped</span>'
-    }</div><div class="ikey">${manifest.id} · ${id}</div></div>`;
-    row.addEventListener("click", () => {
+    const cat = effectiveCategories(manifest)[0];
+    const tile = document.createElement("div");
+    tile.className = "tile" + (running ? "" : " stopped");
+    tile.style.cssText = "text-align:center;";
+    tile.title = "Click to view/edit this instance in State/Actions/Events/Config";
+    tile.innerHTML = `
+      <div style="font-size:28px;">${manifest.icon || CATEGORY_ICON[cat] || "⚙️"}</div>
+      <div class="tname" style="margin-top:6px;">${instanceLabel(id)}${running ? "" : ' <span class="istatus">stopped</span>'}</div>
+      <div class="tstate">${manifest.id} · ${id}</div>`;
+    tile.addEventListener("click", () => {
       instanceFilter.value = id;
       renderActivePanel({ allowConfigRerender: true });
     });
     const btnRow = document.createElement("div");
     btnRow.className = "row";
+    btnRow.style.cssText = "justify-content:center; margin-top:10px;";
 
     const toggleRunBtn = document.createElement("button");
     toggleRunBtn.className = "btn small" + (running ? " danger" : "");
@@ -153,8 +163,8 @@ function renderInstancesList() {
     });
     btnRow.appendChild(delBtn);
 
-    row.appendChild(btnRow);
-    instancesListEl.appendChild(row);
+    tile.appendChild(btnRow);
+    instancesListEl.appendChild(tile);
   });
 }
 
@@ -2611,7 +2621,7 @@ async function renderUploadedDriversList() {
     // compact icon tile fits better than a full-width instance-row once
     // there are this many drivers to scan).
     const rowsEl = document.createElement("div");
-    rowsEl.className = "tile-grid";
+    rowsEl.className = "tile-grid tile-grid-3col";
     function applyCollapsed() {
       chev.textContent = collapsed ? "▸" : "▾";
       rowsEl.style.display = collapsed ? "none" : "";
@@ -2712,12 +2722,35 @@ async function setupAddInstanceForm() {
   }
 
   function driversInCategory(cat) {
-    if (cat === "__all__") return drivers;
-    return drivers.filter((d) => effectiveCategories(d).includes(cat));
+    const filtered = cat === "__all__" ? drivers : drivers.filter((d) => effectiveCategories(d).includes(cat));
+    // Stable, predictable order within a category (alphabetical by display
+    // name) rather than whatever order the drivers directory happens to
+    // list them in - matches the same "category, then a sensible driver
+    // order" the Uploaded Drivers tile grid already established.
+    return [...filtered].sort((a, b) => a.displayName.localeCompare(b.displayName));
   }
+  // The tile grid below is the actual picker UI (click a tile to select a
+  // driver, same icon-tile language the Uploaded Drivers list uses) - this
+  // <select> just keeps tracking the selected value so the rest of this
+  // function (renderFieldsFor, the submit handler) doesn't need to change
+  // how it reads "which driver is picked".
   function renderDriverOptionsFor(cat) {
     const filtered = driversInCategory(cat);
     driverPicker.innerHTML = filtered.map((d) => `<option value="${d.id}">${d.displayName}</option>`).join("");
+    driverTiles.innerHTML = "";
+    filtered.forEach((d, i) => {
+      const tile = document.createElement("div");
+      tile.className = "tile" + (i === 0 ? " selected" : "");
+      tile.style.cssText = "text-align:center;";
+      tile.innerHTML = `<div style="font-size:28px;">${d.icon || CATEGORY_ICON[effectiveCategories(d)[0]] || "⚙️"}</div><div class="tname" style="margin-top:6px;">${d.displayName}</div>`;
+      tile.addEventListener("click", () => {
+        driverPicker.value = d.id;
+        driverTiles.querySelectorAll(".tile").forEach((t) => t.classList.remove("selected"));
+        tile.classList.add("selected");
+        renderFieldsFor(d.id);
+      });
+      driverTiles.appendChild(tile);
+    });
     renderFieldsFor(driverPicker.value);
   }
 
@@ -2726,14 +2759,19 @@ async function setupAddInstanceForm() {
   categoryPicker.innerHTML =
     `<option value="__all__">All categories</option>` +
     presentCats.map((c) => `<option value="${c}">${CATEGORY_ICON[c]} ${CATEGORY_LABEL[c]}</option>`).join("");
+  categoryPicker.value = presentCats[0] || "__all__";
   categoryPicker.addEventListener("change", () => renderDriverOptionsFor(categoryPicker.value));
 
   const driverPicker = document.createElement("select");
   driverPicker.name = "driver";
+  driverPicker.className = "layout-hidden";
   driverPicker.addEventListener("change", () => renderFieldsFor(driverPicker.value));
+  const driverTiles = document.createElement("div");
+  driverTiles.className = "tile-grid";
+  driverTiles.style.marginBottom = "10px";
 
-  fieldsRoot.before(categoryPicker, driverPicker);
-  renderDriverOptionsFor("__all__");
+  fieldsRoot.before(categoryPicker, driverPicker, driverTiles);
+  renderDriverOptionsFor(categoryPicker.value);
 
   document.getElementById("add-instance-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();

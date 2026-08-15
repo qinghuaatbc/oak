@@ -54,6 +54,8 @@ main{ max-width:1400px; margin:0 auto; padding:20px 24px 60px; }
 .instance-row .ikey{ font-family:var(--mono); font-size:.7rem; color:var(--faint); }
 .instance-row.stopped{ opacity:.65; border-style:dashed; }
 .instance-row .istatus{ font-family:var(--mono); font-size:.68rem; color:var(--faint); font-weight:400; }
+.tile.stopped{ opacity:.65; border-style:dashed; }
+.tile .istatus{ font-family:var(--mono); font-size:.68rem; color:var(--faint); font-weight:400; }
 .instance-row .row{ gap:6px; }
 .config-form label{ display:block; margin-bottom:10px; }
 .config-form label .lbl{ display:block; font-size:.76rem; color:var(--soft); margin-bottom:3px; }
@@ -101,6 +103,13 @@ table td, table th{ text-align:left; padding:5px 8px; border-bottom:1px dashed v
 table th{ color:var(--faint); font-weight:500; }
 
 .tile-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px; margin-top:6px; }
+/* Uploaded Drivers list specifically - a fixed 3 columns reads more
+   deliberately organized than auto-fill's "however many fit" for a list
+   that's already grouped by category (each row already carries a clear
+   flow: name -> id -> Delete, worth a bit more width than the default
+   190px tile). */
+.tile-grid-3col{ grid-template-columns:repeat(3,1fr); }
+@media (max-width:640px){ .tile-grid-3col{ grid-template-columns:repeat(2,1fr); } }
 .tile{ border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--raised); cursor:pointer; user-select:none; transition:box-shadow .15s; }
 .tile:hover{ box-shadow:0 4px 14px -6px rgba(0,0,0,.25); }
 .tile .row{ justify-content:space-between; flex-wrap:nowrap; margin-bottom:8px; }
