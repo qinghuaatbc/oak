@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oak — a device-driver platform you actually own</title>
+<meta name="description" content="Oak: a JSON manifest format, a sandboxed Node.js runtime, and an orchestrator for hosting your own device drivers — dashboards, 3D scenes, automations, 19 built-in drivers.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌳</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#14120f; --bg-rgb:20,18,15; --bg-raised:#1b170f; --bg-card:#201b13; --bg-code:#100e0a;
+  --text:#f3ede0; --text-dim:#b4a68c; --text-faint:#7c705c;
+  --accent:#e0973f; --accent-strong:#f2ad5c; --accent-soft:#4a3420; --accent-line:#5c4322;
+  --line:#332a1c; --line-soft:#241f16;
+  --green:#8ab371; --green-soft:#2a3322;
+  --radius:14px;
+  --serif:"Fraunces", Georgia, serif;
+  --sans:"Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0; background:var(--bg); color:var(--text); font-family:var(--sans);
+  font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+::selection{ background:var(--accent-soft); color:var(--accent-strong); }
+a{ color:var(--accent-strong); text-decoration:none; }
+a:hover{ text-decoration:underline; }
+.wrap{ max-width:1080px; margin:0 auto; padding:0 28px; }
+h1,h2,h3{ font-family:var(--serif); font-weight:600; letter-spacing:-0.01em; text-wrap:balance; margin:0; color:var(--text); }
+code, pre, .mono{ font-family:var(--mono); }
+
+/* -------------------- Nav -------------------- */
+.nav{
+  position:sticky; top:0; z-index:50; backdrop-filter:blur(10px);
+  background:rgba(var(--bg-rgb),0.82); border-bottom:1px solid var(--line-soft);
+}
+.nav-inner{ display:flex; align-items:center; justify-content:space-between; padding:14px 28px; max-width:1080px; margin:0 auto; }
+.brand{ display:flex; align-items:center; gap:9px; font-family:var(--serif); font-weight:700; font-size:1.15rem; color:var(--text); }
+.brand-mark{ font-size:1.3rem; }
+.nav-links{ display:flex; gap:26px; align-items:center; font-size:.92rem; color:var(--text-dim); }
+.nav-links a{ color:var(--text-dim); }
+.nav-links a:hover{ color:var(--accent-strong); }
+.nav-cta{
+  border:1px solid var(--accent-line); color:var(--accent-strong) !important; padding:7px 14px;
+  border-radius:8px; font-weight:600; text-decoration:none !important;
+}
+.nav-cta:hover{ background:var(--accent-soft); }
+
+/* -------------------- Hero -------------------- */
+.hero{ padding:96px 0 72px; position:relative; }
+.hero::before{
+  content:""; position:absolute; top:-120px; right:-160px; width:520px; height:520px;
+  background:radial-gradient(circle, var(--accent-soft) 0%, transparent 68%);
+  opacity:.55; pointer-events:none;
+}
+.eyebrow{
+  display:inline-flex; align-items:center; gap:8px; font-family:var(--mono); font-size:.78rem;
+  color:var(--accent-strong); background:var(--accent-soft); border:1px solid var(--accent-line);
+  padding:5px 12px; border-radius:100px; margin-bottom:22px; letter-spacing:.02em;
+}
+.hero h1{ font-size:clamp(2.4rem, 5.6vw, 4rem); line-height:1.05; max-width:14ch; }
+.hero h1 em{ font-style:italic; color:var(--accent-strong); }
+.hero-sub{
+  margin-top:20px; font-size:1.15rem; color:var(--text-dim); max-width:52ch; line-height:1.65;
+}
+.hero-actions{ display:flex; gap:14px; margin-top:34px; flex-wrap:wrap; align-items:center; }
+.btn{
+  display:inline-flex; align-items:center; gap:8px; padding:12px 22px; border-radius:10px;
+  font-weight:700; font-size:.96rem; cursor:pointer; border:1px solid transparent;
+}
+.btn-primary{ background:var(--accent); color:#1c1204; }
+.btn-primary:hover{ background:var(--accent-strong); text-decoration:none; }
+.btn-ghost{ border-color:var(--line); color:var(--text) !important; text-decoration:none; }
+.btn-ghost:hover{ border-color:var(--accent-line); background:var(--bg-raised); text-decoration:none; }
+
+.install-box{
+  margin-top:44px; max-width:640px; background:var(--bg-code); border:1px solid var(--line);
+  border-radius:var(--radius); overflow:hidden;
+}
+.install-box-head{
+  display:flex; align-items:center; justify-content:space-between; padding:10px 16px;
+  border-bottom:1px solid var(--line-soft); font-family:var(--mono); font-size:.76rem; color:var(--text-faint);
+}
+.install-box-head .dots{ display:flex; gap:6px; }
+.install-box-head .dots span{ width:9px; height:9px; border-radius:50%; background:var(--line); }
+.copy-btn{
+  font-family:var(--sans); font-size:.76rem; font-weight:700; color:var(--text-dim);
+  background:transparent; border:1px solid var(--line); border-radius:6px; padding:4px 10px; cursor:pointer;
+}
+.copy-btn:hover{ color:var(--accent-strong); border-color:var(--accent-line); }
+.copy-btn.copied{ color:var(--green); border-color:var(--green-soft); }
+.install-box pre{
+  margin:0; padding:18px 16px; font-size:.86rem; color:var(--text); overflow-x:auto; white-space:pre-wrap; word-break:break-all;
+}
+.install-box .cmt{ color:var(--text-faint); }
+.install-box .str{ color:var(--accent-strong); }
+
+/* -------------------- Section shell -------------------- */
+section{ padding:76px 0; border-top:1px solid var(--line-soft); }
+.section-head{ max-width:56ch; margin-bottom:46px; }
+.section-tag{
+  font-family:var(--mono); font-size:.76rem; color:var(--accent-strong); letter-spacing:.06em;
+  text-transform:uppercase; margin-bottom:12px; display:block;
+}
+.section-head h2{ font-size:clamp(1.7rem, 3.4vw, 2.3rem); }
+.section-head p{ margin-top:14px; color:var(--text-dim); font-size:1.03rem; line-height:1.65; }
+
+/* -------------------- Architecture -------------------- */
+.arch-flow{
+  display:flex; align-items:stretch; gap:0; flex-wrap:wrap; margin-bottom:8px;
+}
+.arch-card{
+  flex:1 1 260px; background:var(--bg-card); border:1px solid var(--line); border-radius:var(--radius);
+  padding:26px 22px; position:relative;
+}
+.arch-card + .arch-card{ margin-left:0; }
+.arch-num{ font-family:var(--mono); font-size:.78rem; color:var(--accent-strong); }
+.arch-card h3{ font-size:1.15rem; margin-top:10px; }
+.arch-card p{ margin-top:10px; color:var(--text-dim); font-size:.92rem; line-height:1.6; }
+.arch-arrow{
+  display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:1.4rem;
+  padding:0 6px; flex:0 0 auto;
+}
+@media (max-width:760px){ .arch-arrow{ transform:rotate(90deg); padding:10px 0; } .arch-flow{ flex-direction:column; } }
+
+/* -------------------- Feature grid -------------------- */
+.feature-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px; }
+.feature-card{
+  background:var(--bg-card); border:1px solid var(--line); border-radius:var(--radius); padding:22px;
+  transition:border-color .15s, transform .15s;
+}
+.feature-card:hover{ border-color:var(--accent-line); transform:translateY(-2px); }
+.feature-icon{ font-size:1.6rem; }
+.feature-card h3{ font-size:1.02rem; margin-top:12px; font-family:var(--sans); font-weight:700; }
+.feature-card p{ margin-top:8px; color:var(--text-dim); font-size:.9rem; line-height:1.55; }
+
+/* -------------------- Driver tags -------------------- */
+.driver-tags{ display:flex; flex-wrap:wrap; gap:10px; }
+.driver-tag{
+  display:inline-flex; align-items:center; gap:7px; background:var(--bg-card); border:1px solid var(--line);
+  border-radius:100px; padding:8px 14px; font-size:.88rem; color:var(--text-dim);
+}
+.driver-tag .ic{ font-size:1rem; }
+.driver-more{
+  display:inline-flex; align-items:center; color:var(--text-faint); font-size:.85rem; padding:8px 4px;
+}
+
+/* -------------------- Install steps -------------------- */
+.steps{ counter-reset:step; }
+.step{ display:flex; gap:18px; padding:20px 0; border-bottom:1px solid var(--line-soft); }
+.step:last-child{ border-bottom:none; }
+.step-num{
+  counter-increment:step; flex:0 0 auto; width:34px; height:34px; border-radius:50%;
+  border:1px solid var(--accent-line); color:var(--accent-strong); font-family:var(--mono); font-weight:600;
+  display:flex; align-items:center; justify-content:center; font-size:.9rem;
+}
+.step-num::before{ content:counter(step); }
+.step-body h3{ font-size:1rem; font-family:var(--sans); font-weight:700; }
+.step-body p{ margin:6px 0 10px; color:var(--text-dim); font-size:.92rem; }
+.step-body pre{
+  background:var(--bg-code); border:1px solid var(--line); border-radius:8px; padding:12px 14px;
+  font-size:.82rem; overflow-x:auto; color:var(--text-dim);
+}
+.step-body pre .k{ color:var(--accent-strong); }
+
+/* -------------------- Caddy panel -------------------- */
+.https-panel{
+  display:grid; grid-template-columns:1fr 1fr; gap:28px; align-items:start;
+}
+@media (max-width:760px){ .https-panel{ grid-template-columns:1fr; } }
+.https-panel pre{
+  background:var(--bg-code); border:1px solid var(--line); border-radius:var(--radius); padding:20px;
+  font-size:.82rem; overflow-x:auto; color:var(--text-dim); line-height:1.7;
+}
+.https-panel pre .k{ color:var(--accent-strong); }
+.https-panel pre .s{ color:var(--green); }
+.https-note{ color:var(--text-dim); font-size:.92rem; line-height:1.7; }
+.https-note code{ background:var(--bg-raised); padding:2px 6px; border-radius:5px; font-size:.85em; color:var(--accent-strong); }
+
+/* -------------------- Status -------------------- */
+.status-banner{
+  background:var(--bg-card); border:1px solid var(--line); border-radius:var(--radius); padding:22px 26px;
+  display:flex; gap:16px; align-items:flex-start;
+}
+.status-banner .dot{ width:10px; height:10px; border-radius:50%; background:var(--accent); margin-top:7px; flex:0 0 auto; }
+.status-banner p{ margin:0; color:var(--text-dim); font-size:.94rem; line-height:1.65; }
+.status-banner strong{ color:var(--text); }
+
+/* -------------------- Footer -------------------- */
+footer{ padding:44px 0 60px; border-top:1px solid var(--line-soft); }
+.footer-inner{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
+.footer-inner p{ margin:0; color:var(--text-faint); font-size:.86rem; }
+.footer-links{ display:flex; gap:20px; font-size:.86rem; }
+.footer-links a{ color:var(--text-dim); }
+
+/* -------------------- Light theme -------------------- */
+:root[data-theme="light"]{
+  --bg:#faf6ee; --bg-rgb:250,246,238; --bg-raised:#f2ead9; --bg-card:#ffffff; --bg-code:#221b10;
+  --text:#241d10; --text-dim:#5c5138; --text-faint:#8d8266;
+  --accent:#b96a1f; --accent-strong:#9a5817; --accent-soft:#f3ddb8; --accent-line:#e0b877;
+  --line:#e6dcc4; --line-soft:#efe6d2;
+  --green:#4f7a3a; --green-soft:#dcecd0;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#faf6ee; --bg-rgb:250,246,238; --bg-raised:#f2ead9; --bg-card:#ffffff; --bg-code:#221b10;
+    --text:#241d10; --text-dim:#5c5138; --text-faint:#8d8266;
+    --accent:#b96a1f; --accent-strong:#9a5817; --accent-soft:#f3ddb8; --accent-line:#e0b877;
+    --line:#e6dcc4; --line-soft:#efe6d2;
+    --green:#4f7a3a; --green-soft:#dcecd0;
+  }
+}
+:root[data-theme="light"] .install-box pre,
+:root[data-theme="light"] .https-panel pre,
+:root[data-theme="light"] .step-body pre{ color:#e8dfc9; }
+:root[data-theme="light"] .btn-primary{ color:#fff8ec; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="brand"><span class="brand-mark">🌳</span> Oak</div>
+    <div class="nav-links">
+      <a href="#architecture">Architecture</a>
+      <a href="#features">Features</a>
+      <a href="#drivers">Drivers</a>
+      <a href="#install">Install</a>
+      <a href="#https">Going public</a>
+      <a class="nav-cta" href="https://github.com/qinghuaatbc/oak" target="_blank" rel="noopener">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">🌳 independently designed &middot; MIT licensed &middot; self-hosted</span>
+    <h1>A device-driver platform <em>you actually own.</em></h1>
+    <p class="hero-sub">
+      Oak is a JSON manifest format, a sandboxed Node.js runtime, and an orchestrator
+      that hosts your own device drivers — lights, thermostats, alarms, media, sensors —
+      behind one dashboard you control end to end. No vendor cloud, no subscription,
+      no black box.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="#install">Install Oak →</a>
+      <a class="btn btn-ghost" href="https://github.com/qinghuaatbc/oak" target="_blank" rel="noopener">View source</a>
+    </div>
+    <div class="install-box">
+      <div class="install-box-head">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <button class="copy-btn" id="copyBtn" type="button">Copy</button>
+      </div>
+      <pre id="installCmd"><span class="cmt"># installs Node.js if needed, clones Oak, and starts it as a service</span>
+curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/install.sh</span> | bash</pre>
+    </div>
+  </div>
+</header>
+
+<section id="architecture">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-tag">Architecture</span>
+      <h2>Three small, honest layers</h2>
+      <p>No framework to learn beyond JSON and plain Node.js. Each layer has one job and stays out of the others' way.</p>
+    </div>
+    <div class="arch-flow">
+      <div class="arch-card">
+        <span class="arch-num">01</span>
+        <h3>Manifest</h3>
+        <p>A JSON file describes a device integration — its actions, states, roles (on/off/level/arm), and transport (TCP, HTTP, MQTT). No code required to declare what a driver can do.</p>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-card">
+        <span class="arch-num">02</span>
+        <h3>Sandboxed runtime</h3>
+        <p>Driver code runs in its own <code>vm.Context</code>, wired to a real TCP <code>Connection</code> or <code>HttpClient</code> depending on the manifest. One misbehaving driver can't take down the host.</p>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-card">
+        <span class="arch-num">03</span>
+        <h3>Orchestrator</h3>
+        <p>Hosts every driver instance behind one REST + WebSocket API, and serves the admin panel, live dashboard, 3D scenes, and Layout builder that sit on top of it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-tag">What's built on top</span>
+      <h2>Everything a real dashboard needs</h2>
+      <p>Not just a driver runtime — a full admin + live control surface, built and battle-tested against real hardware.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🎛️</div>
+        <h3>Dashboard bindings</h3>
+        <p>Name a device once ("kitchen light"), pick its On/Off/Level functions from any driver instance, and it shows up everywhere — Live, Layout, 3D — automatically in sync.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🗂️</div>
+        <h3>Custom categories</h3>
+        <p>Light, Switch, Climate, Security, Media, Sensor and Generic ship built in — add your own categories alongside them and reorder the whole list to match how you think about your home.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🏠</div>
+        <h3>3D scenes</h3>
+        <p>Upload a .glb model of a room, bind meshes to devices, and watch doors swing, blinds roll, and lights glow in real time as the underlying device state changes.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🧩</div>
+        <h3>Layout builder</h3>
+        <p>A drag-and-drop, 12-column dashboard editor for building a custom page per room or per user, mixing device tiles, cameras, macros, and links.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎙️</div>
+        <h3>Voice control</h3>
+        <p>Speak a device's name and Live resolves it to the right zone on the right hub, even when several devices share one physical instance.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎬</div>
+        <h3>Macros &amp; automations</h3>
+        <p>Chain actions across drivers into one macro, and trigger them on schedules, sunrise/sunset, or conditions — no code, configured entirely from the admin panel.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📷</div>
+        <h3>Camera streaming</h3>
+        <p>RTSP feeds transcoded through ffmpeg to browser-native WebSocket/MSE — no plugin, verified against real IP cameras.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <h3>Per-driver sandboxing</h3>
+        <p>Every driver instance is isolated in its own JS context with its own error boundary — a crash in one driver never takes the orchestrator down.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="drivers">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-tag">Included today</span>
+      <h2>19 built-in drivers</h2>
+      <p>Covering security panels, hubs, lighting, media, sensors, and notifications — plus a generic HTTP webhook driver for anything not on this list yet.</p>
+    </div>
+    <div class="driver-tags">
+      <span class="driver-tag"><span class="ic">🚨</span> DSC PowerSeries</span>
+      <span class="driver-tag"><span class="ic">🏠</span> Universal Devices ISY994/eisy</span>
+      <span class="driver-tag"><span class="ic">🏠</span> Home Assistant</span>
+      <span class="driver-tag"><span class="ic">🏘️</span> Multi-Zone Hub</span>
+      <span class="driver-tag"><span class="ic">💡</span> Philips Hue</span>
+      <span class="driver-tag"><span class="ic">💡</span> LIFX</span>
+      <span class="driver-tag"><span class="ic">💡</span> Govee</span>
+      <span class="driver-tag"><span class="ic">🎚️</span> Lutron Caséta</span>
+      <span class="driver-tag"><span class="ic">💡</span> Generic Dimmer</span>
+      <span class="driver-tag"><span class="ic">🔌</span> Shelly</span>
+      <span class="driver-tag"><span class="ic">🔌</span> Generic HTTP Relay</span>
+      <span class="driver-tag"><span class="ic">🔌</span> Generic MQTT Plug</span>
+      <span class="driver-tag"><span class="ic">🔊</span> Sonos</span>
+      <span class="driver-tag"><span class="ic">📺</span> Roku</span>
+      <span class="driver-tag"><span class="ic">⛅</span> OpenWeatherMap</span>
+      <span class="driver-tag"><span class="ic">🔔</span> Pushover</span>
+      <span class="driver-tag"><span class="ic">✈️</span> Telegram Bot</span>
+      <span class="driver-tag"><span class="ic">💬</span> Slack</span>
+      <span class="driver-tag"><span class="ic">🪝</span> Generic Webhook</span>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-tag">Get running</span>
+      <h2>Install in one line, or step by step</h2>
+      <p>The script sets up Node.js (if it's missing), clones the repo, installs dependencies, and registers Oak as a systemd service that starts on boot and restarts on crash.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h3>One line, on a fresh Debian/Ubuntu machine</h3>
+          <p>Downloads and runs the installer directly — no manual clone needed.</p>
+          <pre><span class="k">curl</span> -fsSL https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/install.sh | <span class="k">bash</span></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h3>Or clone first, run locally</h3>
+          <p>Same result — useful if you want to read the script before running it.</p>
+          <pre><span class="k">git</span> clone https://github.com/qinghuaatbc/oak.git ~/oak-app/oak
+~/oak-app/oak/scripts/install.sh          <span class="cmt" style="color:var(--text-faint)"># defaults to port 8702</span>
+~/oak-app/oak/scripts/install.sh 8080     <span class="cmt" style="color:var(--text-faint)"># or pick your own port</span></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h3>Open the admin panel</h3>
+          <p>From any device on the same network as the install:</p>
+          <pre><span class="k">http://</span>&lt;machine-ip&gt;:8702/admin.html   <span class="cmt" style="color:var(--text-faint)"># configure drivers, dashboard, layout</span>
+<span class="k">http://</span>&lt;machine-ip&gt;:8702/live.html    <span class="cmt" style="color:var(--text-faint)"># the day-to-day control surface</span></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h3>Re-run any time to update</h3>
+          <p>The script is idempotent — it pulls the latest code, reinstalls dependencies, and restarts the service.</p>
+          <pre><span class="k">~/oak-app/oak/scripts/install.sh</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="https">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-tag">Optional</span>
+      <h2>Going public with HTTPS</h2>
+      <p>The installer only exposes Oak on your local network, over plain HTTP. To reach it from outside — with a real domain and a certificate — put a reverse proxy in front. <a href="https://caddyserver.com" target="_blank" rel="noopener">Caddy</a> is the easiest option: it requests and renews Let's Encrypt certificates automatically.</p>
+    </div>
+    <div class="https-panel">
+      <pre><span class="s"># /etc/caddy/Caddyfile</span>
+your-domain.com {
+    <span class="k">reverse_proxy</span> localhost:8702
+}</pre>
+      <div class="https-note">
+        <p>That's the entire config. Point your domain's DNS A record at the
+        server's public IP, install Caddy, drop the block above into
+        <code>/etc/caddy/Caddyfile</code>, then:</p>
+        <pre style="margin-top:12px;">sudo systemctl reload caddy</pre>
+        <p style="margin-top:12px;">Caddy handles the certificate on first request — no manual renewal, no
+        separate <code>certbot</code> step. If you want the dashboard
+        password-protected too, add a <code>basic_auth</code> directive —
+        just remember to exclude the <code>/ws</code> path, since browsers
+        don't reliably send cached Basic Auth credentials on WebSocket
+        upgrade requests.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="status">
+  <div class="wrap">
+    <div class="status-banner">
+      <span class="dot"></span>
+      <p>
+        <strong>Honest status:</strong> Oak is under active development, not a
+        finished product. The core (manifest → sandboxed runtime →
+        orchestrator) is solid and running real hardware in production; some
+        driver command sets are a plausible starting point rather than
+        verified against every device's full protocol. Read
+        <a href="https://github.com/qinghuaatbc/oak/blob/main/SPEC.md">SPEC.md</a>
+        for the design rationale, including an explicit note on independence
+        from any third-party driver SDK.
+      </p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap footer-inner">
+    <p>Oak is MIT licensed. Built and maintained independently.</p>
+    <div class="footer-links">
+      <a href="https://github.com/qinghuaatbc/oak" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/qinghuaatbc/oak/blob/main/SPEC.md" target="_blank" rel="noopener">SPEC.md</a>
+      <a href="https://github.com/qinghuaatbc/oak/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.getElementById("copyBtn").addEventListener("click", function () {
+  var text = "curl -fsSL https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/install.sh | bash";
+  navigator.clipboard.writeText(text).then(function () {
+    var btn = document.getElementById("copyBtn");
+    btn.textContent = "Copied ✓";
+    btn.classList.add("copied");
+    setTimeout(function () { btn.textContent = "Copy"; btn.classList.remove("copied"); }, 1800);
+  });
+});
+</script>
+
+</body>
+</html>
