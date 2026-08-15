@@ -54,7 +54,8 @@ main{ max-width:1400px; margin:0 auto; padding:20px 24px 60px; }
 .instance-row .ikey{ font-family:var(--mono); font-size:.7rem; color:var(--faint); }
 .instance-row.stopped{ opacity:.65; border-style:dashed; }
 .instance-row .istatus{ font-family:var(--mono); font-size:.68rem; color:var(--faint); font-weight:400; }
-.tile.stopped{ opacity:.65; border-style:dashed; }
+.tile.running{ background:var(--good-tint); border-color:var(--good); }
+.tile.stopped{ background:var(--bad-tint); border-color:var(--bad); border-style:dashed; opacity:.85; }
 .tile .istatus{ font-family:var(--mono); font-size:.68rem; color:var(--faint); font-weight:400; }
 .instance-row .row{ gap:6px; }
 .config-form label{ display:block; margin-bottom:10px; }
@@ -110,7 +111,15 @@ table th{ color:var(--faint); font-weight:500; }
    190px tile). */
 .tile-grid-3col{ grid-template-columns:repeat(3,1fr); }
 @media (max-width:640px){ .tile-grid-3col{ grid-template-columns:repeat(2,1fr); } }
-.tile{ border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--raised); cursor:pointer; user-select:none; transition:box-shadow .15s; }
+/* display:flex + a bottom-pinned .row (via margin-top:auto below) so
+   every tile in a grid row ends up the same height and their action
+   buttons line up across the row, regardless of how many lines a given
+   tile's own name wraps to - .tile-grid's default grid align-items:
+   stretch already makes the outer boxes equal height, this makes each
+   tile's own CONTENT actually use that full height instead of leaving a
+   gap under a short one. */
+.tile{ display:flex; flex-direction:column; border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--raised); cursor:pointer; user-select:none; transition:box-shadow .15s; }
+.tile > .row, .tile > button{ margin-top:auto; }
 .tile:hover{ box-shadow:0 4px 14px -6px rgba(0,0,0,.25); }
 .tile .row{ justify-content:space-between; flex-wrap:nowrap; margin-bottom:8px; }
 .tile .tname{ font-weight:600; font-size:.92rem; }

@@ -112,7 +112,7 @@ function updateCountPill() {
 // convention here, so a simple border/opacity cue on .stopped) instead of
 // the flat instance-row list.
 function renderInstancesList() {
-  instancesListEl.className = "tile-grid";
+  instancesListEl.className = "tile-grid tile-grid-3col";
   instancesListEl.innerHTML = "";
   if (!instanceIds.length) {
     instancesListEl.innerHTML = `<p class="empty-hint">No driver instances yet.</p>`;
@@ -123,7 +123,7 @@ function renderInstancesList() {
     const running = runningByInstance.get(id);
     const cat = effectiveCategories(manifest)[0];
     const tile = document.createElement("div");
-    tile.className = "tile" + (running ? "" : " stopped");
+    tile.className = "tile" + (running ? " running" : " stopped");
     tile.style.cssText = "text-align:center;";
     tile.title = "Click to view/edit this instance in State/Actions/Events/Config";
     tile.innerHTML = `
@@ -2729,28 +2729,9 @@ async function setupAddInstanceForm() {
     // order" the Uploaded Drivers tile grid already established.
     return [...filtered].sort((a, b) => a.displayName.localeCompare(b.displayName));
   }
-  // The tile grid below is the actual picker UI (click a tile to select a
-  // driver, same icon-tile language the Uploaded Drivers list uses) - this
-  // <select> just keeps tracking the selected value so the rest of this
-  // function (renderFieldsFor, the submit handler) doesn't need to change
-  // how it reads "which driver is picked".
   function renderDriverOptionsFor(cat) {
     const filtered = driversInCategory(cat);
     driverPicker.innerHTML = filtered.map((d) => `<option value="${d.id}">${d.displayName}</option>`).join("");
-    driverTiles.innerHTML = "";
-    filtered.forEach((d, i) => {
-      const tile = document.createElement("div");
-      tile.className = "tile" + (i === 0 ? " selected" : "");
-      tile.style.cssText = "text-align:center;";
-      tile.innerHTML = `<div style="font-size:28px;">${d.icon || CATEGORY_ICON[effectiveCategories(d)[0]] || "⚙️"}</div><div class="tname" style="margin-top:6px;">${d.displayName}</div>`;
-      tile.addEventListener("click", () => {
-        driverPicker.value = d.id;
-        driverTiles.querySelectorAll(".tile").forEach((t) => t.classList.remove("selected"));
-        tile.classList.add("selected");
-        renderFieldsFor(d.id);
-      });
-      driverTiles.appendChild(tile);
-    });
     renderFieldsFor(driverPicker.value);
   }
 
@@ -2764,13 +2745,9 @@ async function setupAddInstanceForm() {
 
   const driverPicker = document.createElement("select");
   driverPicker.name = "driver";
-  driverPicker.className = "layout-hidden";
   driverPicker.addEventListener("change", () => renderFieldsFor(driverPicker.value));
-  const driverTiles = document.createElement("div");
-  driverTiles.className = "tile-grid";
-  driverTiles.style.marginBottom = "10px";
 
-  fieldsRoot.before(categoryPicker, driverPicker, driverTiles);
+  fieldsRoot.before(categoryPicker, driverPicker);
   renderDriverOptionsFor(categoryPicker.value);
 
   document.getElementById("add-instance-form").addEventListener("submit", async (ev) => {
