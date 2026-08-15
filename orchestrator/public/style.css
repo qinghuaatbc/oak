@@ -104,13 +104,13 @@ table td, table th{ text-align:left; padding:5px 8px; border-bottom:1px dashed v
 table th{ color:var(--faint); font-weight:500; }
 
 .tile-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px; margin-top:6px; }
-/* Uploaded Drivers list specifically - a fixed 3 columns reads more
-   deliberately organized than auto-fill's "however many fit" for a list
-   that's already grouped by category (each row already carries a clear
-   flow: name -> id -> Delete, worth a bit more width than the default
-   190px tile). */
-.tile-grid-3col{ grid-template-columns:repeat(3,1fr); }
-@media (max-width:640px){ .tile-grid-3col{ grid-template-columns:repeat(2,1fr); } }
+/* Uploaded Drivers/Running Instances specifically - a fixed 2 columns
+   reads more deliberately organized than auto-fill's "however many fit"
+   for a list that's already grouped by category (each row already
+   carries a clear flow: name -> id -> Delete, worth more per-tile width
+   than the default 190px auto-fill tile gives it). */
+.tile-grid-2col{ grid-template-columns:repeat(2,1fr); }
+@media (max-width:480px){ .tile-grid-2col{ grid-template-columns:1fr; } }
 /* display:flex + a bottom-pinned .row (via margin-top:auto below) so
    every tile in a grid row ends up the same height and their action
    buttons line up across the row, regardless of how many lines a given

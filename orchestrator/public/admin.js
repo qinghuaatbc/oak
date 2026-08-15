@@ -112,7 +112,7 @@ function updateCountPill() {
 // convention here, so a simple border/opacity cue on .stopped) instead of
 // the flat instance-row list.
 function renderInstancesList() {
-  instancesListEl.className = "tile-grid tile-grid-3col";
+  instancesListEl.className = "tile-grid tile-grid-2col";
   instancesListEl.innerHTML = "";
   if (!instanceIds.length) {
     instancesListEl.innerHTML = `<p class="empty-hint">No driver instances yet.</p>`;
@@ -2621,7 +2621,7 @@ async function renderUploadedDriversList() {
     // compact icon tile fits better than a full-width instance-row once
     // there are this many drivers to scan).
     const rowsEl = document.createElement("div");
-    rowsEl.className = "tile-grid tile-grid-3col";
+    rowsEl.className = "tile-grid tile-grid-2col";
     function applyCollapsed() {
       chev.textContent = collapsed ? "▸" : "▾";
       rowsEl.style.display = collapsed ? "none" : "";
