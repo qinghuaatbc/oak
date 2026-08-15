@@ -1,0 +1,37 @@
+{
+  "id": "shelly",
+  "displayName": "Shelly (Gen1)",
+  "version": "0.1.0",
+  "category": "switch",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "http",
+        "label": "HTTP",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 80 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 5000 },
+    {
+      "key": "relayNames",
+      "type": "keyvalue",
+      "label": "Relay names (most Shelly devices have just one, index 0 - multi-channel ones like the Shelly 2.5 have 0 and 1)",
+      "keyLabel": "Relay index (e.g. 0)",
+      "valueLabel": "Friendly name"
+    }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [{ "key": "relay", "type": "number", "default": 0 }] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [{ "key": "relay", "type": "number", "default": 0 }] },
+    { "id": "toggle", "label": "Toggle", "params": [{ "key": "relay", "type": "number", "default": 0 }] }
+  ],
+  "events": [{ "id": "stateChanged", "label": "Relay State Changed", "params": ["relay", "on"] }],
+  "states": [{ "id": "relay.on", "type": "boolean", "role": "on", "perInstance": "relay" }]
+}

@@ -1102,6 +1102,7 @@ function startCameraFfmpeg(rtspUrl, ws) {
 const BUILTIN_DRIVERS = new Set([
   "dsc-powerseries", "http-relay", "mqtt-plug", "generic-dimmer", "zone-hub", "eisy", "homeassistant",
   "pushover", "philips-hue", "sonos", "telegram", "slack", "openweathermap",
+  "webhook", "roku", "lifx", "govee", "lutron-caseta", "shelly",
 ]);
 
 function listDriverManifests() {

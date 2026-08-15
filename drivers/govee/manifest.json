@@ -1,0 +1,41 @@
+{
+  "id": "govee",
+  "displayName": "Govee",
+  "version": "0.1.0",
+  "category": "light",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Govee Cloud API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "apiKey", "type": "password", "label": "API Key (Govee Home app -> Profile -> About Us -> Apply for API Key)" },
+    { "key": "pollIntervalMs", "type": "number", "label": "Poll interval (ms)", "default": 10000 },
+    {
+      "key": "deviceNames",
+      "type": "keyvalue",
+      "label": "Device names (Discover devices auto-fills this - run it once before using other actions, since a device address here also carries its model)",
+      "keyLabel": "Device (MAC|Model)",
+      "valueLabel": "Friendly name"
+    }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [{ "key": "device", "type": "string", "label": "Device (MAC|Model, from Discover devices)" }] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [{ "key": "device", "type": "string", "label": "Device (MAC|Model)" }] },
+    {
+      "id": "setBrightness",
+      "label": "Set Brightness",
+      "role": "level",
+      "params": [
+        { "key": "device", "type": "string", "label": "Device (MAC|Model)" },
+        { "key": "level", "type": "number", "label": "Level (0-100)", "default": 100 }
+      ]
+    },
+    { "id": "discoverDevices", "label": "Discover Devices", "params": [] }
+  ],
+  "events": [{ "id": "nodesDiscovered", "label": "Devices Discovered", "params": ["count"] }],
+  "states": [
+    { "id": "light.on", "type": "boolean", "role": "on", "perInstance": "device" },
+    { "id": "light.level", "type": "number", "role": "level", "perInstance": "device" },
+    { "id": "discovery.nodes", "type": "string" }
+  ]
+}

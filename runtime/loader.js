@@ -153,6 +153,15 @@ class DriverInstance extends EventEmitter {
       this.connection.on("open", () => this._guarded("onConnect", () => this.impl.onConnect && this.impl.onConnect()));
       this.connection.on("close", () => this._guarded("onDisconnect", () => this.impl.onDisconnect && this.impl.onDisconnect()));
       this.connection.on("data", (chunk) => this._guarded("onData", () => this.impl.onData && this.impl.onData(chunk)));
+      // Node's EventEmitter throws an "error" event as an uncaught
+      // exception when nothing is listening for it - a raw socket error
+      // (e.g. ECONNREFUSED while a device is off/unreachable, a perfectly
+      // normal and expected condition any TCP-transport driver needs to
+      // tolerate and retry through) would otherwise crash out as a
+      // misleading "[FATAL - uncaught]" instead of the same safe,
+      // recoverable "error" event every other driver-code failure already
+      // goes through via _guarded() above.
+      this.connection.on("error", (err) => this.emit("error", { where: "connection", error: err }));
     }
   }
 

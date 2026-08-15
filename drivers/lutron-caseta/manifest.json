@@ -1,0 +1,52 @@
+{
+  "id": "lutron-caseta",
+  "displayName": "Lutron Caséta",
+  "version": "0.1.0",
+  "category": "light",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "tcp",
+        "label": "Smart Bridge PRO (Integration Protocol)",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Smart Bridge IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 23 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Integration username", "default": "lutron" },
+    { "key": "password", "type": "password", "label": "Integration password", "default": "integration" },
+    {
+      "key": "deviceNames",
+      "type": "keyvalue",
+      "label": "Device names (Integration IDs come from the Lutron app's Integration Report export - no discovery over this protocol)",
+      "keyLabel": "Integration ID (e.g. 2)",
+      "valueLabel": "Friendly name"
+    }
+  ],
+  "actions": [
+    { "id": "lightOn", "label": "Turn On", "role": "on", "params": [{ "key": "id", "type": "string", "label": "Integration ID" }] },
+    { "id": "lightOff", "label": "Turn Off", "role": "off", "params": [{ "key": "id", "type": "string", "label": "Integration ID" }] },
+    {
+      "id": "setLevel",
+      "label": "Set Level",
+      "role": "level",
+      "params": [
+        { "key": "id", "type": "string", "label": "Integration ID" },
+        { "key": "level", "type": "number", "label": "Level (0-100)", "default": 100 }
+      ]
+    }
+  ],
+  "events": [
+    { "id": "connected", "label": "Connected", "params": [] },
+    { "id": "stateChanged", "label": "State Changed", "params": ["id", "level"] }
+  ],
+  "states": [
+    { "id": "light.on", "type": "boolean", "role": "on", "perInstance": "id" },
+    { "id": "light.level", "type": "number", "role": "level", "perInstance": "id" }
+  ]
+}
