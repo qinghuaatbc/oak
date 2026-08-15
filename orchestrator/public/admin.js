@@ -2606,7 +2606,12 @@ async function renderUploadedDriversList() {
     groupLabel.style.cssText = "margin-top:10px; cursor:pointer; display:flex; align-items:center; gap:6px;";
     const chev = document.createElement("span");
     chev.className = "card-chev";
+    // Same .tile-grid/.tile convention the Camera tab already uses (a
+    // driver isn't a live-state row the way a running instance is, so a
+    // compact icon tile fits better than a full-width instance-row once
+    // there are this many drivers to scan).
     const rowsEl = document.createElement("div");
+    rowsEl.className = "tile-grid";
     function applyCollapsed() {
       chev.textContent = collapsed ? "▸" : "▾";
       rowsEl.style.display = collapsed ? "none" : "";
@@ -2620,12 +2625,17 @@ async function renderUploadedDriversList() {
     applyCollapsed();
     listEl.append(groupLabel, rowsEl);
     group.forEach((d) => {
-      const row = document.createElement("div");
-      row.className = "instance-row";
-      row.innerHTML = `<div><div class="iname">${d.icon || CATEGORY_ICON[cat] || "⚙️"} ${d.displayName}</div><div class="ikey">${d.id}</div></div>`;
+      const tile = document.createElement("div");
+      tile.className = "tile";
+      tile.style.cssText = "cursor:default; text-align:center;";
+      tile.innerHTML = `
+        <div style="font-size:32px;">${d.icon || CATEGORY_ICON[cat] || "⚙️"}</div>
+        <div class="tname" style="margin-top:6px;">${d.displayName}</div>
+        <div class="tstate">${d.id}</div>`;
       const delBtn = document.createElement("button");
       delBtn.className = "btn small danger";
       delBtn.textContent = "Delete";
+      delBtn.style.cssText = "margin-top:10px; width:100%;";
       delBtn.addEventListener("click", async () => {
         if (!confirm(`Delete driver "${d.displayName}" permanently? The files are removed from disk.`)) return;
         const result = await deleteDriverPackage(d.id);
@@ -2635,8 +2645,8 @@ async function renderUploadedDriversList() {
         }
         renderUploadedDriversList();
       });
-      row.appendChild(delBtn);
-      rowsEl.appendChild(row);
+      tile.appendChild(delBtn);
+      rowsEl.appendChild(tile);
     });
   }
 }
