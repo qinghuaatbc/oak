@@ -13,6 +13,11 @@
 :root{
   --bg:#14120f; --bg-rgb:20,18,15; --bg-raised:#1b170f; --bg-card:#201b13; --bg-code:#100e0a;
   --text:#f3ede0; --text-dim:#b4a68c; --text-faint:#7c705c;
+  /* --bg-code stays dark in BOTH themes by design (a terminal-style code
+     block reads oddly on a white ground) - so its text color is its own
+     token, not --text-dim, which flips to a dark tone in light mode and
+     would otherwise go dark-on-dark the moment the light palette loads. */
+  --code-text:#cabfa6; --code-faint:#8f8471; --code-accent:#f2ad5c; --code-green:#8ab371; --code-line:#3a3020;
   --accent:#e0973f; --accent-strong:#f2ad5c; --accent-soft:#4a3420; --accent-line:#5c4322;
   --line:#332a1c; --line-soft:#241f16;
   --green:#8ab371; --green-soft:#2a3322;
@@ -85,21 +90,21 @@ code, pre, .mono{ font-family:var(--mono); }
 }
 .install-box-head{
   display:flex; align-items:center; justify-content:space-between; padding:10px 16px;
-  border-bottom:1px solid var(--line-soft); font-family:var(--mono); font-size:.76rem; color:var(--text-faint);
+  border-bottom:1px solid var(--code-line); font-family:var(--mono); font-size:.76rem; color:var(--code-faint);
 }
 .install-box-head .dots{ display:flex; gap:6px; }
-.install-box-head .dots span{ width:9px; height:9px; border-radius:50%; background:var(--line); }
+.install-box-head .dots span{ width:9px; height:9px; border-radius:50%; background:var(--code-line); }
 .copy-btn{
-  font-family:var(--sans); font-size:.76rem; font-weight:700; color:var(--text-dim);
-  background:transparent; border:1px solid var(--line); border-radius:6px; padding:4px 10px; cursor:pointer;
+  font-family:var(--sans); font-size:.76rem; font-weight:700; color:var(--code-text);
+  background:transparent; border:1px solid var(--code-line); border-radius:6px; padding:4px 10px; cursor:pointer;
 }
-.copy-btn:hover{ color:var(--accent-strong); border-color:var(--accent-line); }
-.copy-btn.copied{ color:var(--green); border-color:var(--green-soft); }
+.copy-btn:hover{ color:var(--code-accent); border-color:var(--code-accent); }
+.copy-btn.copied{ color:var(--code-green); border-color:var(--code-green); }
 .install-box pre{
-  margin:0; padding:18px 16px; font-size:.86rem; color:var(--text); overflow-x:auto; white-space:pre-wrap; word-break:break-all;
+  margin:0; padding:18px 16px; font-size:.86rem; color:var(--code-text); overflow-x:auto; white-space:pre-wrap; word-break:break-all;
 }
-.install-box .cmt{ color:var(--text-faint); }
-.install-box .str{ color:var(--accent-strong); }
+.install-box .cmt{ color:var(--code-faint); }
+.install-box .str{ color:var(--code-accent); }
 
 /* -------------------- Section shell -------------------- */
 section{ padding:76px 0; border-top:1px solid var(--line-soft); }
@@ -165,9 +170,9 @@ section{ padding:76px 0; border-top:1px solid var(--line-soft); }
 .step-body p{ margin:6px 0 10px; color:var(--text-dim); font-size:.92rem; }
 .step-body pre{
   background:var(--bg-code); border:1px solid var(--line); border-radius:8px; padding:12px 14px;
-  font-size:.82rem; overflow-x:auto; color:var(--text-dim);
+  font-size:.82rem; overflow-x:auto; color:var(--code-text);
 }
-.step-body pre .k{ color:var(--accent-strong); }
+.step-body pre .k{ color:var(--code-accent); }
 
 /* -------------------- Caddy panel -------------------- */
 .https-panel{
@@ -176,10 +181,10 @@ section{ padding:76px 0; border-top:1px solid var(--line-soft); }
 @media (max-width:760px){ .https-panel{ grid-template-columns:1fr; } }
 .https-panel pre{
   background:var(--bg-code); border:1px solid var(--line); border-radius:var(--radius); padding:20px;
-  font-size:.82rem; overflow-x:auto; color:var(--text-dim); line-height:1.7;
+  font-size:.82rem; overflow-x:auto; color:var(--code-text); line-height:1.7;
 }
-.https-panel pre .k{ color:var(--accent-strong); }
-.https-panel pre .s{ color:var(--green); }
+.https-panel pre .k{ color:var(--code-accent); }
+.https-panel pre .s{ color:var(--code-green); }
 .https-note{ color:var(--text-dim); font-size:.92rem; line-height:1.7; }
 .https-note code{ background:var(--bg-raised); padding:2px 6px; border-radius:5px; font-size:.85em; color:var(--accent-strong); }
 
@@ -216,9 +221,6 @@ footer{ padding:44px 0 60px; border-top:1px solid var(--line-soft); }
     --green:#4f7a3a; --green-soft:#dcecd0;
   }
 }
-:root[data-theme="light"] .install-box pre,
-:root[data-theme="light"] .https-panel pre,
-:root[data-theme="light"] .step-body pre{ color:#e8dfc9; }
 :root[data-theme="light"] .btn-primary{ color:#fff8ec; }
 </style>
 </head>
@@ -397,8 +399,8 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
           <h3>Or clone first, run locally</h3>
           <p>Same result — useful if you want to read the script before running it.</p>
           <pre><span class="k">git</span> clone https://github.com/qinghuaatbc/oak.git ~/oak-app/oak
-~/oak-app/oak/scripts/install.sh          <span class="cmt" style="color:var(--text-faint)"># defaults to port 8702</span>
-~/oak-app/oak/scripts/install.sh 8080     <span class="cmt" style="color:var(--text-faint)"># or pick your own port</span></pre>
+~/oak-app/oak/scripts/install.sh          <span class="cmt" style="color:var(--code-faint)"># defaults to port 8702</span>
+~/oak-app/oak/scripts/install.sh 8080     <span class="cmt" style="color:var(--code-faint)"># or pick your own port</span></pre>
         </div>
       </div>
       <div class="step">
@@ -406,8 +408,8 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
         <div class="step-body">
           <h3>Open the admin panel</h3>
           <p>From any device on the same network as the install:</p>
-          <pre><span class="k">http://</span>&lt;machine-ip&gt;:8702/admin.html   <span class="cmt" style="color:var(--text-faint)"># configure drivers, dashboard, layout</span>
-<span class="k">http://</span>&lt;machine-ip&gt;:8702/live.html    <span class="cmt" style="color:var(--text-faint)"># the day-to-day control surface</span></pre>
+          <pre><span class="k">http://</span>&lt;machine-ip&gt;:8702/admin.html   <span class="cmt" style="color:var(--code-faint)"># configure drivers, dashboard, layout</span>
+<span class="k">http://</span>&lt;machine-ip&gt;:8702/live.html    <span class="cmt" style="color:var(--code-faint)"># the day-to-day control surface</span></pre>
         </div>
       </div>
       <div class="step">

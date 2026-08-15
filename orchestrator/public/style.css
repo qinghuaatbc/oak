@@ -7,7 +7,7 @@
   --serif: "Iowan Old Style","Palatino Linotype","Book Antiqua",Georgia,serif;
   --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --mono: ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
-  --bg:#f6f4ee; --raised:#ffffff; --ink:#1d2321; --soft:#4b544f; --faint:#8a8f8a;
+  --bg:#f6f4ee; --raised:#ffffff; --ink:#1d2321; --soft:#4b544f; --faint:#686e68;
   --line:#dcd6c8; --accent:#0e7c86; --accent-ink:#fff; --accent-tint:#e3f0ee;
   --good:#1f7a52; --good-tint:#e3f3e9; --bad:#b3403a; --bad-tint:#fbe9e6;
 }
