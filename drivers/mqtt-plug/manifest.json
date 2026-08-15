@@ -1,6 +1,7 @@
 {
   "id": "mqtt-plug",
   "displayName": "Generic MQTT Plug/Sensor",
+  "icon": "🔌",
   "version": "0.1.0",
   "category": "switch",
   "connection": {
@@ -11,26 +12,73 @@
         "label": "MQTT Broker",
         "transport": "tcp",
         "fields": [
-          { "key": "host", "type": "string", "label": "Broker host" },
-          { "key": "port", "type": "number", "label": "Port", "default": 1883 }
+          {
+            "key": "host",
+            "type": "string",
+            "label": "Broker host"
+          },
+          {
+            "key": "port",
+            "type": "number",
+            "label": "Port",
+            "default": 1883
+          }
         ]
       }
     ]
   },
   "settings": [
-    { "key": "baseTopic", "type": "string", "label": "Base topic (e.g. home/plug1)", "default": "home/plug1" },
-    { "key": "clientId", "type": "string", "label": "MQTT client id", "default": "oak-mqtt-plug" }
+    {
+      "key": "baseTopic",
+      "type": "string",
+      "label": "Base topic (e.g. home/plug1)",
+      "default": "home/plug1"
+    },
+    {
+      "key": "clientId",
+      "type": "string",
+      "label": "MQTT client id",
+      "default": "oak-mqtt-plug"
+    }
   ],
   "actions": [
-    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
-    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] }
+    {
+      "id": "turnOn",
+      "label": "Turn On",
+      "role": "on",
+      "params": []
+    },
+    {
+      "id": "turnOff",
+      "label": "Turn Off",
+      "role": "off",
+      "params": []
+    }
   ],
   "events": [
-    { "id": "connected", "label": "Broker Connected", "params": [] },
-    { "id": "disconnected", "label": "Disconnected", "params": [] },
-    { "id": "stateChanged", "label": "State Changed", "params": ["on"] }
+    {
+      "id": "connected",
+      "label": "Broker Connected",
+      "params": []
+    },
+    {
+      "id": "disconnected",
+      "label": "Disconnected",
+      "params": []
+    },
+    {
+      "id": "stateChanged",
+      "label": "State Changed",
+      "params": [
+        "on"
+      ]
+    }
   ],
   "states": [
-    { "id": "plug.on", "type": "boolean", "role": "on" }
+    {
+      "id": "plug.on",
+      "type": "boolean",
+      "role": "on"
+    }
   ]
 }

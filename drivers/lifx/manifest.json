@@ -1,15 +1,32 @@
 {
   "id": "lifx",
   "displayName": "LIFX",
+  "icon": "💡",
   "version": "0.1.0",
   "category": "light",
   "connection": {
     "kind": "choice",
-    "options": [{ "id": "cloud", "label": "LIFX Cloud API", "transport": "http", "fields": [] }]
+    "options": [
+      {
+        "id": "cloud",
+        "label": "LIFX Cloud API",
+        "transport": "http",
+        "fields": []
+      }
+    ]
   },
   "settings": [
-    { "key": "apiToken", "type": "password", "label": "API Token (cloud.lifx.com/settings)" },
-    { "key": "pollIntervalMs", "type": "number", "label": "Poll interval (ms)", "default": 5000 },
+    {
+      "key": "apiToken",
+      "type": "password",
+      "label": "API Token (cloud.lifx.com/settings)"
+    },
+    {
+      "key": "pollIntervalMs",
+      "type": "number",
+      "label": "Poll interval (ms)",
+      "default": 5000
+    },
     {
       "key": "lightNames",
       "type": "keyvalue",
@@ -19,26 +36,87 @@
     }
   ],
   "actions": [
-    { "id": "lightOn", "label": "Turn On", "role": "on", "params": [{ "key": "lightId", "type": "string", "label": "Light ID" }] },
-    { "id": "lightOff", "label": "Turn Off", "role": "off", "params": [{ "key": "lightId", "type": "string", "label": "Light ID" }] },
+    {
+      "id": "lightOn",
+      "label": "Turn On",
+      "role": "on",
+      "params": [
+        {
+          "key": "lightId",
+          "type": "string",
+          "label": "Light ID"
+        }
+      ]
+    },
+    {
+      "id": "lightOff",
+      "label": "Turn Off",
+      "role": "off",
+      "params": [
+        {
+          "key": "lightId",
+          "type": "string",
+          "label": "Light ID"
+        }
+      ]
+    },
     {
       "id": "setBrightness",
       "label": "Set Brightness",
       "role": "level",
       "params": [
-        { "key": "lightId", "type": "string", "label": "Light ID" },
-        { "key": "level", "type": "number", "label": "Level (0-100)", "default": 100 }
+        {
+          "key": "lightId",
+          "type": "string",
+          "label": "Light ID"
+        },
+        {
+          "key": "level",
+          "type": "number",
+          "label": "Level (0-100)",
+          "default": 100
+        }
       ]
     },
-    { "id": "discoverLights", "label": "Discover Lights", "params": [] }
+    {
+      "id": "discoverLights",
+      "label": "Discover Lights",
+      "params": []
+    }
   ],
   "events": [
-    { "id": "stateChanged", "label": "State Changed", "params": ["lightId", "on"] },
-    { "id": "nodesDiscovered", "label": "Lights Discovered", "params": ["count"] }
+    {
+      "id": "stateChanged",
+      "label": "State Changed",
+      "params": [
+        "lightId",
+        "on"
+      ]
+    },
+    {
+      "id": "nodesDiscovered",
+      "label": "Lights Discovered",
+      "params": [
+        "count"
+      ]
+    }
   ],
   "states": [
-    { "id": "light.on", "type": "boolean", "role": "on", "perInstance": "lightId" },
-    { "id": "light.level", "type": "number", "role": "level", "perInstance": "lightId" },
-    { "id": "discovery.nodes", "type": "string" }
+    {
+      "id": "light.on",
+      "type": "boolean",
+      "role": "on",
+      "perInstance": "lightId"
+    },
+    {
+      "id": "light.level",
+      "type": "number",
+      "role": "level",
+      "perInstance": "lightId"
+    },
+    {
+      "id": "discovery.nodes",
+      "type": "string"
+    }
   ]
 }

@@ -1,6 +1,7 @@
 {
   "id": "http-relay",
   "displayName": "Generic HTTP Relay",
+  "icon": "🔌",
   "version": "0.1.0",
   "category": "switch",
   "connection": {
@@ -11,14 +12,28 @@
         "label": "HTTP",
         "transport": "http",
         "fields": [
-          { "key": "host", "type": "string", "label": "Device IP address" },
-          { "key": "port", "type": "number", "label": "Port", "default": 80 }
+          {
+            "key": "host",
+            "type": "string",
+            "label": "Device IP address"
+          },
+          {
+            "key": "port",
+            "type": "number",
+            "label": "Port",
+            "default": 80
+          }
         ]
       }
     ]
   },
   "settings": [
-    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 5000 },
+    {
+      "key": "pollIntervalMs",
+      "type": "number",
+      "label": "Status poll interval (ms)",
+      "default": 5000
+    },
     {
       "key": "relayNames",
       "type": "keyvalue",
@@ -28,14 +43,59 @@
     }
   ],
   "actions": [
-    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [{ "key": "relay", "type": "number", "default": 0 }] },
-    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [{ "key": "relay", "type": "number", "default": 0 }] },
-    { "id": "toggle", "label": "Toggle", "role": "toggle", "params": [{ "key": "relay", "type": "number", "default": 0 }] }
+    {
+      "id": "turnOn",
+      "label": "Turn On",
+      "role": "on",
+      "params": [
+        {
+          "key": "relay",
+          "type": "number",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "id": "turnOff",
+      "label": "Turn Off",
+      "role": "off",
+      "params": [
+        {
+          "key": "relay",
+          "type": "number",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "id": "toggle",
+      "label": "Toggle",
+      "role": "toggle",
+      "params": [
+        {
+          "key": "relay",
+          "type": "number",
+          "default": 0
+        }
+      ]
+    }
   ],
   "events": [
-    { "id": "stateChanged", "label": "Relay State Changed", "params": ["relay", "on"] }
+    {
+      "id": "stateChanged",
+      "label": "Relay State Changed",
+      "params": [
+        "relay",
+        "on"
+      ]
+    }
   ],
   "states": [
-    { "id": "relay.on", "type": "boolean", "role": "on", "perInstance": "relay" }
+    {
+      "id": "relay.on",
+      "type": "boolean",
+      "role": "on",
+      "perInstance": "relay"
+    }
   ]
 }

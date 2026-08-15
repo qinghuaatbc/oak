@@ -1,8 +1,12 @@
 {
   "id": "eisy",
   "displayName": "Universal Devices ISY994/eisy",
+  "icon": "🏠",
   "version": "0.1.0",
-  "category": ["light", "climate"],
+  "category": [
+    "light",
+    "climate"
+  ],
   "connection": {
     "kind": "choice",
     "options": [
@@ -11,15 +15,32 @@
         "label": "HTTP",
         "transport": "http",
         "fields": [
-          { "key": "host", "type": "string", "label": "ISY/eisy IP address" },
-          { "key": "port", "type": "number", "label": "Port", "default": 80 }
+          {
+            "key": "host",
+            "type": "string",
+            "label": "ISY/eisy IP address"
+          },
+          {
+            "key": "port",
+            "type": "number",
+            "label": "Port",
+            "default": 80
+          }
         ]
       }
     ]
   },
   "settings": [
-    { "key": "username", "type": "string", "label": "Admin username" },
-    { "key": "password", "type": "string", "label": "Admin password" },
+    {
+      "key": "username",
+      "type": "string",
+      "label": "Admin username"
+    },
+    {
+      "key": "password",
+      "type": "string",
+      "label": "Admin password"
+    },
     {
       "key": "deviceNames",
       "type": "keyvalue",
@@ -29,31 +50,80 @@
     }
   ],
   "actions": [
-    { "id": "nodeOn", "label": "Node On", "role": "on", "params": [{ "key": "address", "type": "string", "label": "Node address (e.g. 18 22 4B 1)" }] },
-    { "id": "nodeOff", "label": "Node Off", "role": "off", "params": [{ "key": "address", "type": "string", "label": "Node address (e.g. 18 22 4B 1)" }] },
+    {
+      "id": "nodeOn",
+      "label": "Node On",
+      "role": "on",
+      "params": [
+        {
+          "key": "address",
+          "type": "string",
+          "label": "Node address (e.g. 18 22 4B 1)"
+        }
+      ]
+    },
+    {
+      "id": "nodeOff",
+      "label": "Node Off",
+      "role": "off",
+      "params": [
+        {
+          "key": "address",
+          "type": "string",
+          "label": "Node address (e.g. 18 22 4B 1)"
+        }
+      ]
+    },
     {
       "id": "nodeSetLevel",
       "label": "Node Set Level",
       "role": "level",
       "params": [
-        { "key": "address", "type": "string", "label": "Node address (e.g. 18 22 4B 1)" },
-        { "key": "level", "type": "number", "label": "Level (0-100)", "default": 100 }
+        {
+          "key": "address",
+          "type": "string",
+          "label": "Node address (e.g. 18 22 4B 1)"
+        },
+        {
+          "key": "level",
+          "type": "number",
+          "label": "Level (0-100)",
+          "default": 100
+        }
       ]
     },
     {
       "id": "climateSetHeatSetpoint",
       "label": "Climate Set Heat Setpoint",
       "params": [
-        { "key": "address", "type": "string", "label": "Thermostat node address" },
-        { "key": "setpoint", "type": "number", "label": "Heat setpoint (°F)", "default": 68 }
+        {
+          "key": "address",
+          "type": "string",
+          "label": "Thermostat node address"
+        },
+        {
+          "key": "setpoint",
+          "type": "number",
+          "label": "Heat setpoint (°F)",
+          "default": 68
+        }
       ]
     },
     {
       "id": "climateSetCoolSetpoint",
       "label": "Climate Set Cool Setpoint",
       "params": [
-        { "key": "address", "type": "string", "label": "Thermostat node address" },
-        { "key": "setpoint", "type": "number", "label": "Cool setpoint (°F)", "default": 76 }
+        {
+          "key": "address",
+          "type": "string",
+          "label": "Thermostat node address"
+        },
+        {
+          "key": "setpoint",
+          "type": "number",
+          "label": "Cool setpoint (°F)",
+          "default": 76
+        }
       ]
     },
     {
@@ -65,41 +135,134 @@
       "id": "sendRawCommand",
       "label": "Send Raw Command",
       "params": [
-        { "key": "address", "type": "string", "label": "Node address" },
-        { "key": "control", "type": "string", "label": "Command (UDI's own code, e.g. DON/DOF/DFON/BEEP/...)" },
-        { "key": "value", "type": "string", "label": "Value (optional)" }
+        {
+          "key": "address",
+          "type": "string",
+          "label": "Node address"
+        },
+        {
+          "key": "control",
+          "type": "string",
+          "label": "Command (UDI's own code, e.g. DON/DOF/DFON/BEEP/...)"
+        },
+        {
+          "key": "value",
+          "type": "string",
+          "label": "Value (optional)"
+        }
       ]
     },
     {
       "id": "runProgram",
       "label": "Run Program",
       "params": [
-        { "key": "programId", "type": "string", "label": "Program id" },
-        { "key": "clause", "type": "string", "label": "run / runThen / runElse", "default": "run" }
+        {
+          "key": "programId",
+          "type": "string",
+          "label": "Program id"
+        },
+        {
+          "key": "clause",
+          "type": "string",
+          "label": "run / runThen / runElse",
+          "default": "run"
+        }
       ]
     },
-    { "id": "enableProgram", "label": "Enable Program", "params": [{ "key": "programId", "type": "string", "label": "Program id" }] },
-    { "id": "disableProgram", "label": "Disable Program", "params": [{ "key": "programId", "type": "string", "label": "Program id" }] },
+    {
+      "id": "enableProgram",
+      "label": "Enable Program",
+      "params": [
+        {
+          "key": "programId",
+          "type": "string",
+          "label": "Program id"
+        }
+      ]
+    },
+    {
+      "id": "disableProgram",
+      "label": "Disable Program",
+      "params": [
+        {
+          "key": "programId",
+          "type": "string",
+          "label": "Program id"
+        }
+      ]
+    },
     {
       "id": "setVariable",
       "label": "Set Variable",
       "params": [
-        { "key": "varType", "type": "number", "label": "Variable type (1=integer, 2=state)", "default": 2 },
-        { "key": "varId", "type": "number", "label": "Variable id" },
-        { "key": "value", "type": "number", "label": "Value" }
+        {
+          "key": "varType",
+          "type": "number",
+          "label": "Variable type (1=integer, 2=state)",
+          "default": 2
+        },
+        {
+          "key": "varId",
+          "type": "number",
+          "label": "Variable id"
+        },
+        {
+          "key": "value",
+          "type": "number",
+          "label": "Value"
+        }
       ]
     }
   ],
   "events": [
-    { "id": "stateChanged", "label": "State Changed", "params": ["address", "property", "value"] },
-    { "id": "nodesDiscovered", "label": "Nodes Discovered", "params": ["count"] }
+    {
+      "id": "stateChanged",
+      "label": "State Changed",
+      "params": [
+        "address",
+        "property",
+        "value"
+      ]
+    },
+    {
+      "id": "nodesDiscovered",
+      "label": "Nodes Discovered",
+      "params": [
+        "count"
+      ]
+    }
   ],
   "states": [
-    { "id": "node.on", "type": "boolean", "role": "on", "perInstance": "address" },
-    { "id": "node.level", "type": "number", "role": "level", "perInstance": "address" },
-    { "id": "node.error", "type": "boolean", "perInstance": "address" },
-    { "id": "climate.heatSetpoint", "type": "number", "perInstance": "address" },
-    { "id": "climate.coolSetpoint", "type": "number", "perInstance": "address" },
-    { "id": "discovery.nodes", "type": "string" }
+    {
+      "id": "node.on",
+      "type": "boolean",
+      "role": "on",
+      "perInstance": "address"
+    },
+    {
+      "id": "node.level",
+      "type": "number",
+      "role": "level",
+      "perInstance": "address"
+    },
+    {
+      "id": "node.error",
+      "type": "boolean",
+      "perInstance": "address"
+    },
+    {
+      "id": "climate.heatSetpoint",
+      "type": "number",
+      "perInstance": "address"
+    },
+    {
+      "id": "climate.coolSetpoint",
+      "type": "number",
+      "perInstance": "address"
+    },
+    {
+      "id": "discovery.nodes",
+      "type": "string"
+    }
   ]
 }

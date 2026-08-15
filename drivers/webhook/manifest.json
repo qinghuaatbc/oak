@@ -1,11 +1,19 @@
 {
   "id": "webhook",
   "displayName": "Generic Webhook",
+  "icon": "🪝",
   "version": "0.1.0",
   "category": "generic",
   "connection": {
     "kind": "choice",
-    "options": [{ "id": "cloud", "label": "Any HTTP endpoint", "transport": "http", "fields": [] }]
+    "options": [
+      {
+        "id": "cloud",
+        "label": "Any HTTP endpoint",
+        "transport": "http",
+        "fields": []
+      }
+    ]
   },
   "settings": [],
   "actions": [
@@ -13,20 +21,60 @@
       "id": "call",
       "label": "Call Webhook",
       "params": [
-        { "key": "url", "type": "string", "label": "URL" },
-        { "key": "method", "type": "string", "label": "Method (GET, POST, PUT, PATCH, DELETE)", "default": "POST" },
-        { "key": "headers", "type": "string", "label": "Headers as JSON (optional, e.g. {\"Authorization\":\"Bearer ...\"})" },
-        { "key": "body", "type": "string", "label": "Body (optional - raw text, or JSON - Content-Type defaults to application/json if it parses as JSON)" }
+        {
+          "key": "url",
+          "type": "string",
+          "label": "URL"
+        },
+        {
+          "key": "method",
+          "type": "string",
+          "label": "Method (GET, POST, PUT, PATCH, DELETE)",
+          "default": "POST"
+        },
+        {
+          "key": "headers",
+          "type": "string",
+          "label": "Headers as JSON (optional, e.g. {\"Authorization\":\"Bearer ...\"})"
+        },
+        {
+          "key": "body",
+          "type": "string",
+          "label": "Body (optional - raw text, or JSON - Content-Type defaults to application/json if it parses as JSON)"
+        }
       ]
     }
   ],
   "events": [
-    { "id": "callSucceeded", "label": "Call Succeeded", "params": ["url", "status"] },
-    { "id": "callFailed", "label": "Call Failed", "params": ["url", "error"] }
+    {
+      "id": "callSucceeded",
+      "label": "Call Succeeded",
+      "params": [
+        "url",
+        "status"
+      ]
+    },
+    {
+      "id": "callFailed",
+      "label": "Call Failed",
+      "params": [
+        "url",
+        "error"
+      ]
+    }
   ],
   "states": [
-    { "id": "lastUrl", "type": "string" },
-    { "id": "lastStatus", "type": "number" },
-    { "id": "lastCalledAt", "type": "number" }
+    {
+      "id": "lastUrl",
+      "type": "string"
+    },
+    {
+      "id": "lastStatus",
+      "type": "number"
+    },
+    {
+      "id": "lastCalledAt",
+      "type": "number"
+    }
   ]
 }

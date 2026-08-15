@@ -1,31 +1,69 @@
 {
   "id": "slack",
   "displayName": "Slack",
+  "icon": "💬",
   "version": "0.1.0",
   "category": "generic",
   "connection": {
     "kind": "choice",
-    "options": [{ "id": "cloud", "label": "Slack Incoming Webhook", "transport": "http", "fields": [] }]
+    "options": [
+      {
+        "id": "cloud",
+        "label": "Slack Incoming Webhook",
+        "transport": "http",
+        "fields": []
+      }
+    ]
   },
   "settings": [
-    { "key": "webhookUrl", "type": "password", "label": "Incoming Webhook URL (Slack app settings -> Incoming Webhooks -> Add New Webhook to Workspace)" }
+    {
+      "key": "webhookUrl",
+      "type": "password",
+      "label": "Incoming Webhook URL (Slack app settings -> Incoming Webhooks -> Add New Webhook to Workspace)"
+    }
   ],
   "actions": [
     {
       "id": "sendMessage",
       "label": "Send Message",
       "params": [
-        { "key": "text", "type": "string", "label": "Message" },
-        { "key": "channel", "type": "string", "label": "Channel override (optional, e.g. #alerts - only works if the webhook allows it)" }
+        {
+          "key": "text",
+          "type": "string",
+          "label": "Message"
+        },
+        {
+          "key": "channel",
+          "type": "string",
+          "label": "Channel override (optional, e.g. #alerts - only works if the webhook allows it)"
+        }
       ]
     }
   ],
   "events": [
-    { "id": "messageSent", "label": "Message Sent", "params": ["text"] },
-    { "id": "sendFailed", "label": "Send Failed", "params": ["error"] }
+    {
+      "id": "messageSent",
+      "label": "Message Sent",
+      "params": [
+        "text"
+      ]
+    },
+    {
+      "id": "sendFailed",
+      "label": "Send Failed",
+      "params": [
+        "error"
+      ]
+    }
   ],
   "states": [
-    { "id": "lastMessage", "type": "string" },
-    { "id": "lastSentAt", "type": "number" }
+    {
+      "id": "lastMessage",
+      "type": "string"
+    },
+    {
+      "id": "lastSentAt",
+      "type": "number"
+    }
   ]
 }

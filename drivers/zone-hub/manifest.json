@@ -1,8 +1,12 @@
 {
   "id": "zone-hub",
   "displayName": "Multi-Zone Light + Climate Hub",
+  "icon": "🏘️",
   "version": "0.1.0",
-  "category": ["light", "climate"],
+  "category": [
+    "light",
+    "climate"
+  ],
   "connection": {
     "kind": "choice",
     "options": [
@@ -11,14 +15,28 @@
         "label": "HTTP",
         "transport": "http",
         "fields": [
-          { "key": "host", "type": "string", "label": "Hub IP address" },
-          { "key": "port", "type": "number", "label": "Port", "default": 80 }
+          {
+            "key": "host",
+            "type": "string",
+            "label": "Hub IP address"
+          },
+          {
+            "key": "port",
+            "type": "number",
+            "label": "Port",
+            "default": 80
+          }
         ]
       }
     ]
   },
   "settings": [
-    { "key": "pollIntervalMs", "type": "number", "label": "Status poll interval (ms)", "default": 3000 },
+    {
+      "key": "pollIntervalMs",
+      "type": "number",
+      "label": "Status poll interval (ms)",
+      "default": 3000
+    },
     {
       "key": "zoneNames",
       "type": "keyvalue",
@@ -28,30 +46,94 @@
     }
   ],
   "actions": [
-    { "id": "lightOn", "label": "Light On", "role": "on", "params": [{ "key": "zone", "type": "string", "label": "Zone" }] },
-    { "id": "lightOff", "label": "Light Off", "role": "off", "params": [{ "key": "zone", "type": "string", "label": "Zone" }] },
+    {
+      "id": "lightOn",
+      "label": "Light On",
+      "role": "on",
+      "params": [
+        {
+          "key": "zone",
+          "type": "string",
+          "label": "Zone"
+        }
+      ]
+    },
+    {
+      "id": "lightOff",
+      "label": "Light Off",
+      "role": "off",
+      "params": [
+        {
+          "key": "zone",
+          "type": "string",
+          "label": "Zone"
+        }
+      ]
+    },
     {
       "id": "lightSetLevel",
       "label": "Light Set Level",
       "role": "level",
       "params": [
-        { "key": "zone", "type": "string", "label": "Zone" },
-        { "key": "level", "type": "number", "label": "Level (0-100)", "default": 100 }
+        {
+          "key": "zone",
+          "type": "string",
+          "label": "Zone"
+        },
+        {
+          "key": "level",
+          "type": "number",
+          "label": "Level (0-100)",
+          "default": 100
+        }
       ]
     },
     {
       "id": "climateSetTarget",
       "label": "Climate Set Target",
       "params": [
-        { "key": "zone", "type": "string", "label": "Zone" },
-        { "key": "target", "type": "number", "label": "Target (°F)", "default": 70 }
+        {
+          "key": "zone",
+          "type": "string",
+          "label": "Zone"
+        },
+        {
+          "key": "target",
+          "type": "number",
+          "label": "Target (°F)",
+          "default": 70
+        }
       ]
     }
   ],
-  "events": [{ "id": "stateChanged", "label": "State Changed", "params": ["zone", "field", "value"] }],
+  "events": [
+    {
+      "id": "stateChanged",
+      "label": "State Changed",
+      "params": [
+        "zone",
+        "field",
+        "value"
+      ]
+    }
+  ],
   "states": [
-    { "id": "light.on", "type": "boolean", "role": "on", "perInstance": "zone" },
-    { "id": "light.level", "type": "number", "role": "level", "perInstance": "zone" },
-    { "id": "climate.target", "type": "number", "perInstance": "zone" }
+    {
+      "id": "light.on",
+      "type": "boolean",
+      "role": "on",
+      "perInstance": "zone"
+    },
+    {
+      "id": "light.level",
+      "type": "number",
+      "role": "level",
+      "perInstance": "zone"
+    },
+    {
+      "id": "climate.target",
+      "type": "number",
+      "perInstance": "zone"
+    }
   ]
 }

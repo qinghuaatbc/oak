@@ -1,6 +1,7 @@
 {
   "id": "dsc-powerseries",
   "displayName": "DSC PowerSeries (Envisalink)",
+  "icon": "🚨",
   "version": "0.1.0",
   "category": "security",
   "connection": {
@@ -11,15 +12,33 @@
         "label": "Envisalink (network)",
         "transport": "tcp",
         "fields": [
-          { "key": "host", "type": "string", "label": "Envisalink IP address" },
-          { "key": "port", "type": "number", "label": "Port", "default": 4025 }
+          {
+            "key": "host",
+            "type": "string",
+            "label": "Envisalink IP address"
+          },
+          {
+            "key": "port",
+            "type": "number",
+            "label": "Port",
+            "default": 4025
+          }
         ]
       }
     ]
   },
   "settings": [
-    { "key": "password", "type": "password", "label": "TPI Password", "default": "user" },
-    { "key": "accessCode", "type": "password", "label": "Default Access Code" },
+    {
+      "key": "password",
+      "type": "password",
+      "label": "TPI Password",
+      "default": "user"
+    },
+    {
+      "key": "accessCode",
+      "type": "password",
+      "label": "Default Access Code"
+    },
     {
       "key": "zoneNames",
       "type": "keyvalue",
@@ -40,43 +59,117 @@
       "id": "armAway",
       "label": "Arm (Away)",
       "role": "arm",
-      "params": [{ "key": "partition", "type": "number", "default": 1 }]
+      "params": [
+        {
+          "key": "partition",
+          "type": "number",
+          "default": 1
+        }
+      ]
     },
     {
       "id": "armStay",
       "label": "Arm (Stay)",
       "role": "arm",
-      "params": [{ "key": "partition", "type": "number", "default": 1 }]
+      "params": [
+        {
+          "key": "partition",
+          "type": "number",
+          "default": 1
+        }
+      ]
     },
     {
       "id": "disarm",
       "label": "Disarm",
       "role": "disarm",
       "params": [
-        { "key": "partition", "type": "number", "default": 1 },
-        { "key": "code", "type": "string" }
+        {
+          "key": "partition",
+          "type": "number",
+          "default": 1
+        },
+        {
+          "key": "code",
+          "type": "string"
+        }
       ]
     },
     {
       "id": "sendKeys",
       "label": "Send Keystrokes",
       "params": [
-        { "key": "partition", "type": "number", "default": 1 },
-        { "key": "keys", "type": "string" }
+        {
+          "key": "partition",
+          "type": "number",
+          "default": 1
+        },
+        {
+          "key": "keys",
+          "type": "string"
+        }
       ]
     }
   ],
   "events": [
-    { "id": "connected", "label": "Panel Logged In", "params": [] },
-    { "id": "disconnected", "label": "Disconnected", "params": [] },
-    { "id": "zoneOpen", "label": "Zone Opened", "params": ["zone"] },
-    { "id": "zoneRestore", "label": "Zone Restored", "params": ["zone"] },
-    { "id": "partitionArmed", "label": "Partition Armed", "params": ["partition", "mode"] },
-    { "id": "partitionDisarmed", "label": "Partition Disarmed", "params": ["partition"] },
-    { "id": "alarm", "label": "Alarm", "params": ["partition"] }
+    {
+      "id": "connected",
+      "label": "Panel Logged In",
+      "params": []
+    },
+    {
+      "id": "disconnected",
+      "label": "Disconnected",
+      "params": []
+    },
+    {
+      "id": "zoneOpen",
+      "label": "Zone Opened",
+      "params": [
+        "zone"
+      ]
+    },
+    {
+      "id": "zoneRestore",
+      "label": "Zone Restored",
+      "params": [
+        "zone"
+      ]
+    },
+    {
+      "id": "partitionArmed",
+      "label": "Partition Armed",
+      "params": [
+        "partition",
+        "mode"
+      ]
+    },
+    {
+      "id": "partitionDisarmed",
+      "label": "Partition Disarmed",
+      "params": [
+        "partition"
+      ]
+    },
+    {
+      "id": "alarm",
+      "label": "Alarm",
+      "params": [
+        "partition"
+      ]
+    }
   ],
   "states": [
-    { "id": "zone.open", "type": "boolean", "perInstance": "zone" },
-    { "id": "partition.status", "type": "string", "role": "status", "perInstance": "partition" }
+    {
+      "id": "zone.open",
+      "type": "boolean",
+      "perInstance": "zone"
+    },
+    {
+      "id": "partition.status",
+      "type": "string",
+      "role": "status",
+      "perInstance": "partition"
+    }
   ]
 }

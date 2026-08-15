@@ -1,8 +1,15 @@
 {
   "id": "homeassistant",
   "displayName": "Home Assistant",
+  "icon": "🏠",
   "version": "0.1.0",
-  "category": ["light", "switch", "climate", "sensor", "generic"],
+  "category": [
+    "light",
+    "switch",
+    "climate",
+    "sensor",
+    "generic"
+  ],
   "connection": {
     "kind": "choice",
     "options": [
@@ -11,14 +18,27 @@
         "label": "HTTP/WebSocket",
         "transport": "http",
         "fields": [
-          { "key": "host", "type": "string", "label": "Home Assistant IP address" },
-          { "key": "port", "type": "number", "label": "Port", "default": 8123 }
+          {
+            "key": "host",
+            "type": "string",
+            "label": "Home Assistant IP address"
+          },
+          {
+            "key": "port",
+            "type": "number",
+            "label": "Port",
+            "default": 8123
+          }
         ]
       }
     ]
   },
   "settings": [
-    { "key": "accessToken", "type": "password", "label": "Long-lived access token (Profile → Security → Long-Lived Access Tokens)" },
+    {
+      "key": "accessToken",
+      "type": "password",
+      "label": "Long-lived access token (Profile → Security → Long-Lived Access Tokens)"
+    },
     {
       "key": "entityNames",
       "type": "keyvalue",
@@ -28,47 +48,146 @@
     }
   ],
   "actions": [
-    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [{ "key": "entityId", "type": "string", "label": "Entity id (e.g. light.kitchen)" }] },
-    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [{ "key": "entityId", "type": "string", "label": "Entity id (e.g. light.kitchen)" }] },
+    {
+      "id": "turnOn",
+      "label": "Turn On",
+      "role": "on",
+      "params": [
+        {
+          "key": "entityId",
+          "type": "string",
+          "label": "Entity id (e.g. light.kitchen)"
+        }
+      ]
+    },
+    {
+      "id": "turnOff",
+      "label": "Turn Off",
+      "role": "off",
+      "params": [
+        {
+          "key": "entityId",
+          "type": "string",
+          "label": "Entity id (e.g. light.kitchen)"
+        }
+      ]
+    },
     {
       "id": "setBrightness",
       "label": "Set Brightness",
       "role": "level",
       "params": [
-        { "key": "entityId", "type": "string", "label": "Entity id (light.* only)" },
-        { "key": "level", "type": "number", "label": "Level (0-100)", "default": 100 }
+        {
+          "key": "entityId",
+          "type": "string",
+          "label": "Entity id (light.* only)"
+        },
+        {
+          "key": "level",
+          "type": "number",
+          "label": "Level (0-100)",
+          "default": 100
+        }
       ]
     },
     {
       "id": "climateSetTemperature",
       "label": "Climate Set Temperature",
       "params": [
-        { "key": "entityId", "type": "string", "label": "Entity id (climate.*)" },
-        { "key": "temperature", "type": "number", "label": "Target temperature", "default": 70 }
+        {
+          "key": "entityId",
+          "type": "string",
+          "label": "Entity id (climate.*)"
+        },
+        {
+          "key": "temperature",
+          "type": "number",
+          "label": "Target temperature",
+          "default": 70
+        }
       ]
     },
     {
       "id": "callService",
       "label": "Call Service",
       "params": [
-        { "key": "domain", "type": "string", "label": "Service domain (e.g. cover, fan, lock, media_player, scene)" },
-        { "key": "service", "type": "string", "label": "Service (e.g. open_cover, toggle, activate)" },
-        { "key": "entityId", "type": "string", "label": "Entity id (optional)" },
-        { "key": "serviceData", "type": "string", "label": "Extra service data as JSON (optional, e.g. {\"color_name\":\"red\"})" }
+        {
+          "key": "domain",
+          "type": "string",
+          "label": "Service domain (e.g. cover, fan, lock, media_player, scene)"
+        },
+        {
+          "key": "service",
+          "type": "string",
+          "label": "Service (e.g. open_cover, toggle, activate)"
+        },
+        {
+          "key": "entityId",
+          "type": "string",
+          "label": "Entity id (optional)"
+        },
+        {
+          "key": "serviceData",
+          "type": "string",
+          "label": "Extra service data as JSON (optional, e.g. {\"color_name\":\"red\"})"
+        }
       ]
     },
-    { "id": "discoverEntities", "label": "Discover Entities", "params": [] }
+    {
+      "id": "discoverEntities",
+      "label": "Discover Entities",
+      "params": []
+    }
   ],
   "events": [
-    { "id": "stateChanged", "label": "State Changed", "params": ["entityId", "state"] },
-    { "id": "nodesDiscovered", "label": "Entities Discovered", "params": ["count"] }
+    {
+      "id": "stateChanged",
+      "label": "State Changed",
+      "params": [
+        "entityId",
+        "state"
+      ]
+    },
+    {
+      "id": "nodesDiscovered",
+      "label": "Entities Discovered",
+      "params": [
+        "count"
+      ]
+    }
   ],
   "states": [
-    { "id": "entity.on", "type": "boolean", "role": "on", "perInstance": "entityId" },
-    { "id": "entity.level", "type": "number", "role": "level", "perInstance": "entityId" },
-    { "id": "entity.state", "type": "string", "role": "status", "perInstance": "entityId" },
-    { "id": "climate.currentTemperature", "type": "number", "perInstance": "entityId" },
-    { "id": "climate.targetTemperature", "type": "number", "perInstance": "entityId" },
-    { "id": "discovery.nodes", "type": "string" }
+    {
+      "id": "entity.on",
+      "type": "boolean",
+      "role": "on",
+      "perInstance": "entityId"
+    },
+    {
+      "id": "entity.level",
+      "type": "number",
+      "role": "level",
+      "perInstance": "entityId"
+    },
+    {
+      "id": "entity.state",
+      "type": "string",
+      "role": "status",
+      "perInstance": "entityId"
+    },
+    {
+      "id": "climate.currentTemperature",
+      "type": "number",
+      "perInstance": "entityId"
+    },
+    {
+      "id": "climate.targetTemperature",
+      "type": "number",
+      "perInstance": "entityId"
+    },
+    {
+      "id": "discovery.nodes",
+      "type": "string"
+    }
   ]
 }

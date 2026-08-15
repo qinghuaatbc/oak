@@ -1,26 +1,85 @@
 {
   "id": "openweathermap",
   "displayName": "OpenWeatherMap",
+  "icon": "⛅",
   "version": "0.1.0",
   "category": "sensor",
   "connection": {
     "kind": "choice",
-    "options": [{ "id": "cloud", "label": "OpenWeatherMap API", "transport": "http", "fields": [] }]
+    "options": [
+      {
+        "id": "cloud",
+        "label": "OpenWeatherMap API",
+        "transport": "http",
+        "fields": []
+      }
+    ]
   },
   "settings": [
-    { "key": "apiKey", "type": "password", "label": "API Key (openweathermap.org/api - free tier is enough for polling)" },
-    { "key": "location", "type": "string", "label": "Location - city name (e.g. Vancouver,CA) or \"lat,lon\"" },
-    { "key": "units", "type": "string", "label": "Units (metric, imperial, or standard/Kelvin)", "default": "metric" },
-    { "key": "pollIntervalMs", "type": "number", "label": "Poll interval (ms)", "default": 600000 }
+    {
+      "key": "apiKey",
+      "type": "password",
+      "label": "API Key (openweathermap.org/api - free tier is enough for polling)"
+    },
+    {
+      "key": "location",
+      "type": "string",
+      "label": "Location - city name (e.g. Vancouver,CA) or \"lat,lon\""
+    },
+    {
+      "key": "units",
+      "type": "string",
+      "label": "Units (metric, imperial, or standard/Kelvin)",
+      "default": "metric"
+    },
+    {
+      "key": "pollIntervalMs",
+      "type": "number",
+      "label": "Poll interval (ms)",
+      "default": 600000
+    }
   ],
-  "actions": [{ "id": "refresh", "label": "Refresh Now", "params": [] }],
-  "events": [{ "id": "weatherChanged", "label": "Weather Changed", "params": ["temperature", "description"] }],
+  "actions": [
+    {
+      "id": "refresh",
+      "label": "Refresh Now",
+      "params": []
+    }
+  ],
+  "events": [
+    {
+      "id": "weatherChanged",
+      "label": "Weather Changed",
+      "params": [
+        "temperature",
+        "description"
+      ]
+    }
+  ],
   "states": [
-    { "id": "weather.temperature", "type": "number" },
-    { "id": "weather.feelsLike", "type": "number" },
-    { "id": "weather.humidity", "type": "number" },
-    { "id": "weather.description", "type": "string" },
-    { "id": "weather.condition", "type": "string" },
-    { "id": "weather.windSpeed", "type": "number" }
+    {
+      "id": "weather.temperature",
+      "type": "number"
+    },
+    {
+      "id": "weather.feelsLike",
+      "type": "number"
+    },
+    {
+      "id": "weather.humidity",
+      "type": "number"
+    },
+    {
+      "id": "weather.description",
+      "type": "string"
+    },
+    {
+      "id": "weather.condition",
+      "type": "string"
+    },
+    {
+      "id": "weather.windSpeed",
+      "type": "number"
+    }
   ]
 }

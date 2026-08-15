@@ -1,32 +1,74 @@
 {
   "id": "telegram",
   "displayName": "Telegram Bot",
+  "icon": "✈️",
   "version": "0.1.0",
   "category": "generic",
   "connection": {
     "kind": "choice",
-    "options": [{ "id": "cloud", "label": "Telegram Bot API", "transport": "http", "fields": [] }]
+    "options": [
+      {
+        "id": "cloud",
+        "label": "Telegram Bot API",
+        "transport": "http",
+        "fields": []
+      }
+    ]
   },
   "settings": [
-    { "key": "botToken", "type": "password", "label": "Bot Token (create a bot with @BotFather in Telegram to get one)" },
-    { "key": "chatId", "type": "string", "label": "Default chat ID (message @userinfobot, or add the bot to a group and check getUpdates - optional, can override per-message)" }
+    {
+      "key": "botToken",
+      "type": "password",
+      "label": "Bot Token (create a bot with @BotFather in Telegram to get one)"
+    },
+    {
+      "key": "chatId",
+      "type": "string",
+      "label": "Default chat ID (message @userinfobot, or add the bot to a group and check getUpdates - optional, can override per-message)"
+    }
   ],
   "actions": [
     {
       "id": "sendMessage",
       "label": "Send Message",
       "params": [
-        { "key": "text", "type": "string", "label": "Message" },
-        { "key": "chatId", "type": "string", "label": "Chat ID (optional, overrides the default)" }
+        {
+          "key": "text",
+          "type": "string",
+          "label": "Message"
+        },
+        {
+          "key": "chatId",
+          "type": "string",
+          "label": "Chat ID (optional, overrides the default)"
+        }
       ]
     }
   ],
   "events": [
-    { "id": "messageSent", "label": "Message Sent", "params": ["text"] },
-    { "id": "sendFailed", "label": "Send Failed", "params": ["error"] }
+    {
+      "id": "messageSent",
+      "label": "Message Sent",
+      "params": [
+        "text"
+      ]
+    },
+    {
+      "id": "sendFailed",
+      "label": "Send Failed",
+      "params": [
+        "error"
+      ]
+    }
   ],
   "states": [
-    { "id": "lastMessage", "type": "string" },
-    { "id": "lastSentAt", "type": "number" }
+    {
+      "id": "lastMessage",
+      "type": "string"
+    },
+    {
+      "id": "lastSentAt",
+      "type": "number"
+    }
   ]
 }

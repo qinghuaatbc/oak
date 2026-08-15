@@ -2598,15 +2598,31 @@ async function renderUploadedDriversList() {
   for (const cat of [...byCategory.keys()]) {
     const group = byCategory.get(cat);
     if (!group.length) continue;
+    const storageKey = `oak_driverlist_collapsed_${cat}`;
+    let collapsed = localStorage.getItem(storageKey) === "1";
+
     const groupLabel = document.createElement("div");
     groupLabel.className = "layout-palette-group-label";
-    groupLabel.style.marginTop = "10px";
-    groupLabel.textContent = `${CATEGORY_ICON[cat] || "⚙️"} ${CATEGORY_LABEL[cat] || cat}`;
-    listEl.appendChild(groupLabel);
+    groupLabel.style.cssText = "margin-top:10px; cursor:pointer; display:flex; align-items:center; gap:6px;";
+    const chev = document.createElement("span");
+    chev.className = "card-chev";
+    const rowsEl = document.createElement("div");
+    function applyCollapsed() {
+      chev.textContent = collapsed ? "▸" : "▾";
+      rowsEl.style.display = collapsed ? "none" : "";
+    }
+    groupLabel.append(chev, document.createTextNode(`${CATEGORY_ICON[cat] || "⚙️"} ${CATEGORY_LABEL[cat] || cat} (${group.length})`));
+    groupLabel.addEventListener("click", () => {
+      collapsed = !collapsed;
+      localStorage.setItem(storageKey, collapsed ? "1" : "0");
+      applyCollapsed();
+    });
+    applyCollapsed();
+    listEl.append(groupLabel, rowsEl);
     group.forEach((d) => {
       const row = document.createElement("div");
       row.className = "instance-row";
-      row.innerHTML = `<div><div class="iname">${CATEGORY_ICON[cat] || "⚙️"} ${d.displayName}</div><div class="ikey">${d.id}</div></div>`;
+      row.innerHTML = `<div><div class="iname">${d.icon || CATEGORY_ICON[cat] || "⚙️"} ${d.displayName}</div><div class="ikey">${d.id}</div></div>`;
       const delBtn = document.createElement("button");
       delBtn.className = "btn small danger";
       delBtn.textContent = "Delete";
@@ -2620,7 +2636,7 @@ async function renderUploadedDriversList() {
         renderUploadedDriversList();
       });
       row.appendChild(delBtn);
-      listEl.appendChild(row);
+      rowsEl.appendChild(row);
     });
   }
 }
