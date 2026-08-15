@@ -9,7 +9,7 @@
 import { listInstances, getState, getBindings, callAction, runMacro, listCameras, listMacros } from "./api.js";
 import { connectWS } from "./live-socket.js";
 import { attachCameraPlayer } from "./camera-player.js";
-import { bindingSlot, resolveMeshOnLevel, callFn as callFnShared, primaryInstanceId, slotCallParams, CATEGORY_ICON } from "./roles.js";
+import { bindingSlot, resolveMeshOnLevel, callFn as callFnShared, primaryInstanceId, slotCallParams, effectiveCategoryIcon } from "./roles.js";
 
 function callFn(fn, slot) {
   return callFnShared(fn, slot, { callAction, runMacro });
@@ -89,7 +89,7 @@ function buildSlotWidget(w) {
   const hasToggle = Boolean(slot.onFn || slot.offFn);
   const hasLevel = Boolean(slot.levelFn) && w.showLevel !== false;
   if (hasToggle) el.classList.add("tappable");
-  el.innerHTML = `<div class="lo-w-icon">${CATEGORY_ICON[w.cat] || "⚙️"}</div><img class="lo-w-icon-img" style="width:26px; height:26px; object-fit:contain; display:none;" /><div class="lo-w-name">${slot.name}</div><div class="lo-w-sub"></div>`;
+  el.innerHTML = `<div class="lo-w-icon">${effectiveCategoryIcon(bindingsData.customCategories)[w.cat] || "⚙️"}</div><img class="lo-w-icon-img" style="width:26px; height:26px; object-fit:contain; display:none;" /><div class="lo-w-name">${slot.name}</div><div class="lo-w-sub"></div>`;
   const subEl = el.querySelector(".lo-w-sub");
   const iconEl = el.querySelector(".lo-w-icon");
   const iconImgEl = el.querySelector(".lo-w-icon-img");

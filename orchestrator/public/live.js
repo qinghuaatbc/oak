@@ -13,9 +13,10 @@ import { listInstances, getState, callAction, getBindings, runMacro } from "./ap
 import { connectWS } from "./live-socket.js";
 import { createCommPanel } from "./comm.js";
 import {
-  CATEGORY_ICON,
-  CATEGORY_LABEL,
   CATEGORY_ORDER,
+  effectiveCategoryOrder,
+  effectiveCategoryIcon,
+  effectiveCategoryLabel,
   slotCallParams,
   primaryInstanceId,
   slotOnEntry,
@@ -45,6 +46,20 @@ let statesByInstance = new Map(); // instanceId -> {key: value}
 let bindingsData = Object.fromEntries(CATEGORY_ORDER.map((c) => [c, []])); // cat -> slot[]
 let cardEls = new Map(); // slotId -> {el, apply(state, running), cat}
 let activeCat = "__all__";
+// Live (not module-level-static) icon/label/order lookups - custom
+// categories live in bindingsData.customCategories, populated once
+// getBindings()/the "bindings" WS message replaces bindingsData wholesale
+// (see below), so these read bindingsData at call time. Mirrors admin.js's
+// identical catIcon/catLabel/catOrder helpers.
+function catIcon(cat) {
+  return effectiveCategoryIcon(bindingsData.customCategories)[cat] || "⚙️";
+}
+function catLabel(cat) {
+  return effectiveCategoryLabel(bindingsData.customCategories)[cat] || cat;
+}
+function catOrder() {
+  return effectiveCategoryOrder(bindingsData.customCategories);
+}
 
 // A bound 3D mesh's tap toggles its device exactly like a flat card's tap
 // does - resolve current on/off via the same shared helper the card grid
@@ -132,7 +147,7 @@ function buildRingCard(slot, cat) {
   bulb.setAttribute("class", "ring-bulb");
   bulb.setAttribute("x", "80");
   bulb.setAttribute("y", "88");
-  bulb.textContent = CATEGORY_ICON[cat] || "⚙️";
+  bulb.textContent = catIcon(cat);
   // Custom on/off icon pair (set on the Dashboard tab) - an SVG <image>
   // laid over the same center spot the emoji glyph occupies, an on/off
   // PAIR not a single image (a slider's level has no sensible per-value
@@ -297,7 +312,7 @@ function buildRingCard(slot, cat) {
 // actions on the underlying driver are reachable from the admin's Driver
 // tab, not from a Dashboard slot.
 function buildPlainCard(slot, cat) {
-  const icon = CATEGORY_ICON[cat] || "⚙️";
+  const icon = catIcon(cat);
   const hasToggle = Boolean(slot.onFn || slot.offFn);
 
   const card = document.createElement("div");
@@ -372,7 +387,7 @@ function buildPlainCard(slot, cat) {
 }
 
 function renderSidebar() {
-  const cats = CATEGORY_ORDER.filter((c) => (bindingsData[c] || []).length > 0);
+  const cats = catOrder().filter((c) => (bindingsData[c] || []).length > 0);
 
   sidebar.innerHTML = "";
   const allBtn = document.createElement("button");
@@ -383,7 +398,7 @@ function renderSidebar() {
   cats.forEach((cat) => {
     const btn = document.createElement("button");
     btn.className = "sky-cat" + (activeCat === cat ? " active" : "");
-    btn.innerHTML = `<span>${CATEGORY_ICON[cat] || "⚙️"}</span><span>${langZh ? zhCategoryLabel(cat) : CATEGORY_LABEL[cat] || cat}</span>`;
+    btn.innerHTML = `<span>${catIcon(cat)}</span><span>${langZh ? zhCategoryLabel(cat) : catLabel(cat)}</span>`;
     btn.addEventListener("click", () => setActiveCategory(cat));
     sidebar.appendChild(btn);
   });
@@ -401,7 +416,10 @@ function renderSidebar() {
 }
 const ZH_CATEGORY_LABEL = { light: "灯光", switch: "开关", security: "安防", climate: "温控", media: "媒体", sensor: "传感器", generic: "通用" };
 function zhCategoryLabel(cat) {
-  return ZH_CATEGORY_LABEL[cat] || cat;
+  // A custom category has no Chinese translation - fall back to its own
+  // admin-entered label (usually already Chinese if the admin typed it in
+  // Chinese) rather than the raw internal id.
+  return ZH_CATEGORY_LABEL[cat] || catLabel(cat);
 }
 
 function setActiveCategory(cat) {
@@ -446,7 +464,7 @@ async function refresh() {
   );
 
   const seen = new Set();
-  for (const cat of CATEGORY_ORDER) {
+  for (const cat of catOrder()) {
     for (const slot of bindingsData[cat] || []) {
       if (!(slot.onFn || slot.offFn || slot.levelFn)) continue; // unconfigured - nothing to show
       seen.add(slot.id);
@@ -656,7 +674,7 @@ cmdBtn.addEventListener("click", () => {
 // exists" when nothing named matches, same single-device convenience the
 // old instance-based version had.
 function findNamedSlot(cmdLower, cmdRaw) {
-  const all = CATEGORY_ORDER.flatMap((cat) => (bindingsData[cat] || []).map((slot) => ({ slot, cat })));
+  const all = catOrder().flatMap((cat) => (bindingsData[cat] || []).map((slot) => ({ slot, cat })));
   const named = all.filter(({ slot }) => slot.name && (cmdRaw.includes(slot.name) || cmdLower.includes(slot.name.toLowerCase())));
   if (named.length) return named.sort((a, b) => b.slot.name.length - a.slot.name.length)[0];
   return all.length === 1 ? all[0] : null;

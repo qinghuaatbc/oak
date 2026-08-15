@@ -16,6 +16,9 @@ import {
   CATEGORY_LABEL,
   CATEGORY_ORDER,
   effectiveCategories,
+  effectiveCategoryOrder,
+  effectiveCategoryIcon,
+  effectiveCategoryLabel,
   getOnOffPair,
   ANIM_TYPES,
   AXIS_ANIM_TYPES,
@@ -1090,40 +1093,61 @@ async function persistBindings() {
 const CATEGORY_LABEL_PLURAL = {
   light: "Lights", switch: "Switches", security: "Securities", climate: "Climates", media: "Media", sensor: "Sensors", generic: "Generics",
 };
+// Live (not module-level-static) icon/label/order lookups - custom
+// categories live in bindingsCache.customCategories, which only exists
+// once the Dashboard tab has loaded, so these read bindingsCache at call
+// time rather than being computed once at import time.
+function catIcon(cat) {
+  return effectiveCategoryIcon(bindingsCache.customCategories)[cat] || "⚙️";
+}
+function catLabel(cat) {
+  return effectiveCategoryLabel(bindingsCache.customCategories)[cat] || cat;
+}
+function catLabelPlural(cat) {
+  return CATEGORY_LABEL_PLURAL[cat] || `${catLabel(cat)}s`;
+}
+function catOrder() {
+  return effectiveCategoryOrder(bindingsCache.customCategories);
+}
 
 function buildCategoryCard(cat) {
   const card = document.createElement("div");
   card.className = "card";
   card.dataset.defaultCollapsed = cat === "generic" ? "true" : "false";
   const h2 = document.createElement("h2");
-  h2.textContent = `${CATEGORY_ICON[cat]} ${CATEGORY_LABEL_PLURAL[cat] || CATEGORY_LABEL[cat] + "s"}`;
+  const titleText = document.createElement("span");
+  h2.appendChild(titleText);
+  function updateTitle() {
+    titleText.textContent = `${catIcon(cat)} ${catLabelPlural(cat)} (${(bindingsCache[cat] || []).length})`;
+  }
   const addBtn = document.createElement("button");
   addBtn.className = "btn small";
   addBtn.style.marginLeft = "auto";
-  addBtn.textContent = `+ Add ${CATEGORY_LABEL[cat]}`;
+  addBtn.textContent = `+ Add ${catLabel(cat)}`;
   addBtn.addEventListener("click", (ev) => {
     ev.stopPropagation();
     // A freshly-added slot has nothing configured yet, so it starts
     // expanded - landing on a collapsed empty row after clicking "+ Add"
     // would just leave the admin hunting for how to open it, the exact
     // confusion an earlier version of this hit.
-    bindingsCache[cat].push({ id: Math.random().toString(16).slice(2, 10), name: `New ${CATEGORY_LABEL[cat]}`, fixedArgs: {}, __justAdded: true });
+    bindingsCache[cat].push({ id: Math.random().toString(16).slice(2, 10), name: `New ${catLabel(cat)}`, fixedArgs: {}, __justAdded: true });
     persistBindings();
-    renderSlotList(cat, list);
+    renderSlotList(cat, list, updateTitle);
   });
   h2.appendChild(addBtn);
   const list = document.createElement("div");
   list.id = `slotList-${cat}`;
   card.append(h2, list);
-  renderSlotList(cat, list);
+  renderSlotList(cat, list, updateTitle);
   return card;
 }
 
-function renderSlotList(cat, list) {
+function renderSlotList(cat, list, updateTitle) {
+  updateTitle();
   list.innerHTML = "";
   const slots = bindingsCache[cat] || [];
   if (!slots.length) {
-    list.innerHTML = `<p class="empty-hint">No ${(CATEGORY_LABEL_PLURAL[cat] || CATEGORY_LABEL[cat] + "s").toLowerCase()} yet - "+ Add ${CATEGORY_LABEL[cat]}" or Auto-generate above.</p>`;
+    list.innerHTML = `<p class="empty-hint">No ${catLabelPlural(cat).toLowerCase()} yet - "+ Add ${catLabel(cat)}" or Auto-generate above.</p>`;
     return;
   }
   slots.forEach((slot, i) => {
@@ -1133,7 +1157,7 @@ function renderSlotList(cat, list) {
       () => {
         bindingsCache[cat] = bindingsCache[cat].filter((s) => s !== slot);
         persistBindings();
-        renderSlotList(cat, list);
+        renderSlotList(cat, list, updateTitle);
       },
       i === slots.length - 1 && slot.__justAdded
     );
@@ -1149,22 +1173,164 @@ async function renderDashboardTab() {
     Promise.all(instanceIds.map(async (id) => [id, await getConfig(id)])),
   ]);
   bindingsCache = bindings;
+  if (!Array.isArray(bindingsCache.customCategories)) bindingsCache.customCategories = [];
   macrosCache = macros;
   configByInstance = new Map(configs);
+  renderCategoryCards();
+}
+// Local-only re-render from the already-mutated bindingsCache - no
+// network round-trip. Every custom-category add/rename/delete/reorder
+// handler below must call THIS, never renderDashboardTab() (which
+// re-fetches from the server): persistBindings()'s PUT is fired off but
+// not awaited, so an immediately-following renderDashboardTab() could
+// race ahead, GET the pre-write bindings, and silently wipe out the
+// change that was just made in the UI. Same reasoning renderSlotList
+// already follows for slot add/delete - this just extends it to the
+// category level.
+function renderCategoryCards() {
   const root = document.getElementById("bindingsCategoryCards");
   root.innerHTML = "";
-  CATEGORY_ORDER.forEach((cat) => root.appendChild(buildCategoryCard(cat)));
+  root.appendChild(buildCustomCategoryManager());
+  root.appendChild(buildBuiltinCategoriesHeader());
+  catOrder().forEach((cat) => root.appendChild(buildCategoryCard(cat)));
   makeCardsCollapsible();
 }
-document.getElementById("autoGenBindingsBtn").addEventListener("click", async () => {
-  const result = await autoGenerateBindings();
-  if (result.error) {
-    alert(result.error);
-    return;
+
+// "Auto-generate" only ever creates slots under BUILT-IN categories -
+// roleActionsForCategory/roleStatesForCategory have no role-inference
+// vocabulary for an arbitrary custom category (see roles.js's header
+// comment on effectiveCategoryOrder) - so this row sits directly above
+// the built-in category cards, below the Custom categories manager, not
+// in the page-level header where it would look like it also applies to
+// custom ones.
+function buildBuiltinCategoriesHeader() {
+  const row = document.createElement("div");
+  row.className = "row";
+  row.style.cssText = "justify-content:space-between; align-items:center; margin:18px 0 4px;";
+  const label = document.createElement("div");
+  label.className = "sub";
+  label.textContent = "Built-in categories";
+  const btn = document.createElement("button");
+  btn.className = "btn small primary";
+  btn.textContent = "⚡ Auto-generate";
+  btn.addEventListener("click", async (ev) => {
+    ev.stopPropagation();
+    const result = await autoGenerateBindings();
+    if (result.error) {
+      alert(result.error);
+      return;
+    }
+    alert(result.added ? `Added ${result.added} slot(s).` : "Nothing new to add - every instance with a role-tagged on/off/level action already has a default slot.");
+    renderDashboardTab();
+  });
+  row.append(label, btn);
+  return row;
+}
+
+// Custom categories (bindings.customCategories: [{id, label, icon}])
+// extend the built-in Light/Switch/.../Generic list - built-ins are
+// always shown as their own fixed cards above (never deletable/
+// reorderable relative to each other), custom ones get their own card
+// via buildCategoryCard exactly like a built-in does (buildCategoryCard/
+// renderSlotList/catIcon/catLabel all key off bindingsCache[cat] and
+// bindingsCache.customCategories, not off a hardcoded built-in list, so a
+// custom category's card works identically once it exists). This manager
+// panel is just add/rename/reorder/delete for the customCategories array
+// itself - array order IS display order (moveCustomCategory swaps
+// adjacent elements), the same convention bindings.pages already uses for
+// Layout page reordering.
+function buildCustomCategoryManager() {
+  const card = document.createElement("div");
+  card.className = "card";
+  const h2 = document.createElement("h2");
+  h2.textContent = "🗂️ Custom categories";
+  const addBtn = document.createElement("button");
+  addBtn.className = "btn small";
+  addBtn.style.marginLeft = "auto";
+  addBtn.textContent = "+ Add custom category";
+  addBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    const label = (prompt('Category name (e.g. "Garden", "Cameras")') || "").trim();
+    if (!label) return;
+    const icon = (prompt("Icon (single emoji, optional)", "⭐") || "⭐").trim();
+    const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24) || "category";
+    const id = `custom_${slug}_${Math.random().toString(16).slice(2, 6)}`;
+    bindingsCache.customCategories.push({ id, label, icon });
+    bindingsCache[id] = [];
+    persistBindings();
+    renderCategoryCards();
+  });
+  h2.appendChild(addBtn);
+  card.appendChild(h2);
+  const list = bindingsCache.customCategories;
+  if (!list.length) {
+    const hint = document.createElement("p");
+    hint.className = "empty-hint";
+    hint.textContent = "None yet - add one to organize Dashboard/Live/Layout slots beyond Light, Switch, Climate, etc.";
+    card.appendChild(hint);
+    return card;
   }
-  alert(result.added ? `Added ${result.added} slot(s).` : "Nothing new to add - every instance with a role-tagged on/off/level action already has a default slot.");
-  renderDashboardTab();
-});
+  list.forEach((c, i) => {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.cssText = "align-items:center; gap:8px; margin-top:8px;";
+    const label = document.createElement("span");
+    label.textContent = `${c.icon} ${c.label}`;
+    label.style.flex = "1";
+    const upBtn = document.createElement("button");
+    upBtn.className = "btn small";
+    upBtn.textContent = "↑";
+    upBtn.disabled = i === 0;
+    upBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      moveCustomCategory(i, -1);
+    });
+    const downBtn = document.createElement("button");
+    downBtn.className = "btn small";
+    downBtn.textContent = "↓";
+    downBtn.disabled = i === list.length - 1;
+    downBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      moveCustomCategory(i, 1);
+    });
+    const renameBtn = document.createElement("button");
+    renameBtn.className = "btn small";
+    renameBtn.textContent = "Rename";
+    renameBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const newLabel = (prompt("Category name", c.label) || "").trim();
+      if (!newLabel) return;
+      const newIcon = (prompt("Icon", c.icon) || c.icon).trim();
+      c.label = newLabel;
+      c.icon = newIcon || c.icon;
+      persistBindings();
+      renderCategoryCards();
+    });
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn small danger";
+    delBtn.textContent = "Delete";
+    delBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const slotCount = (bindingsCache[c.id] || []).length;
+      if (!confirm(`Delete "${c.label}"?${slotCount ? ` Its ${slotCount} slot(s) will be removed from Dashboard, Live, Layout and 3D too.` : ""}`)) return;
+      bindingsCache.customCategories = bindingsCache.customCategories.filter((x) => x.id !== c.id);
+      delete bindingsCache[c.id];
+      persistBindings();
+      renderCategoryCards();
+    });
+    row.append(label, upBtn, downBtn, renameBtn, delBtn);
+    card.appendChild(row);
+  });
+  return card;
+}
+function moveCustomCategory(i, delta) {
+  const list = bindingsCache.customCategories;
+  const j = i + delta;
+  if (j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  persistBindings();
+  renderCategoryCards();
+}
 
 // --- Health: per-instance running/error status + orchestrator uptime,
 // ported in spirit from QTI's getHealthSnapshot/refreshHealthPanel. ---
@@ -1909,7 +2075,7 @@ function makeDragGhost(label) {
 }
 
 function layoutWidgetIcon(w) {
-  if (w.type === "slot") return CATEGORY_ICON[w.cat] || "⚙️";
+  if (w.type === "slot") return catIcon(w.cat);
   return { camera: "📷", macro: "▶️", pageLink: "🔗", appUrl: "🌐", label: "📝", varDisplay: "📊" }[w.type] || "❔";
 }
 function layoutWidgetLabel(w) {
@@ -1958,11 +2124,11 @@ function renderLayoutPalette() {
     });
     root.appendChild(chip);
   }
-  CATEGORY_ORDER.forEach((cat) => {
+  catOrder().forEach((cat) => {
     const slots = bindingsCache[cat] || [];
     if (!slots.length) return;
-    addGroupLabel(CATEGORY_LABEL[cat]);
-    slots.forEach((slot) => addChip(slot.name, CATEGORY_ICON[cat], (x, y) => ({ type: "slot", cat, slotId: slot.id, x, y, w: 2, h: 2 })));
+    addGroupLabel(catLabel(cat));
+    slots.forEach((slot) => addChip(slot.name, catIcon(cat), (x, y) => ({ type: "slot", cat, slotId: slot.id, x, y, w: 2, h: 2 })));
   });
   if (layoutCamerasCache.length) {
     addGroupLabel("Cameras");
@@ -2549,13 +2715,13 @@ function openMeshBindPicker(meshName, clientX, clientY) {
   popup.className = "card";
   popup.style.cssText = `position:fixed; left:${Math.min(clientX, window.innerWidth - 300)}px; top:${Math.min(clientY, window.innerHeight - 260)}px; width:280px; z-index:500; box-shadow:0 8px 30px rgba(0,0,0,0.35);`;
 
-  const deviceOptions = CATEGORY_ORDER.map((cat) => {
+  const deviceOptions = catOrder().map((cat) => {
     const slots = (bindingsCache[cat] || []);
     if (!slots.length) return "";
     const opts = slots
       .map((s) => `<option value="${cat}:${s.id}"${existing && existing.cat === cat && existing.id === s.id ? " selected" : ""}>${s.name}</option>`)
       .join("");
-    return `<optgroup label="${CATEGORY_LABEL[cat]}">${opts}</optgroup>`;
+    return `<optgroup label="${catLabel(cat)}">${opts}</optgroup>`;
   }).join("");
 
   popup.innerHTML = `

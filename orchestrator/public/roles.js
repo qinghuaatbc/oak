@@ -53,6 +53,32 @@ export const CATEGORY_LABEL = {
 };
 export const CATEGORY_ORDER = ["light", "switch", "climate", "security", "media", "sensor", "generic"];
 
+// Custom categories (bindings.customCategories: [{id, label, icon}]) extend
+// the built-in list above rather than replacing it - a driver's manifest
+// only ever declares a built-in category (roleActionsForCategory/
+// roleStatesForCategory have no role vocabulary for an arbitrary custom
+// one), but a Dashboard SLOT can be filed under any category, built-in or
+// custom. Built-ins always render first in CATEGORY_ORDER's fixed order;
+// custom categories follow in bindings.customCategories' own array order -
+// same "array order IS display order, reordered by swapping adjacent
+// elements" convention bindings.pages already uses for Layout pages, so
+// reordering a custom category is just moveCustomCategory(delta) mirroring
+// the existing moveLayoutPage(delta). No separate order field needed.
+export function effectiveCategoryOrder(customCategories) {
+  const custom = Array.isArray(customCategories) ? customCategories : [];
+  return [...CATEGORY_ORDER, ...custom.map((c) => c.id)];
+}
+export function effectiveCategoryIcon(customCategories) {
+  const out = { ...CATEGORY_ICON };
+  for (const c of customCategories || []) out[c.id] = c.icon || "⭐";
+  return out;
+}
+export function effectiveCategoryLabel(customCategories) {
+  const out = { ...CATEGORY_LABEL };
+  for (const c of customCategories || []) out[c.id] = c.label || c.id;
+  return out;
+}
+
 // Still used for the "Add instance" two-step category-then-driver picker,
 // and for guessing a sensible default category for an uploaded driver -
 // NOT for Dashboard display anymore (that's entirely slot-driven now).

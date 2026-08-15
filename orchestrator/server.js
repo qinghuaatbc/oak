@@ -709,16 +709,29 @@ const AXIS_ANIM_TYPES = new Set(["rotate", "slide", "roller"]);
 function bindingsDefaults() {
   const obj = {};
   for (const c of BINDING_CATEGORIES) obj[c] = [];
+  obj.customCategories = [];
   obj.glbs = [];
   obj.pages = [];
   return obj;
+}
+// All valid slot-category ids for a given bindings object: the fixed
+// built-ins plus whatever custom categories that bindings object has
+// defined. Threaded explicitly into the sanitizers below (rather than read
+// off the module-level `bindings` global) since sanitizeBindings() is
+// rebuilding a whole bindings object from scratch, including
+// customCategories itself, in one pass - a custom category slot array or
+// mesh binding must validate against the customCategories that same raw
+// payload just defined, not the previous one still sitting in memory.
+function allCategoryIds(customCategories) {
+  return [...BINDING_CATEGORIES, ...(Array.isArray(customCategories) ? customCategories.map((c) => c.id) : [])];
 }
 function loadBindings() {
   if (!fs.existsSync(BINDINGS_PATH)) return bindingsDefaults();
   try {
     const raw = JSON.parse(fs.readFileSync(BINDINGS_PATH, "utf8"));
     const out = bindingsDefaults();
-    for (const c of BINDING_CATEGORIES) if (Array.isArray(raw[c])) out[c] = raw[c];
+    if (Array.isArray(raw.customCategories)) out.customCategories = raw.customCategories.map(sanitizeCustomCategory).filter(Boolean);
+    for (const c of allCategoryIds(out.customCategories)) out[c] = Array.isArray(raw[c]) ? raw[c] : [];
     if (Array.isArray(raw.glbs)) out.glbs = raw.glbs;
     if (Array.isArray(raw.pages)) out.pages = raw.pages;
     return out;
@@ -781,9 +794,9 @@ function sanitizeSlot(s) {
 // QTI's own {kind, id} mesh-binding shape (server.js's meshBindings), just
 // with Oak's actual category vocabulary in place of QTI's fixed
 // lights/media/doors/security set.
-function sanitizeMeshBinding(m) {
+function sanitizeMeshBinding(m, catIds) {
   if (!m || typeof m !== "object") return undefined;
-  if (!BINDING_CATEGORIES.includes(m.cat) || typeof m.id !== "string" || !m.id) return undefined;
+  if (!catIds.includes(m.cat) || typeof m.id !== "string" || !m.id) return undefined;
   const out = { cat: m.cat, id: m.id, animType: ANIM_TYPES.includes(m.animType) ? m.animType : "" };
   if (AXIS_ANIM_TYPES.has(out.animType)) {
     out.axis = ["x", "y", "z"].includes(m.axis) ? m.axis : "x";
@@ -791,12 +804,12 @@ function sanitizeMeshBinding(m) {
   }
   return out;
 }
-function sanitizeGlbScene(s) {
+function sanitizeGlbScene(s, catIds) {
   if (!s || typeof s !== "object") return null;
   const meshBindings = {};
   if (s.meshBindings && typeof s.meshBindings === "object") {
     for (const [meshName, mb] of Object.entries(s.meshBindings)) {
-      const sm = sanitizeMeshBinding(mb);
+      const sm = sanitizeMeshBinding(mb, catIds);
       if (sm) meshBindings[meshName] = sm;
     }
   }
@@ -822,7 +835,7 @@ function sanitizeGlbScene(s) {
 // category at once; only camera and macro (Oak's other two non-category
 // top-level entities) get their own widget types.
 const LAYOUT_WIDGET_TYPES = new Set(["slot", "camera", "macro", "pageLink", "appUrl", "label", "varDisplay"]);
-function sanitizeWidget(w) {
+function sanitizeWidget(w, catIds) {
   if (!w || typeof w !== "object" || !LAYOUT_WIDGET_TYPES.has(w.type)) return null;
   const out = {
     id: typeof w.id === "string" && w.id ? w.id : crypto.randomBytes(4).toString("hex"),
@@ -840,7 +853,7 @@ function sanitizeWidget(w) {
     // sanitizeMeshBinding above): editing a slot's name/function on the
     // Dashboard tab is automatically reflected on every page it's placed
     // on, with no separate sync step.
-    if (!BINDING_CATEGORIES.includes(w.cat) || typeof w.slotId !== "string" || !w.slotId) return null;
+    if (!catIds.includes(w.cat) || typeof w.slotId !== "string" || !w.slotId) return null;
     out.cat = w.cat;
     out.slotId = w.slotId;
     if (w.showLevel !== undefined) out.showLevel = Boolean(w.showLevel);
@@ -870,9 +883,9 @@ function sanitizeWidget(w) {
   }
   return out;
 }
-function sanitizePage(p) {
+function sanitizePage(p, catIds) {
   if (!p || typeof p !== "object") return null;
-  const widgets = Array.isArray(p.widgets) ? p.widgets.map(sanitizeWidget).filter(Boolean) : [];
+  const widgets = Array.isArray(p.widgets) ? p.widgets.map((w) => sanitizeWidget(w, catIds)).filter(Boolean) : [];
   return {
     id: typeof p.id === "string" && p.id ? p.id : crypto.randomBytes(4).toString("hex"),
     name: typeof p.name === "string" && p.name ? p.name.slice(0, 60) : "Untitled",
@@ -880,15 +893,41 @@ function sanitizePage(p) {
     widgets,
   };
 }
+// A custom category ({id, label, icon}) extends BINDING_CATEGORIES for
+// slot filing purposes only - see roles.js's effectiveCategoryOrder header
+// comment for why driver-side role inference stays built-in-only. `id` is
+// slugified from the label on creation (client-side, like a driver id) and
+// never re-slugified here on edit, since a stable id is what every slot/
+// mesh-binding/widget pointing at this category is keyed on - only label/
+// icon are editable after creation.
+function sanitizeCustomCategory(c) {
+  if (!c || typeof c !== "object") return null;
+  const id = typeof c.id === "string" && c.id ? c.id.slice(0, 40) : "";
+  if (!id || BINDING_CATEGORIES.includes(id)) return null;
+  return {
+    id,
+    label: typeof c.label === "string" && c.label ? c.label.slice(0, 40) : id,
+    icon: typeof c.icon === "string" && c.icon ? c.icon.slice(0, 8) : "⭐",
+  };
+}
 function sanitizeBindings(raw) {
   const out = bindingsDefaults();
   if (!raw || typeof raw !== "object") return out;
-  for (const c of BINDING_CATEGORIES) {
-    if (!Array.isArray(raw[c])) continue;
-    out[c] = raw[c].map(sanitizeSlot).filter(Boolean);
+  // Dedupe by id, keeping the first occurrence, so a submitted duplicate
+  // id (shouldn't happen via the UI, but this is the boundary that must
+  // hold regardless) can't silently shadow an existing category's slots.
+  const seen = new Set();
+  out.customCategories = Array.isArray(raw.customCategories)
+    ? raw.customCategories
+        .map(sanitizeCustomCategory)
+        .filter((c) => c && !seen.has(c.id) && seen.add(c.id))
+    : [];
+  const catIds = allCategoryIds(out.customCategories);
+  for (const c of catIds) {
+    out[c] = Array.isArray(raw[c]) ? raw[c].map(sanitizeSlot).filter(Boolean) : [];
   }
-  out.glbs = Array.isArray(raw.glbs) ? raw.glbs.map(sanitizeGlbScene).filter(Boolean) : [];
-  out.pages = Array.isArray(raw.pages) ? raw.pages.map(sanitizePage).filter(Boolean) : [];
+  out.glbs = Array.isArray(raw.glbs) ? raw.glbs.map((s) => sanitizeGlbScene(s, catIds)).filter(Boolean) : [];
+  out.pages = Array.isArray(raw.pages) ? raw.pages.map((p) => sanitizePage(p, catIds)).filter(Boolean) : [];
   return out;
 }
 
@@ -1231,13 +1270,25 @@ function serveStatic(req, res) {
       res.writeHead(404);
       return res.end("Not found");
     }
-    const type = STATIC_TYPES[path.extname(filePath)] || "application/octet-stream";
+    const ext = path.extname(filePath);
+    const type = STATIC_TYPES[ext] || "application/octet-stream";
     // Explicit Content-Length (not left to Node to infer) - without it,
     // this response comes back chunked with no declared size, so the
     // browser's fetch/XHR progress events report lengthComputable:false
     // for a .glb load and the admin/live 3D loading bar can only ever
     // show an indeterminate stripe, never a real percentage.
-    res.writeHead(200, { "Content-Type": type, "Content-Length": data.length });
+    const headers = { "Content-Type": type, "Content-Length": data.length };
+    // No Cache-Control at all here previously meant every browser applied
+    // its own heuristic freshness lifetime with zero way for this server
+    // to force a revalidation - an edited admin.js/live.js/admin.html
+    // could keep being served stale from cache indefinitely, and an iOS
+    // "Add to Home Screen" PWA caches even more aggressively than a
+    // regular browser tab. HTML/JS/CSS are small and change during active
+    // development, so always revalidate; models/images are large and
+    // effectively immutable once uploaded (a re-upload gets a new
+    // filename), so those are left to the browser's own default caching.
+    if (ext === ".html" || ext === ".js" || ext === ".css") headers["Cache-Control"] = "no-cache";
+    res.writeHead(200, headers);
     res.end(data);
   });
 }
