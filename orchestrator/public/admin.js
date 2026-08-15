@@ -1008,9 +1008,78 @@ function buildSlotRow(cat, slot, onDelete, startExpanded) {
   buildStateEditor(body, "On state (for reading current on/off back)", slot, "onState", persistBindings);
   buildStateEditor(body, "Level state (for reading the current level back)", slot, "levelState", persistBindings);
   suffixWrap.style.display = fixedParamKeysForSlot(slot).length === 1 ? "none" : "";
+  body.appendChild(buildSlotImageSection(slot));
 
   row.append(header, body);
   return row;
+}
+
+// Custom icon pair (on/off) for a slot - shown instead of the default
+// category emoji on Live's cards (and Layout's slot widget) once set.
+// Uploads reuse the same /api/image-upload endpoint the Layout page's
+// background picker already added - no new upload plumbing needed.
+function buildSlotImageSection(slot) {
+  const section = document.createElement("div");
+  const label = document.createElement("div");
+  label.className = "lbl";
+  label.textContent = "Custom icon (optional - shown instead of the default icon on Live/Layout)";
+  section.appendChild(label);
+
+  const row = document.createElement("div");
+  row.className = "row";
+  section.appendChild(row);
+
+  function buildPicker(pickerLabel, key) {
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "display:flex; flex-direction:column; gap:4px; align-items:flex-start;";
+    const lbl = document.createElement("span");
+    lbl.className = "lbl";
+    lbl.style.margin = "0";
+    lbl.textContent = pickerLabel;
+    const preview = document.createElement("img");
+    preview.style.cssText = `width:36px; height:36px; object-fit:contain; border:1px solid var(--line); border-radius:6px; background:var(--bg); display:${slot[key] ? "block" : "none"};`;
+    if (slot[key]) preview.src = slot[key];
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.addEventListener("click", (ev) => ev.stopPropagation());
+    input.addEventListener("change", async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const buf = await file.arrayBuffer();
+      const dataBase64 = btoa(new Uint8Array(buf).reduce((s, b) => s + String.fromCharCode(b), ""));
+      const result = await uploadImage(file.name, dataBase64);
+      if (result.error) {
+        alert(result.error);
+        return;
+      }
+      slot[key] = result.url;
+      preview.src = result.url;
+      preview.style.display = "block";
+      persistBindings();
+    });
+    wrap.append(lbl, preview, input);
+    return wrap;
+  }
+  const onPicker = buildPicker("On image", "imageOn");
+  const offPicker = buildPicker("Off image", "imageOff");
+  row.append(onPicker, offPicker);
+
+  const clearBtn = document.createElement("button");
+  clearBtn.type = "button";
+  clearBtn.className = "btn small";
+  clearBtn.textContent = "Clear custom icons";
+  clearBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    slot.imageOn = undefined;
+    slot.imageOff = undefined;
+    onPicker.querySelector("img").style.display = "none";
+    offPicker.querySelector("img").style.display = "none";
+    persistBindings();
+  });
+  row.appendChild(clearBtn);
+
+  return section;
 }
 
 async function persistBindings() {

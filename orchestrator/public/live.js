@@ -133,7 +133,20 @@ function buildRingCard(slot, cat) {
   bulb.setAttribute("x", "80");
   bulb.setAttribute("y", "88");
   bulb.textContent = CATEGORY_ICON[cat] || "⚙️";
-  svg.append(track, val, thumb, bulb);
+  // Custom on/off icon pair (set on the Dashboard tab) - an SVG <image>
+  // laid over the same center spot the emoji glyph occupies, an on/off
+  // PAIR not a single image (a slider's level has no sensible per-value
+  // image, only its on/off state does), swapped every applyVisual() call
+  // rather than once at build time so a later admin edit or state change
+  // is never left showing a stale icon.
+  const iconImg = document.createElementNS(SVG_NS, "image");
+  iconImg.setAttribute("class", "ring-icon-img");
+  iconImg.setAttribute("x", "50");
+  iconImg.setAttribute("y", "50");
+  iconImg.setAttribute("width", "60");
+  iconImg.setAttribute("height", "60");
+  iconImg.style.display = "none";
+  svg.append(track, val, thumb, bulb, iconImg);
   box.appendChild(svg);
 
   const valueEl = document.createElement("div");
@@ -150,7 +163,16 @@ function buildRingCard(slot, cat) {
     const [tx, ty] = ringPolar(RING_START + (value / 100) * RING_SPAN, RING_R_ARC);
     thumb.setAttribute("cx", tx.toFixed(2));
     thumb.setAttribute("cy", ty.toFixed(2));
-    bulb.style.opacity = on ? Math.max(0.35, value / 100) : 0.25;
+    const customIcon = on ? slot.imageOn : slot.imageOff;
+    if (customIcon) {
+      iconImg.setAttribute("href", customIcon);
+      iconImg.style.display = "";
+      bulb.style.display = "none";
+    } else {
+      iconImg.style.display = "none";
+      bulb.style.display = "";
+      bulb.style.opacity = on ? Math.max(0.35, value / 100) : 0.25;
+    }
     valueEl.textContent = on ? String(value) : "—";
     box.dataset.on = on ? "1" : "0";
   }
@@ -285,6 +307,11 @@ function buildPlainCard(slot, cat) {
   const iconEl = document.createElement("div");
   iconEl.className = "sky-icon";
   iconEl.textContent = icon;
+  // Same on/off custom-icon-pair swap as the ring card - see its own
+  // comment for why it's a pair, not a single image, and why this is
+  // re-applied every apply() call rather than set once at build time.
+  const iconImg = document.createElement("img");
+  iconImg.style.cssText = "width:36px; height:36px; object-fit:contain; display:none;";
   const valueEl = document.createElement("div");
   valueEl.className = "sky-value";
   const labelEl = document.createElement("div");
@@ -314,7 +341,7 @@ function buildPlainCard(slot, cat) {
     actionsEl.appendChild(btn);
   }
 
-  card.append(iconEl, valueEl, labelEl, offlineEl, actionsEl);
+  card.append(iconEl, iconImg, valueEl, labelEl, offlineEl, actionsEl);
 
   function apply() {
     const running = Boolean(runningByInstance.get(primaryInstanceId(slot)));
@@ -326,6 +353,15 @@ function buildPlainCard(slot, cat) {
     const onEntry = onState ? slotOnEntry(slot, onState) : undefined;
     const on = onEntry ? onEntry[1] : false;
     card.dataset.on = on ? "1" : "0";
+    const customIcon = on ? slot.imageOn : slot.imageOff;
+    if (customIcon) {
+      iconImg.src = customIcon;
+      iconImg.style.display = "";
+      iconEl.style.display = "none";
+    } else {
+      iconImg.style.display = "none";
+      iconEl.style.display = "";
+    }
     valueEl.textContent = onEntry ? (on ? (langZh ? "开" : "ON") : langZh ? "关" : "OFF") : "—";
     if (actionsEl.firstChild) {
       actionsEl.firstChild.textContent = on ? (langZh ? "关闭" : "Turn Off") : langZh ? "开启" : "Turn On";

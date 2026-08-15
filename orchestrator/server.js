@@ -766,6 +766,12 @@ function sanitizeSlot(s) {
     levelState: sanitizeStateRef(s.levelState),
     fixedArgs: s.fixedArgs && typeof s.fixedArgs === "object" ? s.fixedArgs : {},
     stateSuffix: typeof s.stateSuffix === "string" && s.stateSuffix ? s.stateSuffix : undefined,
+    // Optional custom icon pair (uploaded via the same /api/image-upload
+    // endpoint the Layout page's background image uses) - an on/off PAIR,
+    // not a single image, on purpose: a single static image would erase
+    // the on/off distinction the card exists to show in the first place.
+    imageOn: typeof s.imageOn === "string" && s.imageOn ? s.imageOn : undefined,
+    imageOff: typeof s.imageOff === "string" && s.imageOff ? s.imageOff : undefined,
   };
 }
 // A mesh binding is a POINTER into bindings[cat], not a copy of a slot -

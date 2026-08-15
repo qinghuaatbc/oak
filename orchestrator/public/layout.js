@@ -89,8 +89,10 @@ function buildSlotWidget(w) {
   const hasToggle = Boolean(slot.onFn || slot.offFn);
   const hasLevel = Boolean(slot.levelFn) && w.showLevel !== false;
   if (hasToggle) el.classList.add("tappable");
-  el.innerHTML = `<div class="lo-w-icon">${CATEGORY_ICON[w.cat] || "⚙️"}</div><div class="lo-w-name">${slot.name}</div><div class="lo-w-sub"></div>`;
+  el.innerHTML = `<div class="lo-w-icon">${CATEGORY_ICON[w.cat] || "⚙️"}</div><img class="lo-w-icon-img" style="width:26px; height:26px; object-fit:contain; display:none;" /><div class="lo-w-name">${slot.name}</div><div class="lo-w-sub"></div>`;
   const subEl = el.querySelector(".lo-w-sub");
+  const iconEl = el.querySelector(".lo-w-icon");
+  const iconImgEl = el.querySelector(".lo-w-icon-img");
   let sliderEl = null;
   if (hasLevel) {
     sliderEl = document.createElement("input");
@@ -110,6 +112,17 @@ function buildSlotWidget(w) {
     subEl.textContent = on ? (hasLevel ? `On · ${level}%` : "On") : "Off";
     if (sliderEl && document.activeElement !== sliderEl) sliderEl.value = level;
     el.style.opacity = runningByInstance.get(primaryInstanceId(slot)) === false ? 0.5 : 1;
+    // Same on/off custom-icon-pair swap as Live's cards (see live.js's
+    // buildRingCard comment) - re-applied every refresh, not just once.
+    const customIcon = on ? slot.imageOn : slot.imageOff;
+    if (customIcon) {
+      iconImgEl.src = customIcon;
+      iconImgEl.style.display = "";
+      iconEl.style.display = "none";
+    } else {
+      iconImgEl.style.display = "none";
+      iconEl.style.display = "";
+    }
   }
   if (hasToggle) {
     el.addEventListener("click", () => {
