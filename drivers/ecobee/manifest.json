@@ -1,0 +1,52 @@
+{
+  "id": "ecobee",
+  "displayName": "Ecobee Thermostat",
+  "icon": "🌡️",
+  "version": "0.1.0",
+  "category": "climate",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "cloud",
+        "label": "Ecobee Cloud API",
+        "transport": "http",
+        "fields": []
+      }
+    ]
+  },
+  "settings": [
+    { "key": "apiKey", "type": "string", "label": "Ecobee API key (developer.ecobee.com)" },
+    {
+      "key": "refreshToken",
+      "type": "password",
+      "label": "Refresh token (filled in after completing PIN authorization - see driver notes)"
+    },
+    { "key": "thermostatId", "type": "string", "label": "Thermostat identifier" }
+  ],
+  "actions": [
+    { "id": "startPinAuth", "label": "Start PIN Authorization", "params": [] },
+    { "id": "completePinAuth", "label": "Complete PIN Authorization", "params": [] },
+    {
+      "id": "setHold",
+      "label": "Set Temperature Hold",
+      "params": [
+        { "key": "heatTemp", "type": "number", "label": "Heat setpoint (°F)" },
+        { "key": "coolTemp", "type": "number", "label": "Cool setpoint (°F)" }
+      ]
+    },
+    { "id": "resumeProgram", "label": "Resume Program", "params": [] },
+    { "id": "refresh", "label": "Refresh Now", "params": [] }
+  ],
+  "events": [
+    { "id": "pinReady", "label": "PIN Ready for Authorization", "params": ["pin"] },
+    { "id": "authorized", "label": "Authorization Complete", "params": [] }
+  ],
+  "states": [
+    { "id": "climate.currentTemp", "type": "number" },
+    { "id": "climate.heatSetpoint", "type": "number" },
+    { "id": "climate.coolSetpoint", "type": "number" },
+    { "id": "climate.hvacMode", "type": "string" },
+    { "id": "auth.pin", "type": "string" }
+  ]
+}

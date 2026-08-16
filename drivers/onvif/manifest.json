@@ -1,0 +1,45 @@
+{
+  "id": "onvif",
+  "displayName": "ONVIF Camera",
+  "icon": "📷",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Camera IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 80 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Username" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "profileToken", "type": "string", "label": "Media profile token" },
+    { "key": "presetToken", "type": "string", "label": "Default PTZ preset token" }
+  ],
+  "actions": [
+    { "id": "getStreamUri", "label": "Get RTSP Stream URI", "params": [] },
+    {
+      "id": "ptzMove",
+      "label": "PTZ Continuous Move",
+      "params": [
+        { "key": "pan", "type": "number", "min": -1, "max": 1, "default": 0 },
+        { "key": "tilt", "type": "number", "min": -1, "max": 1, "default": 0 },
+        { "key": "zoom", "type": "number", "min": -1, "max": 1, "default": 0 }
+      ]
+    },
+    { "id": "ptzStop", "label": "PTZ Stop", "params": [] },
+    { "id": "ptzGotoPreset", "label": "PTZ Goto Preset", "params": [{ "key": "presetToken", "type": "string" }] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "stream.rtspUri", "type": "string" }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "id": "unifi-protect",
+  "displayName": "UniFi Protect",
+  "icon": "📷",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "UniFi OS Console",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Console IP address" }]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "apiKey", "type": "password", "label": "API key (Settings > Control Plane > Integrations)" },
+    { "key": "cameraId", "type": "string", "label": "Camera id (for the actions below)" }
+  ],
+  "actions": [
+    { "id": "discoverCameras", "label": "Discover Cameras", "params": [] },
+    { "id": "setRecordingMode", "label": "Set Recording Mode", "params": [{ "key": "mode", "type": "string", "label": "always / never / detections" }] },
+    { "id": "playChime", "label": "Play Doorbell Chime", "params": [] },
+    { "id": "setStatusLight", "label": "Set Status Light", "params": [{ "key": "on", "type": "boolean" }] }
+  ],
+  "events": [
+    { "id": "motion", "label": "Motion Detected", "params": ["cameraId"] },
+    { "id": "ring", "label": "Doorbell Ring", "params": ["cameraId"] }
+  ],
+  "states": [
+    { "id": "discovery.cameras", "type": "string" },
+    { "id": "camera.recordingMode", "type": "string" }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "id": "xiaomi-miio",
+  "displayName": "Xiaomi Mi Home (miIO)",
+  "icon": "💡",
+  "version": "0.1.0",
+  "category": ["light", "switch"],
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network (UDP)",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 54321 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "token", "type": "password", "label": "Device token (32 hex chars, from Mi Home app extraction)" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    {
+      "id": "setBrightness",
+      "label": "Set Brightness",
+      "role": "level",
+      "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }]
+    },
+    {
+      "id": "call",
+      "label": "Call Raw miIO Method",
+      "params": [
+        { "key": "method", "type": "string" },
+        { "key": "params", "type": "string", "label": "JSON array of params" }
+      ]
+    }
+  ],
+  "events": [
+    { "id": "response", "label": "Device Response", "params": ["result"] }
+  ],
+  "states": [
+    { "id": "device.on", "type": "boolean", "role": "on" },
+    { "id": "device.brightness", "type": "number", "role": "level" }
+  ]
+}

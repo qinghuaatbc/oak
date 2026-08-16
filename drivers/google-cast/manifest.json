@@ -1,0 +1,48 @@
+{
+  "id": "google-cast",
+  "displayName": "Google Cast / Chromecast",
+  "icon": "📺",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network (CASTV2/TLS)",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 8009 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "defaultAppId", "type": "string", "label": "Default app id", "default": "CC1AD845" }
+  ],
+  "actions": [
+    { "id": "launchApp", "label": "Launch App", "params": [{ "key": "appId", "type": "string" }] },
+    { "id": "stopApp", "label": "Stop Current App", "params": [] },
+    { "id": "setVolume", "label": "Set Volume", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "mute", "label": "Mute", "role": "off", "params": [] },
+    { "id": "unmute", "label": "Unmute", "role": "on", "params": [] },
+    {
+      "id": "send",
+      "label": "Send Raw Namespace Message",
+      "params": [
+        { "key": "namespace", "type": "string" },
+        { "key": "payload", "type": "string", "label": "JSON payload" }
+      ]
+    }
+  ],
+  "events": [
+    { "id": "status", "label": "Receiver Status", "params": ["status"] },
+    { "id": "message", "label": "Raw Message", "params": ["namespace", "payload"] }
+  ],
+  "states": [
+    { "id": "volume.level", "type": "number", "role": "level" },
+    { "id": "volume.muted", "type": "boolean" },
+    { "id": "app.id", "type": "string" }
+  ]
+}

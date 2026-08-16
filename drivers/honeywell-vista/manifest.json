@@ -1,0 +1,113 @@
+{
+  "id": "honeywell-vista",
+  "displayName": "Honeywell/Ademco Vista (Envisalink)",
+  "icon": "🚨",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "envisalink",
+        "label": "Envisalink (network)",
+        "transport": "tcp",
+        "fields": [
+          {
+            "key": "host",
+            "type": "string",
+            "label": "Envisalink IP address"
+          },
+          {
+            "key": "port",
+            "type": "number",
+            "label": "Port",
+            "default": 4025
+          }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    {
+      "key": "password",
+      "type": "password",
+      "label": "TPI Password",
+      "default": "user"
+    },
+    {
+      "key": "accessCode",
+      "type": "password",
+      "label": "Default Access Code"
+    },
+    {
+      "key": "zoneNames",
+      "type": "keyvalue",
+      "label": "Zone names",
+      "keyLabel": "Zone number (e.g. 1)",
+      "valueLabel": "Friendly name (e.g. Front Door)"
+    },
+    {
+      "key": "partitionNames",
+      "type": "keyvalue",
+      "label": "Partition names",
+      "keyLabel": "Partition number (e.g. 1)",
+      "valueLabel": "Friendly name (e.g. Main House)"
+    }
+  ],
+  "actions": [
+    {
+      "id": "armAway",
+      "label": "Arm (Away)",
+      "role": "arm",
+      "params": [
+        { "key": "partition", "type": "number", "default": 1 },
+        { "key": "code", "type": "string" }
+      ]
+    },
+    {
+      "id": "armStay",
+      "label": "Arm (Stay)",
+      "params": [
+        { "key": "partition", "type": "number", "default": 1 },
+        { "key": "code", "type": "string" }
+      ]
+    },
+    {
+      "id": "armInstant",
+      "label": "Arm (Instant/Max)",
+      "params": [
+        { "key": "partition", "type": "number", "default": 1 },
+        { "key": "code", "type": "string" }
+      ]
+    },
+    {
+      "id": "disarm",
+      "label": "Disarm",
+      "role": "disarm",
+      "params": [
+        { "key": "partition", "type": "number", "default": 1 },
+        { "key": "code", "type": "string" }
+      ]
+    },
+    {
+      "id": "sendKeys",
+      "label": "Send Keystrokes",
+      "params": [
+        { "key": "partition", "type": "number", "default": 1 },
+        { "key": "keys", "type": "string" }
+      ]
+    }
+  ],
+  "events": [
+    { "id": "connected", "label": "Panel Logged In", "params": [] },
+    { "id": "loginFailed", "label": "TPI Login Failed", "params": [] },
+    { "id": "disconnected", "label": "Disconnected", "params": [] },
+    { "id": "zoneChange", "label": "Zone State Changed", "params": ["zone", "open"] },
+    { "id": "partitionChange", "label": "Partition State Changed", "params": ["partition", "status"] },
+    { "id": "alarm", "label": "Alarm", "params": ["partition"] }
+  ],
+  "states": [
+    { "id": "zone.open", "type": "boolean", "perInstance": "zone" },
+    { "id": "partition.status", "type": "string", "role": "status", "perInstance": "partition" }
+  ]
+}

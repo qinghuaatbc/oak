@@ -598,8 +598,22 @@ function checkTimeAutomations() {
 const timeAutomationTimer = setInterval(checkTimeAutomations, 20000);
 if (timeAutomationTimer.unref) timeAutomationTimer.unref();
 
-for (const inst of config.instances)
-  addInstance(inst.id, { driver: inst.driver, connection: inst.connection, settings: inst.settings, label: inst.label });
+// One bad instance (a missing host/port after a manual config edit, a
+// renamed/removed driver, a broken driver.js) must never take the WHOLE
+// orchestrator down at boot - every other saved instance would go dark
+// with it. The POST /api/instances route already gets this for free (its
+// handler wraps addInstance in try/catch and returns a 400), but nothing
+// wrapped this startup loop the same way - found via a synchronous
+// net.createConnection throw (missing host/port) propagating all the way
+// up through addInstance to here, uncaught, killing the process before
+// it ever started listening.
+for (const inst of config.instances) {
+  try {
+    addInstance(inst.id, { driver: inst.driver, connection: inst.connection, settings: inst.settings, label: inst.label });
+  } catch (err) {
+    console.error(`Failed to start instance "${inst.id}" (${inst.driver}) at boot:`, err.message);
+  }
+}
 
 function stopInstance(id) {
   const entry = instances.get(id);
@@ -1148,6 +1162,8 @@ const BUILTIN_DRIVERS = new Set([
   "dsc-powerseries", "http-relay", "mqtt-plug", "generic-dimmer", "zone-hub", "eisy", "homeassistant",
   "pushover", "philips-hue", "sonos", "telegram", "slack", "openweathermap",
   "webhook", "roku", "lifx", "govee", "lutron-caseta", "shelly",
+  "honeywell-vista", "tuya-local", "zigbee2mqtt", "zwave-js", "esphome", "xiaomi-miio",
+  "broadlink", "google-cast", "ecobee", "ikea-tradfri", "unifi-protect", "onvif", "ring",
 ]);
 
 function listDriverManifests() {

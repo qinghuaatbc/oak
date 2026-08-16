@@ -1,0 +1,47 @@
+{
+  "id": "esphome",
+  "displayName": "ESPHome Device",
+  "icon": "🔧",
+  "version": "0.1.0",
+  "category": ["light", "switch", "sensor"],
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "native",
+        "label": "ESPHome native API",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 6053 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "password", "type": "password", "label": "API password (legacy plaintext auth, optional)" },
+    {
+      "key": "entityKey",
+      "type": "string",
+      "label": "Entity key (fixed32, from ESPHome logs/API dump - see driver notes)"
+    }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    {
+      "id": "setBrightness",
+      "label": "Set Brightness",
+      "role": "level",
+      "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }]
+    }
+  ],
+  "events": [
+    { "id": "connected", "label": "Connected", "params": [] },
+    { "id": "stateChanged", "label": "State Changed", "params": ["key", "state"] }
+  ],
+  "states": [
+    { "id": "entity.on", "type": "boolean", "role": "on" },
+    { "id": "entity.brightness", "type": "number", "role": "level" }
+  ]
+}

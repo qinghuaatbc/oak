@@ -1,0 +1,54 @@
+{
+  "id": "tuya-local",
+  "displayName": "Tuya / SmartLife (local)",
+  "icon": "💡",
+  "version": "0.1.0",
+  "category": ["light", "switch"],
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 6668 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "deviceId", "type": "string", "label": "Device ID (devId)" },
+    { "key": "localKey", "type": "password", "label": "Local key (16 chars, from Tuya IoT Cloud)" },
+    { "key": "version", "type": "string", "label": "Protocol version", "default": "3.3" },
+    { "key": "switchDp", "type": "string", "label": "Power DP id", "default": "1" },
+    { "key": "brightnessDp", "type": "string", "label": "Brightness DP id (optional)", "default": "2" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    {
+      "id": "setBrightness",
+      "label": "Set Brightness",
+      "role": "level",
+      "params": [{ "key": "value", "type": "number", "min": 0, "max": 1000 }]
+    },
+    {
+      "id": "setDp",
+      "label": "Set Raw Data Point",
+      "params": [
+        { "key": "dp", "type": "string" },
+        { "key": "value", "type": "string" }
+      ]
+    },
+    { "id": "query", "label": "Query Status", "params": [] }
+  ],
+  "events": [
+    { "id": "statusUpdate", "label": "Status Update", "params": ["dps"] }
+  ],
+  "states": [
+    { "id": "power.on", "type": "boolean", "role": "on" },
+    { "id": "power.brightness", "type": "number", "role": "level" }
+  ]
+}

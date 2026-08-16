@@ -1,0 +1,38 @@
+{
+  "id": "ring",
+  "displayName": "Ring (unofficial)",
+  "icon": "🔔",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "cloud",
+        "label": "Ring Cloud (unofficial API)",
+        "transport": "http",
+        "fields": []
+      }
+    ]
+  },
+  "settings": [
+    { "key": "email", "type": "string", "label": "Ring account email" },
+    { "key": "password", "type": "password", "label": "Ring account password" },
+    { "key": "twoFactorCode", "type": "string", "label": "2FA code (fill in and run completeLogin when prompted)" },
+    { "key": "deviceId", "type": "string", "label": "Device id" }
+  ],
+  "actions": [
+    { "id": "login", "label": "Login", "params": [] },
+    { "id": "completeLogin", "label": "Complete Login (2FA)", "params": [] },
+    { "id": "discoverDevices", "label": "Discover Devices", "params": [] },
+    { "id": "refresh", "label": "Refresh Device Health", "params": [] }
+  ],
+  "events": [
+    { "id": "twoFactorRequired", "label": "2FA Code Required", "params": [] },
+    { "id": "loggedIn", "label": "Logged In", "params": [] }
+  ],
+  "states": [
+    { "id": "discovery.devices", "type": "string" },
+    { "id": "device.battery", "type": "number" }
+  ]
+}

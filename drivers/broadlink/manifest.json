@@ -1,0 +1,57 @@
+{
+  "id": "broadlink",
+  "displayName": "Broadlink IR/RF Blaster",
+  "icon": "📡",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network (UDP)",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 80 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    {
+      "key": "deviceType",
+      "type": "number",
+      "label": "Device type code (decimal - e.g. 10002 for RM Mini 3)",
+      "default": 10002
+    },
+    {
+      "key": "storedCodes",
+      "type": "keyvalue",
+      "label": "Stored IR/RF codes",
+      "keyLabel": "Name (e.g. tv_power)",
+      "valueLabel": "Hex code (from a learn session)"
+    }
+  ],
+  "actions": [
+    {
+      "id": "sendCode",
+      "label": "Send Stored Code",
+      "params": [{ "key": "name", "type": "string" }]
+    },
+    {
+      "id": "sendRawHex",
+      "label": "Send Raw Hex Code",
+      "params": [{ "key": "hex", "type": "string" }]
+    },
+    { "id": "enterLearning", "label": "Enter Learning Mode", "params": [] },
+    { "id": "readLearned", "label": "Read Learned Code", "params": [] }
+  ],
+  "events": [
+    { "id": "authenticated", "label": "Authenticated", "params": [] },
+    { "id": "codeLearned", "label": "Code Learned", "params": ["hex"] }
+  ],
+  "states": [
+    { "id": "learned.code", "type": "string" }
+  ]
+}

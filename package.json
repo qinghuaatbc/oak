@@ -5,6 +5,7 @@
   "description": "Independently-designed device-driver platform: JSON manifests + a sandboxed Node.js runtime + an orchestrator",
   "license": "MIT",
   "dependencies": {
+    "node-coap-client": "^3.0.0",
     "web-push": "^3.6.7",
     "ws": "^8.21.3"
   }

@@ -1,0 +1,43 @@
+{
+  "id": "ikea-tradfri",
+  "displayName": "IKEA Trådfri",
+  "icon": "💡",
+  "version": "0.1.0",
+  "category": "light",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "gateway",
+        "label": "Trådfri Gateway",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Gateway IP address" }]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "securityCode", "type": "password", "label": "Security code (printed on the gateway's underside)" },
+    { "key": "identity", "type": "string", "label": "Client identity (filled in after running Authenticate)" },
+    { "key": "psk", "type": "password", "label": "Client PSK (filled in after running Authenticate)" },
+    { "key": "deviceId", "type": "string", "label": "Device id" }
+  ],
+  "actions": [
+    { "id": "authenticate", "label": "Authenticate (mint client identity/PSK)", "params": [] },
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    {
+      "id": "setBrightness",
+      "label": "Set Brightness",
+      "role": "level",
+      "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }]
+    }
+  ],
+  "events": [
+    { "id": "authenticated", "label": "Authenticated", "params": ["identity"] },
+    { "id": "stateChanged", "label": "State Changed", "params": ["on", "brightness"] }
+  ],
+  "states": [
+    { "id": "device.on", "type": "boolean", "role": "on" },
+    { "id": "device.brightness", "type": "number", "role": "level" }
+  ]
+}

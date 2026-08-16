@@ -67,6 +67,17 @@ class Connection extends EventEmitter {
     this.connected = false;
   }
   open() {
+    // net.createConnection throws SYNCHRONOUSLY (before any "error" event
+    // machinery even exists to catch it) when host/port are missing -
+    // e.g. a saved instance whose connection config predates a manifest
+    // change, or was hand-edited wrong. Every other connection failure
+    // (ECONNREFUSED, DNS lookup failure, ...) already surfaces as a safe
+    // "error" event; a missing host/port deserves the exact same
+    // treatment, not a special case that crashes the caller instead.
+    if (!this.host || !this.port) {
+      setImmediate(() => this.emit("error", new Error(`Connection requires both host and port (got host=${JSON.stringify(this.host)}, port=${JSON.stringify(this.port)})`)));
+      return;
+    }
     this.socket = net.createConnection({ host: this.host, port: this.port });
     this.socket.on("connect", () => {
       this.connected = true;

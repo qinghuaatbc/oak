@@ -1,0 +1,52 @@
+{
+  "id": "zwave-js",
+  "displayName": "Z-Wave (zwave-js-server)",
+  "icon": "📶",
+  "version": "0.1.0",
+  "category": ["light", "switch"],
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "zwavejs",
+        "label": "zwave-js-server",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "zwave-js-server host" },
+          { "key": "port", "type": "number", "label": "Port", "default": 3000 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "nodeId", "type": "number", "label": "Node ID" },
+    { "key": "endpoint", "type": "number", "label": "Endpoint", "default": 0 }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    {
+      "id": "setLevel",
+      "label": "Set Level",
+      "role": "level",
+      "params": [{ "key": "value", "type": "number", "min": 0, "max": 99 }]
+    },
+    {
+      "id": "setValue",
+      "label": "Set Raw CC Value",
+      "params": [
+        { "key": "commandClass", "type": "number" },
+        { "key": "property", "type": "string" },
+        { "key": "value", "type": "string" }
+      ]
+    }
+  ],
+  "events": [
+    { "id": "valueUpdated", "label": "Value Updated", "params": ["nodeId", "commandClass", "property", "value"] },
+    { "id": "connected", "label": "Connected to zwave-js-server", "params": [] }
+  ],
+  "states": [
+    { "id": "node.on", "type": "boolean", "role": "on", "perInstance": "node" },
+    { "id": "node.level", "type": "number", "role": "level", "perInstance": "node" }
+  ]
+}

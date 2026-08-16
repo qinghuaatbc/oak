@@ -1,0 +1,48 @@
+{
+  "id": "zigbee2mqtt",
+  "displayName": "Zigbee2MQTT Device",
+  "icon": "📡",
+  "version": "0.1.0",
+  "category": ["light", "switch", "sensor"],
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "mqtt",
+        "label": "MQTT Broker",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Broker host" },
+          { "key": "port", "type": "number", "label": "Port", "default": 1883 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "baseTopic", "type": "string", "label": "Zigbee2MQTT base topic", "default": "zigbee2mqtt" },
+    { "key": "friendlyName", "type": "string", "label": "Device friendly name (from Zigbee2MQTT)" },
+    { "key": "clientId", "type": "string", "label": "MQTT client id", "default": "oak-zigbee2mqtt" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    {
+      "id": "setBrightness",
+      "label": "Set Brightness",
+      "role": "level",
+      "params": [{ "key": "value", "type": "number", "min": 0, "max": 254 }]
+    },
+    {
+      "id": "setRaw",
+      "label": "Set Raw JSON",
+      "params": [{ "key": "json", "type": "string" }]
+    }
+  ],
+  "events": [
+    { "id": "stateChanged", "label": "State Changed", "params": ["payload"] }
+  ],
+  "states": [
+    { "id": "device.on", "type": "boolean", "role": "on" },
+    { "id": "device.brightness", "type": "number", "role": "level" }
+  ]
+}
