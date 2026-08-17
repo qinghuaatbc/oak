@@ -1,0 +1,49 @@
+{
+  "id": "smartthings",
+  "displayName": "Samsung SmartThings",
+  "icon": "🧠",
+  "version": "0.1.0",
+  "category": ["light", "switch"],
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "cloud",
+        "label": "SmartThings Cloud API",
+        "transport": "http",
+        "fields": []
+      }
+    ]
+  },
+  "settings": [
+    { "key": "token", "type": "password", "label": "Personal Access Token (account.smartthings.com/tokens)" },
+    { "key": "deviceId", "type": "string", "label": "Device id" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    {
+      "id": "setLevel",
+      "label": "Set Level",
+      "role": "level",
+      "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }]
+    },
+    {
+      "id": "sendCommand",
+      "label": "Send Raw Capability Command",
+      "params": [
+        { "key": "capability", "type": "string" },
+        { "key": "command", "type": "string" },
+        { "key": "args", "type": "string", "label": "JSON array of arguments (optional)" }
+      ]
+    },
+    { "id": "discoverDevices", "label": "Discover Devices", "params": [] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [{ "id": "statusChanged", "label": "Status Changed", "params": ["status"] }],
+  "states": [
+    { "id": "device.on", "type": "boolean", "role": "on" },
+    { "id": "device.level", "type": "number", "role": "level" },
+    { "id": "discovery.devices", "type": "string" }
+  ]
+}

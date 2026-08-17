@@ -1,0 +1,39 @@
+{
+  "id": "ntfy",
+  "displayName": "ntfy",
+  "icon": "📣",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "server",
+        "label": "ntfy Server",
+        "transport": "http",
+        "fields": [{ "key": "baseUrl", "type": "string", "label": "Server URL", "default": "https://ntfy.sh" }]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "topic", "type": "string", "label": "Topic" },
+    { "key": "accessToken", "type": "password", "label": "Access token (optional, for a protected topic)" }
+  ],
+  "actions": [
+    {
+      "id": "send",
+      "label": "Send Notification",
+      "params": [
+        { "key": "message", "type": "string" },
+        { "key": "title", "type": "string" },
+        { "key": "priority", "type": "number", "min": 1, "max": 5, "default": 3 },
+        { "key": "tags", "type": "string", "label": "Comma-separated emoji tags (e.g. warning,fire)" },
+        { "key": "clickUrl", "type": "string" }
+      ]
+    }
+  ],
+  "events": [],
+  "states": [
+    { "id": "last.sentAt", "type": "string" }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "nuki",
+  "displayName": "Nuki Smart Lock",
+  "icon": "🔐",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "bridge",
+        "label": "Nuki Bridge (local)",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Bridge IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 8080 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "token", "type": "password", "label": "Bridge API token (from Nuki app > Bridge settings)" },
+    { "key": "nukiId", "type": "string", "label": "Lock id (from discoverLocks)" }
+  ],
+  "actions": [
+    { "id": "lock", "label": "Lock", "role": "off", "params": [] },
+    { "id": "unlock", "label": "Unlock", "role": "on", "params": [] },
+    { "id": "unlatch", "label": "Unlatch (open door)", "params": [] },
+    { "id": "discoverLocks", "label": "Discover Locks", "params": [] },
+    { "id": "refresh", "label": "Refresh State", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "lock.locked", "type": "boolean" },
+    { "id": "lock.batteryCritical", "type": "boolean" },
+    { "id": "discovery.locks", "type": "string" }
+  ]
+}

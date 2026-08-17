@@ -1164,6 +1164,8 @@ const BUILTIN_DRIVERS = new Set([
   "webhook", "roku", "lifx", "govee", "lutron-caseta", "shelly",
   "honeywell-vista", "tuya-local", "zigbee2mqtt", "zwave-js", "esphome", "xiaomi-miio",
   "broadlink", "google-cast", "ecobee", "ikea-tradfri", "unifi-protect", "onvif", "ring",
+  "smartthings", "yamaha", "nuki", "rachio", "myq", "irobot-roomba", "tesla", "denon-avr",
+  "ntfy", "presence", "somfy-mylink",
 ]);
 
 function listDriverManifests() {

@@ -1,0 +1,21 @@
+{
+  "id": "presence",
+  "displayName": "Presence Detection (ping)",
+  "icon": "📶",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "none", "label": "No connection needed", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "host", "type": "string", "label": "IP address or hostname to ping" },
+    { "key": "intervalSeconds", "type": "number", "label": "Check interval (seconds)", "default": 30 }
+  ],
+  "actions": [{ "id": "checkNow", "label": "Check Now", "params": [] }],
+  "events": [
+    { "id": "arrived", "label": "Arrived", "params": [] },
+    { "id": "departed", "label": "Departed", "params": [] }
+  ],
+  "states": [{ "id": "presence.home", "type": "boolean", "role": "on" }]
+}

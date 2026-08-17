@@ -1,0 +1,33 @@
+{
+  "id": "somfy-mylink",
+  "displayName": "Somfy myLink (RTS shades)",
+  "icon": "🪟",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "myLink Gateway",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "myLink IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 44100 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "systemId", "type": "password", "label": "System id (myLink app > gateway settings > System ID)" },
+    { "key": "targetId", "type": "string", "label": "Shade/target id" }
+  ],
+  "actions": [
+    { "id": "up", "label": "Open (Up)", "role": "on", "params": [] },
+    { "id": "down", "label": "Close (Down)", "role": "off", "params": [] },
+    { "id": "stop", "label": "Stop", "params": [] },
+    { "id": "discoverTargets", "label": "Discover Shades", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "discovery.targets", "type": "string" }]
+}

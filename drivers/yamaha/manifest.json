@@ -1,0 +1,42 @@
+{
+  "id": "yamaha",
+  "displayName": "Yamaha / MusicCast AVR",
+  "icon": "🔊",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Receiver IP address" }]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "zone", "type": "string", "label": "Zone", "default": "main" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Standby", "role": "off", "params": [] },
+    {
+      "id": "setVolume",
+      "label": "Set Volume",
+      "role": "level",
+      "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }]
+    },
+    { "id": "mute", "label": "Mute", "params": [] },
+    { "id": "unmute", "label": "Unmute", "params": [] },
+    { "id": "setInput", "label": "Set Input", "params": [{ "key": "input", "type": "string" }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "power.on", "type": "boolean", "role": "on" },
+    { "id": "power.volume", "type": "number", "role": "level" },
+    { "id": "power.muted", "type": "boolean" },
+    { "id": "power.input", "type": "string" }
+  ]
+}

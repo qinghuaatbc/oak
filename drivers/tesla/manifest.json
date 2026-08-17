@@ -1,0 +1,38 @@
+{
+  "id": "tesla",
+  "displayName": "Tesla Vehicle (unofficial)",
+  "icon": "🚗",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Tesla Owner API (unofficial)", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    {
+      "key": "refreshToken",
+      "type": "password",
+      "label": "Refresh token (Tesla's login is captcha-protected SSO - use a tool like tesla-auth to get this once)"
+    },
+    { "key": "vehicleId", "type": "string", "label": "Vehicle id (from discoverVehicles)" }
+  ],
+  "actions": [
+    { "id": "wake", "label": "Wake Vehicle", "params": [] },
+    { "id": "lock", "label": "Lock", "role": "off", "params": [] },
+    { "id": "unlock", "label": "Unlock", "role": "on", "params": [] },
+    { "id": "startCharging", "label": "Start Charging", "params": [] },
+    { "id": "stopCharging", "label": "Stop Charging", "params": [] },
+    { "id": "setChargeLimit", "label": "Set Charge Limit", "role": "level", "params": [{ "key": "value", "type": "number", "min": 50, "max": 100 }] },
+    { "id": "honkHorn", "label": "Honk Horn", "params": [] },
+    { "id": "flashLights", "label": "Flash Lights", "params": [] },
+    { "id": "discoverVehicles", "label": "Discover Vehicles", "params": [] },
+    { "id": "refresh", "label": "Refresh Vehicle Data", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "vehicle.locked", "type": "boolean" },
+    { "id": "vehicle.batteryLevel", "type": "number" },
+    { "id": "vehicle.chargingState", "type": "string" },
+    { "id": "discovery.vehicles", "type": "string" }
+  ]
+}

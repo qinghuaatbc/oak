@@ -1,0 +1,28 @@
+{
+  "id": "myq",
+  "displayName": "MyQ Garage (unofficial)",
+  "icon": "🚪",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "MyQ Cloud (unofficial API)", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "email", "type": "string", "label": "MyQ account email" },
+    { "key": "password", "type": "password", "label": "MyQ account password" },
+    { "key": "deviceId", "type": "string", "label": "Device id (from discoverDevices)" }
+  ],
+  "actions": [
+    { "id": "login", "label": "Login", "params": [] },
+    { "id": "open", "label": "Open", "role": "on", "params": [] },
+    { "id": "close", "label": "Close", "role": "off", "params": [] },
+    { "id": "discoverDevices", "label": "Discover Devices", "params": [] },
+    { "id": "refresh", "label": "Refresh State", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "door.state", "type": "string" },
+    { "id": "discovery.devices", "type": "string" }
+  ]
+}

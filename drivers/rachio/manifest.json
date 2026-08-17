@@ -1,0 +1,35 @@
+{
+  "id": "rachio",
+  "displayName": "Rachio Irrigation",
+  "icon": "💧",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Rachio Cloud API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "apiKey", "type": "password", "label": "API key (app.rach.io > account settings > GET API KEY)" },
+    { "key": "deviceId", "type": "string", "label": "Device id (from discoverDevices)" },
+    { "key": "zoneId", "type": "string", "label": "Default zone id" }
+  ],
+  "actions": [
+    {
+      "id": "startZone",
+      "label": "Start Zone",
+      "role": "on",
+      "params": [
+        { "key": "zoneId", "type": "string" },
+        { "key": "durationSeconds", "type": "number", "default": 300 }
+      ]
+    },
+    { "id": "stopWatering", "label": "Stop All Watering", "role": "off", "params": [] },
+    { "id": "enableSchedule", "label": "Enable Schedule (device on)", "params": [] },
+    { "id": "disableSchedule", "label": "Disable Schedule (device off)", "params": [] },
+    { "id": "discoverDevices", "label": "Discover Devices/Zones", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "discovery.devices", "type": "string" }
+  ]
+}

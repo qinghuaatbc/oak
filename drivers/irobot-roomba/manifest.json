@@ -1,0 +1,37 @@
+{
+  "id": "irobot-roomba",
+  "displayName": "iRobot Roomba (wifi)",
+  "icon": "🤖",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network (MQTTS)",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Robot IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 8883 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "blid", "type": "string", "label": "BLID (robot username - see driver notes for how to get it)" },
+    { "key": "password", "type": "password", "label": "Robot local password (see driver notes)" }
+  ],
+  "actions": [
+    { "id": "start", "label": "Start Cleaning", "role": "on", "params": [] },
+    { "id": "stop", "label": "Stop", "params": [] },
+    { "id": "pause", "label": "Pause", "params": [] },
+    { "id": "resume", "label": "Resume", "params": [] },
+    { "id": "dock", "label": "Return to Dock", "role": "off", "params": [] }
+  ],
+  "events": [{ "id": "stateUpdate", "label": "State Update", "params": ["state"] }],
+  "states": [
+    { "id": "robot.cleanMissionStatus", "type": "string" },
+    { "id": "robot.batPct", "type": "number" }
+  ]
+}
