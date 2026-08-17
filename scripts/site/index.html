@@ -155,6 +155,24 @@ section{ padding:76px 0; border-top:1px solid var(--line-soft); }
 .driver-more{
   display:inline-flex; align-items:center; color:var(--text-faint); font-size:.85rem; padding:8px 4px;
 }
+.driver-search-row{
+  display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--line);
+  border-radius:12px; padding:12px 16px; margin-bottom:28px; max-width:480px;
+}
+.driver-search-icon{ color:var(--text-faint); flex:0 0 auto; }
+.driver-search-row input{
+  flex:1; border:none; background:transparent; outline:none; font-family:var(--sans); font-size:.94rem; color:var(--text);
+}
+.driver-search-row input::placeholder{ color:var(--text-faint); }
+.driver-search-count{ font-family:var(--mono); font-size:.76rem; color:var(--accent-strong); white-space:nowrap; }
+.driver-group{ margin-bottom:26px; }
+.driver-group:last-child{ margin-bottom:0; }
+.driver-group-label{
+  font-family:var(--mono); font-size:.74rem; letter-spacing:.05em; text-transform:uppercase; color:var(--text-faint);
+  margin-bottom:10px;
+}
+.driver-group-count{ color:var(--text-faint); opacity:.7; }
+.driver-empty{ color:var(--text-faint); font-size:.92rem; padding:20px 0; }
 
 /* -------------------- Install steps -------------------- */
 .steps{ counter-reset:step; }
@@ -350,68 +368,141 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
   <div class="wrap">
     <div class="section-head">
       <span class="section-tag">Included today</span>
-      <h2>55 built-in drivers</h2>
+      <h2 id="driverCount">66 built-in drivers</h2>
       <p>Covering security panels, hubs, Zigbee/Z-Wave/Tuya ecosystems, lighting, media, cameras, climate, and notifications — plus a generic HTTP webhook driver for anything not on this list yet.</p>
     </div>
-    <div class="driver-tags">
-      <span class="driver-tag"><span class="ic">🚨</span> DSC PowerSeries</span>
-      <span class="driver-tag"><span class="ic">🏠</span> Universal Devices ISY994/eisy</span>
-      <span class="driver-tag"><span class="ic">🏠</span> Home Assistant</span>
-      <span class="driver-tag"><span class="ic">🏘️</span> Multi-Zone Hub</span>
-      <span class="driver-tag"><span class="ic">💡</span> Philips Hue</span>
-      <span class="driver-tag"><span class="ic">💡</span> LIFX</span>
-      <span class="driver-tag"><span class="ic">💡</span> Govee</span>
-      <span class="driver-tag"><span class="ic">🎚️</span> Lutron Caséta</span>
-      <span class="driver-tag"><span class="ic">💡</span> Generic Dimmer</span>
-      <span class="driver-tag"><span class="ic">🔌</span> Shelly</span>
-      <span class="driver-tag"><span class="ic">🔌</span> Generic HTTP Relay</span>
-      <span class="driver-tag"><span class="ic">🔌</span> Generic MQTT Plug</span>
-      <span class="driver-tag"><span class="ic">🔊</span> Sonos</span>
-      <span class="driver-tag"><span class="ic">📺</span> Roku</span>
-      <span class="driver-tag"><span class="ic">⛅</span> OpenWeatherMap</span>
-      <span class="driver-tag"><span class="ic">🔔</span> Pushover</span>
-      <span class="driver-tag"><span class="ic">✈️</span> Telegram Bot</span>
-      <span class="driver-tag"><span class="ic">💬</span> Slack</span>
-      <span class="driver-tag"><span class="ic">🪝</span> Generic Webhook</span>
-      <span class="driver-tag"><span class="ic">🚨</span> Honeywell/Ademco Vista</span>
-      <span class="driver-tag"><span class="ic">💡</span> Tuya / SmartLife</span>
-      <span class="driver-tag"><span class="ic">📡</span> Zigbee2MQTT</span>
-      <span class="driver-tag"><span class="ic">📶</span> Z-Wave (zwave-js-server)</span>
-      <span class="driver-tag"><span class="ic">🔧</span> ESPHome</span>
-      <span class="driver-tag"><span class="ic">💡</span> Xiaomi Mi Home</span>
-      <span class="driver-tag"><span class="ic">📡</span> Broadlink IR/RF</span>
-      <span class="driver-tag"><span class="ic">📺</span> Google Cast</span>
-      <span class="driver-tag"><span class="ic">🌡️</span> Ecobee</span>
-      <span class="driver-tag"><span class="ic">💡</span> IKEA Trådfri</span>
-      <span class="driver-tag"><span class="ic">📷</span> UniFi Protect</span>
-      <span class="driver-tag"><span class="ic">📷</span> ONVIF Camera</span>
-      <span class="driver-tag"><span class="ic">🔔</span> Ring (unofficial)</span>
-      <span class="driver-tag"><span class="ic">🧠</span> Samsung SmartThings</span>
-      <span class="driver-tag"><span class="ic">🔊</span> Yamaha / MusicCast</span>
-      <span class="driver-tag"><span class="ic">🔐</span> Nuki Smart Lock</span>
-      <span class="driver-tag"><span class="ic">💧</span> Rachio Irrigation</span>
-      <span class="driver-tag"><span class="ic">🚪</span> MyQ Garage (unofficial)</span>
-      <span class="driver-tag"><span class="ic">🤖</span> iRobot Roomba</span>
-      <span class="driver-tag"><span class="ic">🚗</span> Tesla (unofficial)</span>
-      <span class="driver-tag"><span class="ic">🔊</span> Denon / Marantz AVR</span>
-      <span class="driver-tag"><span class="ic">📣</span> ntfy</span>
-      <span class="driver-tag"><span class="ic">📶</span> Presence Detection</span>
-      <span class="driver-tag"><span class="ic">🪟</span> Somfy myLink</span>
-      <span class="driver-tag"><span class="ic">🌡️</span> Google Nest</span>
-      <span class="driver-tag"><span class="ic">🎵</span> Spotify</span>
-      <span class="driver-tag"><span class="ic">🎬</span> Plex</span>
-      <span class="driver-tag"><span class="ic">🎬</span> Kodi</span>
-      <span class="driver-tag"><span class="ic">💡</span> Nanoleaf</span>
-      <span class="driver-tag"><span class="ic">🔌</span> Belkin Wemo</span>
-      <span class="driver-tag"><span class="ic">⛅</span> Netatmo</span>
-      <span class="driver-tag"><span class="ic">🛡️</span> AdGuard Home</span>
-      <span class="driver-tag"><span class="ic">💬</span> Twilio SMS</span>
-      <span class="driver-tag"><span class="ic">💬</span> Discord Webhook</span>
-      <span class="driver-tag"><span class="ic">🌡️</span> Sensibo</span>
-      <span class="driver-tag"><span class="ic">📺</span> LG webOS TV</span>
+    <div class="driver-search-row">
+      <svg class="driver-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.4"/><path d="M11.2 11.2L14.5 14.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <input type="text" id="driverSearch" placeholder="Search drivers (e.g. camera, MQTT, Tesla)…" autocomplete="off">
+      <span class="driver-search-count" id="driverSearchCount"></span>
     </div>
+    <div id="driverGroups"></div>
+    <p class="driver-empty" id="driverEmpty" style="display:none;">No drivers match "<span id="driverEmptyTerm"></span>".</p>
   </div>
 </section>
+<script>
+(function () {
+  var DRIVERS = [
+    ["🚨","DSC PowerSeries","Security & cameras"],
+    ["🚨","Honeywell/Ademco Vista","Security & cameras"],
+    ["🔔","Ring (unofficial)","Security & cameras"],
+    ["📷","UniFi Protect","Security & cameras"],
+    ["📷","ONVIF Camera","Security & cameras"],
+    ["📷","Hikvision","Security & cameras"],
+    ["📷","Reolink","Security & cameras"],
+    ["🏠","Universal Devices ISY994/eisy","Hubs & bridges"],
+    ["🏠","Home Assistant","Hubs & bridges"],
+    ["🏘️","Multi-Zone Hub","Hubs & bridges"],
+    ["📡","Zigbee2MQTT","Hubs & bridges"],
+    ["📶","Z-Wave (zwave-js-server)","Hubs & bridges"],
+    ["🔧","ESPHome","Hubs & bridges"],
+    ["🧠","Samsung SmartThings","Hubs & bridges"],
+    ["💡","Philips Hue","Lighting"],
+    ["💡","LIFX","Lighting"],
+    ["💡","Govee","Lighting"],
+    ["🎚️","Lutron Caséta","Lighting"],
+    ["💡","Generic Dimmer","Lighting"],
+    ["💡","Tuya / SmartLife","Lighting"],
+    ["💡","Xiaomi Mi Home","Lighting"],
+    ["💡","IKEA Trådfri","Lighting"],
+    ["💡","Nanoleaf","Lighting"],
+    ["🔌","Shelly","Switches & plugs"],
+    ["🔌","Generic HTTP Relay","Switches & plugs"],
+    ["🔌","Generic MQTT Plug","Switches & plugs"],
+    ["🔌","Belkin Wemo","Switches & plugs"],
+    ["🔊","Sonos","Media & entertainment"],
+    ["📺","Roku","Media & entertainment"],
+    ["📺","Google Cast","Media & entertainment"],
+    ["🔊","Yamaha / MusicCast","Media & entertainment"],
+    ["🔊","Denon / Marantz AVR","Media & entertainment"],
+    ["🎵","Spotify","Media & entertainment"],
+    ["🎬","Plex","Media & entertainment"],
+    ["🎬","Kodi","Media & entertainment"],
+    ["📺","LG webOS TV","Media & entertainment"],
+    ["📺","Samsung Tizen TV","Media & entertainment"],
+    ["🔊","Squeezebox / Logitech Media Server","Media & entertainment"],
+    ["🎮","Logitech Harmony Hub","Media & entertainment"],
+    ["🌡️","Ecobee","Climate"],
+    ["🌡️","Google Nest","Climate"],
+    ["🌡️","Sensibo","Climate"],
+    ["🌡️","Resideo / Honeywell Home","Climate"],
+    ["🔐","Nuki Smart Lock","Locks & access"],
+    ["🚪","MyQ Garage (unofficial)","Locks & access"],
+    ["🪟","Somfy myLink","Locks & access"],
+    ["💧","Rachio Irrigation","Irrigation"],
+    ["💧","Hunter Hydrawise","Irrigation"],
+    ["🤖","iRobot Roomba","Robots & appliances"],
+    ["🏠","Home Connect (Bosch/Siemens)","Robots & appliances"],
+    ["🚗","Tesla (unofficial)","Vehicles & energy"],
+    ["🔋","Tesla Powerwall","Vehicles & energy"],
+    ["⛅","OpenWeatherMap","Sensors & weather"],
+    ["⛅","Netatmo","Sensors & weather"],
+    ["📶","Presence Detection","Sensors & weather"],
+    ["🔔","Pushover","Notifications"],
+    ["✈️","Telegram Bot","Notifications"],
+    ["💬","Slack","Notifications"],
+    ["📣","ntfy","Notifications"],
+    ["💬","Twilio SMS","Notifications"],
+    ["💬","Discord Webhook","Notifications"],
+    ["🪝","IFTTT Webhooks","Notifications"],
+    ["🛡️","AdGuard Home","Network & universal"],
+    ["🛡️","OPNsense Firewall","Network & universal"],
+    ["📡","Broadlink IR/RF","Network & universal"],
+    ["🪝","Generic Webhook","Network & universal"]
+  ];
+  var CATEGORY_ORDER = ["Security & cameras","Hubs & bridges","Lighting","Switches & plugs","Media & entertainment","Climate","Locks & access","Irrigation","Robots & appliances","Vehicles & energy","Sensors & weather","Notifications","Network & universal"];
+
+  var groupsEl = document.getElementById("driverGroups");
+  var searchEl = document.getElementById("driverSearch");
+  var countEl = document.getElementById("driverSearchCount");
+  var emptyEl = document.getElementById("driverEmpty");
+  var emptyTermEl = document.getElementById("driverEmptyTerm");
+
+  var byCategory = {};
+  CATEGORY_ORDER.forEach(function (c) { byCategory[c] = []; });
+  DRIVERS.forEach(function (d) { byCategory[d[2]].push(d); });
+
+  CATEGORY_ORDER.forEach(function (cat) {
+    var section = document.createElement("div");
+    section.className = "driver-group";
+    section.dataset.category = cat;
+    var heading = document.createElement("div");
+    heading.className = "driver-group-label";
+    heading.innerHTML = cat + ' <span class="driver-group-count">(' + byCategory[cat].length + ")</span>";
+    var tagsWrap = document.createElement("div");
+    tagsWrap.className = "driver-tags";
+    byCategory[cat].forEach(function (d) {
+      var tag = document.createElement("span");
+      tag.className = "driver-tag";
+      tag.dataset.name = (d[1] + " " + d[2]).toLowerCase();
+      tag.innerHTML = '<span class="ic">' + d[0] + "</span> " + d[1];
+      tagsWrap.appendChild(tag);
+    });
+    section.append(heading, tagsWrap);
+    groupsEl.appendChild(section);
+  });
+
+  function applyFilter() {
+    var term = searchEl.value.trim().toLowerCase();
+    var visibleTotal = 0;
+    Array.prototype.forEach.call(groupsEl.children, function (group) {
+      var tags = group.querySelectorAll(".driver-tag");
+      var visibleInGroup = 0;
+      tags.forEach(function (tag) {
+        var match = !term || tag.dataset.name.indexOf(term) !== -1;
+        tag.style.display = match ? "" : "none";
+        if (match) visibleInGroup++;
+      });
+      group.style.display = visibleInGroup ? "" : "none";
+      visibleTotal += visibleInGroup;
+    });
+    countEl.textContent = term ? visibleTotal + " match" + (visibleTotal === 1 ? "" : "es") : "";
+    emptyEl.style.display = term && visibleTotal === 0 ? "" : "none";
+    emptyTermEl.textContent = searchEl.value.trim();
+  }
+  searchEl.addEventListener("input", applyFilter);
+})();
+</script>
 
 <section id="install">
   <div class="wrap">
