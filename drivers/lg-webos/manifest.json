@@ -1,0 +1,34 @@
+{
+  "id": "lg-webos",
+  "displayName": "LG webOS TV",
+  "icon": "📺",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "TV IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 3000 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "clientKey", "type": "password", "label": "Client key (filled in automatically after the first on-screen pairing prompt is accepted)" }
+  ],
+  "actions": [
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "setVolume", "label": "Set Volume", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "mute", "label": "Mute", "params": [] },
+    { "id": "unmute", "label": "Unmute", "params": [] },
+    { "id": "launchApp", "label": "Launch App", "params": [{ "key": "appId", "type": "string", "label": "e.g. netflix, youtube.leanback.v4" }] },
+    { "id": "switchInput", "label": "Switch Input", "params": [{ "key": "inputId", "type": "string" }] }
+  ],
+  "events": [{ "id": "paired", "label": "Pairing Confirmed", "params": [] }],
+  "states": [{ "id": "tv.paired", "type": "boolean" }]
+}

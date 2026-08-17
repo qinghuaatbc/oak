@@ -1,0 +1,24 @@
+{
+  "id": "netatmo",
+  "displayName": "Netatmo Weather Station",
+  "icon": "⛅",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Netatmo API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "clientId", "type": "string", "label": "Client id (dev.netatmo.com/apps)" },
+    { "key": "clientSecret", "type": "password", "label": "Client secret" },
+    { "key": "refreshToken", "type": "password", "label": "Refresh token (from a one-time Authorization Code flow)" },
+    { "key": "moduleId", "type": "string", "label": "Module id (optional - blank for the main indoor station)" }
+  ],
+  "actions": [{ "id": "refresh", "label": "Refresh Now", "params": [] }],
+  "events": [],
+  "states": [
+    { "id": "sensor.temperature", "type": "number" },
+    { "id": "sensor.humidity", "type": "number" },
+    { "id": "sensor.co2", "type": "number" }
+  ]
+}

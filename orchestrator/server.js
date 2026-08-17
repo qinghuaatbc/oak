@@ -1166,6 +1166,8 @@ const BUILTIN_DRIVERS = new Set([
   "broadlink", "google-cast", "ecobee", "ikea-tradfri", "unifi-protect", "onvif", "ring",
   "smartthings", "yamaha", "nuki", "rachio", "myq", "irobot-roomba", "tesla", "denon-avr",
   "ntfy", "presence", "somfy-mylink",
+  "nest", "spotify", "plex", "kodi", "nanoleaf", "wemo", "netatmo", "adguard-home",
+  "twilio", "discord-webhook", "sensibo", "lg-webos",
 ]);
 
 function listDriverManifests() {

@@ -1,0 +1,31 @@
+{
+  "id": "nest",
+  "displayName": "Google Nest (SDM API)",
+  "icon": "🌡️",
+  "version": "0.1.0",
+  "category": "climate",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Google Smart Device Management API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "projectId", "type": "string", "label": "Device Access project id" },
+    { "key": "clientId", "type": "string", "label": "OAuth client id" },
+    { "key": "clientSecret", "type": "password", "label": "OAuth client secret" },
+    { "key": "refreshToken", "type": "password", "label": "Refresh token (from the one-time Device Access authorization flow)" },
+    { "key": "deviceId", "type": "string", "label": "Device id (from discoverDevices)" }
+  ],
+  "actions": [
+    { "id": "setMode", "label": "Set Thermostat Mode", "params": [{ "key": "mode", "type": "string", "label": "HEAT / COOL / HEATCOOL / OFF" }] },
+    { "id": "setHeatSetpoint", "label": "Set Heat Setpoint (C)", "params": [{ "key": "value", "type": "number" }] },
+    { "id": "setCoolSetpoint", "label": "Set Cool Setpoint (C)", "params": [{ "key": "value", "type": "number" }] },
+    { "id": "discoverDevices", "label": "Discover Devices", "params": [] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "climate.currentTemp", "type": "number" },
+    { "id": "climate.mode", "type": "string" },
+    { "id": "discovery.devices", "type": "string" }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "id": "adguard-home",
+  "displayName": "AdGuard Home",
+  "icon": "🛡️",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Server IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 3000 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Username" },
+    { "key": "password", "type": "password", "label": "Password" }
+  ],
+  "actions": [
+    { "id": "enableProtection", "label": "Enable Protection", "role": "on", "params": [] },
+    { "id": "disableProtection", "label": "Disable Protection", "role": "off", "params": [{ "key": "durationMinutes", "type": "number", "default": 0 }] },
+    { "id": "refresh", "label": "Refresh Stats", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "protection.enabled", "type": "boolean", "role": "on" },
+    { "id": "stats.queriesToday", "type": "number" },
+    { "id": "stats.blockedToday", "type": "number" }
+  ]
+}

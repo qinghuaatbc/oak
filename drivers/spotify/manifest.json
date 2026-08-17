@@ -1,0 +1,32 @@
+{
+  "id": "spotify",
+  "displayName": "Spotify",
+  "icon": "🎵",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Spotify Web API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "clientId", "type": "string", "label": "Client id (developer.spotify.com/dashboard)" },
+    { "key": "clientSecret", "type": "password", "label": "Client secret" },
+    { "key": "refreshToken", "type": "password", "label": "Refresh token (from a one-time Authorization Code flow)" }
+  ],
+  "actions": [
+    { "id": "play", "label": "Play", "role": "on", "params": [] },
+    { "id": "pause", "label": "Pause", "role": "off", "params": [] },
+    { "id": "next", "label": "Next Track", "params": [] },
+    { "id": "previous", "label": "Previous Track", "params": [] },
+    { "id": "setVolume", "label": "Set Volume", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "playUri", "label": "Play Specific URI", "params": [{ "key": "uri", "type": "string" }] },
+    { "id": "refresh", "label": "Refresh Now Playing", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "playback.isPlaying", "type": "boolean", "role": "on" },
+    { "id": "playback.trackName", "type": "string" },
+    { "id": "playback.artistName", "type": "string" },
+    { "id": "playback.volume", "type": "number", "role": "level" }
+  ]
+}

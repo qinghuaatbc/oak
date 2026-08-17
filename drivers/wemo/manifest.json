@@ -1,0 +1,29 @@
+{
+  "id": "wemo",
+  "displayName": "Belkin Wemo",
+  "icon": "🔌",
+  "version": "0.1.0",
+  "category": "switch",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 49153 }
+        ]
+      }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "refresh", "label": "Refresh State", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "device.on", "type": "boolean", "role": "on" }]
+}

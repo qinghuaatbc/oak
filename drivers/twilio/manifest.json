@@ -1,0 +1,29 @@
+{
+  "id": "twilio",
+  "displayName": "Twilio SMS",
+  "icon": "💬",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Twilio API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "accountSid", "type": "string", "label": "Account SID (console.twilio.com)" },
+    { "key": "authToken", "type": "password", "label": "Auth Token" },
+    { "key": "fromNumber", "type": "string", "label": "From phone number (E.164, e.g. +15551234567)" },
+    { "key": "toNumber", "type": "string", "label": "Default recipient (E.164)" }
+  ],
+  "actions": [
+    {
+      "id": "sendSms",
+      "label": "Send SMS",
+      "params": [
+        { "key": "message", "type": "string" },
+        { "key": "to", "type": "string", "label": "Recipient (optional, defaults to toNumber setting)" }
+      ]
+    }
+  ],
+  "events": [],
+  "states": [{ "id": "last.sentAt", "type": "string" }]
+}

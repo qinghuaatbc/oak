@@ -1,0 +1,38 @@
+{
+  "id": "nanoleaf",
+  "displayName": "Nanoleaf",
+  "icon": "💡",
+  "version": "0.1.0",
+  "category": "light",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 16021 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "authToken", "type": "password", "label": "Auth token (see driver notes for pairing steps)" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "setBrightness", "label": "Set Brightness", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "setEffect", "label": "Set Effect", "params": [{ "key": "name", "type": "string" }] },
+    { "id": "pair", "label": "Pair (hold power button 5-7s first)", "params": [] },
+    { "id": "refresh", "label": "Refresh State", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "panel.on", "type": "boolean", "role": "on" },
+    { "id": "panel.brightness", "type": "number", "role": "level" },
+    { "id": "pairing.token", "type": "string" }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "id": "plex",
+  "displayName": "Plex Media Server",
+  "icon": "🎬",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Plex Media Server",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Server IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 32400 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "token", "type": "password", "label": "X-Plex-Token (support.plex.tv > Finding an authentication token)" },
+    { "key": "clientIdentifier", "type": "string", "label": "Target client machine identifier (from discoverClients)" }
+  ],
+  "actions": [
+    { "id": "play", "label": "Play", "role": "on", "params": [] },
+    { "id": "pause", "label": "Pause", "role": "off", "params": [] },
+    { "id": "stop", "label": "Stop", "params": [] },
+    { "id": "skipNext", "label": "Next", "params": [] },
+    { "id": "skipPrevious", "label": "Previous", "params": [] },
+    { "id": "discoverClients", "label": "Discover Clients", "params": [] },
+    { "id": "refresh", "label": "Refresh Sessions", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "session.playing", "type": "boolean", "role": "on" },
+    { "id": "session.title", "type": "string" },
+    { "id": "discovery.clients", "type": "string" }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "id": "sensibo",
+  "displayName": "Sensibo AC Control",
+  "icon": "🌡️",
+  "version": "0.1.0",
+  "category": "climate",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Sensibo API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "apiKey", "type": "password", "label": "API key (home.sensibo.com/me/api)" },
+    { "key": "podId", "type": "string", "label": "Pod id (from discoverPods)" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "setTemperature", "label": "Set Target Temperature (C)", "role": "level", "params": [{ "key": "value", "type": "number" }] },
+    { "id": "setMode", "label": "Set Mode", "params": [{ "key": "mode", "type": "string", "label": "cool / heat / fan / dry / auto" }] },
+    { "id": "discoverPods", "label": "Discover Pods", "params": [] },
+    { "id": "refresh", "label": "Refresh State", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "ac.on", "type": "boolean", "role": "on" },
+    { "id": "ac.targetTemperature", "type": "number", "role": "level" },
+    { "id": "ac.mode", "type": "string" },
+    { "id": "discovery.pods", "type": "string" }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "id": "kodi",
+  "displayName": "Kodi",
+  "icon": "🎬",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Kodi IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 8080 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Username (if webserver auth is enabled)" },
+    { "key": "password", "type": "password", "label": "Password" }
+  ],
+  "actions": [
+    { "id": "playPause", "label": "Play/Pause", "role": "on", "params": [] },
+    { "id": "stop", "label": "Stop", "role": "off", "params": [] },
+    { "id": "setVolume", "label": "Set Volume", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "mute", "label": "Mute", "params": [] },
+    { "id": "unmute", "label": "Unmute", "params": [] },
+    { "id": "goHome", "label": "Go to Home Screen", "params": [] },
+    { "id": "notify", "label": "Show Notification", "params": [{ "key": "title", "type": "string" }, { "key": "message", "type": "string" }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "player.active", "type": "boolean", "role": "on" },
+    { "id": "player.volume", "type": "number", "role": "level" },
+    { "id": "player.muted", "type": "boolean" }
+  ]
+}

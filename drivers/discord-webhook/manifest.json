@@ -1,0 +1,24 @@
+{
+  "id": "discord-webhook",
+  "displayName": "Discord Webhook",
+  "icon": "💬",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "webhook", "label": "Discord Webhook", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "webhookUrl", "type": "password", "label": "Webhook URL (Channel Settings > Integrations > Webhooks)" },
+    { "key": "username", "type": "string", "label": "Override username (optional)" }
+  ],
+  "actions": [
+    {
+      "id": "send",
+      "label": "Send Message",
+      "params": [{ "key": "content", "type": "string" }]
+    }
+  ],
+  "events": [],
+  "states": [{ "id": "last.sentAt", "type": "string" }]
+}
