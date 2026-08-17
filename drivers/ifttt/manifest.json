@@ -1,0 +1,28 @@
+{
+  "id": "ifttt",
+  "displayName": "IFTTT Webhooks",
+  "icon": "🪝",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "IFTTT Webhooks", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "webhookKey", "type": "password", "label": "Webhook key (ifttt.com/maker_webhooks > Documentation)" }
+  ],
+  "actions": [
+    {
+      "id": "trigger",
+      "label": "Trigger Event",
+      "params": [
+        { "key": "event", "type": "string" },
+        { "key": "value1", "type": "string" },
+        { "key": "value2", "type": "string" },
+        { "key": "value3", "type": "string" }
+      ]
+    }
+  ],
+  "events": [],
+  "states": [{ "id": "last.triggeredAt", "type": "string" }]
+}

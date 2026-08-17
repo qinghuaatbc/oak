@@ -1,0 +1,33 @@
+{
+  "id": "samsung-tizen",
+  "displayName": "Samsung Tizen TV",
+  "icon": "📺",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "TV IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 8001 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "token", "type": "password", "label": "Pairing token (filled in automatically after the first on-screen prompt is accepted)" }
+  ],
+  "actions": [
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "volumeUp", "label": "Volume Up", "params": [] },
+    { "id": "volumeDown", "label": "Volume Down", "params": [] },
+    { "id": "mute", "label": "Mute", "params": [] },
+    { "id": "pressKey", "label": "Press Remote Key", "params": [{ "key": "key", "type": "string", "label": "e.g. KEY_HOME, KEY_ENTER, KEY_SOURCE" }] }
+  ],
+  "events": [{ "id": "paired", "label": "Pairing Confirmed", "params": [] }],
+  "states": [{ "id": "tv.paired", "type": "boolean" }]
+}

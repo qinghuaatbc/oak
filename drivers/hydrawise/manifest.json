@@ -1,0 +1,31 @@
+{
+  "id": "hydrawise",
+  "displayName": "Hunter Hydrawise",
+  "icon": "💧",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Hydrawise API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "apiKey", "type": "password", "label": "API key (account settings)" },
+    { "key": "relayId", "type": "string", "label": "Default zone/relay id" }
+  ],
+  "actions": [
+    {
+      "id": "runZone",
+      "label": "Run Zone",
+      "role": "on",
+      "params": [
+        { "key": "relayId", "type": "string" },
+        { "key": "durationSeconds", "type": "number", "default": 300 }
+      ]
+    },
+    { "id": "stopZone", "label": "Stop Zone", "role": "off", "params": [{ "key": "relayId", "type": "string" }] },
+    { "id": "suspendZone", "label": "Suspend Zone (rain delay)", "params": [{ "key": "relayId", "type": "string" }, { "key": "durationSeconds", "type": "number", "default": 86400 }] },
+    { "id": "discoverZones", "label": "Discover Zones", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "discovery.zones", "type": "string" }]
+}

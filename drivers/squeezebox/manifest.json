@@ -1,0 +1,41 @@
+{
+  "id": "squeezebox",
+  "displayName": "Squeezebox / Logitech Media Server",
+  "icon": "🔊",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Server IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 9000 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "playerId", "type": "string", "label": "Player id/MAC (from discoverPlayers)" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "play", "label": "Play", "params": [] },
+    { "id": "pause", "label": "Pause", "params": [] },
+    { "id": "next", "label": "Next Track", "params": [] },
+    { "id": "previous", "label": "Previous Track", "params": [] },
+    { "id": "setVolume", "label": "Set Volume", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "discoverPlayers", "label": "Discover Players", "params": [] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "player.on", "type": "boolean", "role": "on" },
+    { "id": "player.volume", "type": "number", "role": "level" },
+    { "id": "discovery.players", "type": "string" }
+  ]
+}

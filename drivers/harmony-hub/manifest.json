@@ -1,0 +1,27 @@
+{
+  "id": "harmony-hub",
+  "displayName": "Logitech Harmony Hub",
+  "icon": "🎮",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Hub IP address" }]
+      }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "startActivity", "label": "Start Activity", "role": "on", "params": [{ "key": "activityId", "type": "string" }] },
+    { "id": "turnOff", "label": "Turn Off (PowerOff activity)", "role": "off", "params": [] },
+    { "id": "pressButton", "label": "Press Button", "params": [{ "key": "deviceId", "type": "string" }, { "key": "command", "type": "string" }] },
+    { "id": "discoverConfig", "label": "Discover Devices/Activities", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "discovery.config", "type": "string" }]
+}

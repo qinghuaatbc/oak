@@ -1,0 +1,31 @@
+{
+  "id": "home-connect",
+  "displayName": "Home Connect (Bosch/Siemens)",
+  "icon": "🏠",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Home Connect API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "clientId", "type": "string", "label": "Client id (developer.home-connect.com)" },
+    { "key": "clientSecret", "type": "password", "label": "Client secret" },
+    { "key": "refreshToken", "type": "password", "label": "Refresh token (from a one-time Authorization Code flow)" },
+    { "key": "applianceId", "type": "string", "label": "Appliance id (haId, from discoverAppliances)" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off (Standby)", "role": "off", "params": [] },
+    { "id": "startProgram", "label": "Start Program", "params": [{ "key": "programKey", "type": "string" }] },
+    { "id": "stopProgram", "label": "Stop Program", "params": [] },
+    { "id": "discoverAppliances", "label": "Discover Appliances", "params": [] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "appliance.powerState", "type": "string" },
+    { "id": "appliance.doorState", "type": "string" },
+    { "id": "discovery.appliances", "type": "string" }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "opnsense",
+  "displayName": "OPNsense Firewall",
+  "icon": "🛡️",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Firewall IP address" }]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "apiKey", "type": "string", "label": "API key (System > Access > Users > API keys)" },
+    { "key": "apiSecret", "type": "password", "label": "API secret" }
+  ],
+  "actions": [
+    { "id": "reboot", "label": "Reboot Firewall", "params": [] },
+    { "id": "restartService", "label": "Restart Service", "params": [{ "key": "service", "type": "string", "label": "e.g. unbound, dhcpd" }] },
+    { "id": "stopService", "label": "Stop Service", "params": [{ "key": "service", "type": "string" }] },
+    { "id": "startService", "label": "Start Service", "params": [{ "key": "service", "type": "string" }] },
+    { "id": "refresh", "label": "Refresh Firmware Status", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "firmware.status", "type": "string" }]
+}

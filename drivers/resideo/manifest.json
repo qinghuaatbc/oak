@@ -1,0 +1,31 @@
+{
+  "id": "resideo",
+  "displayName": "Resideo / Honeywell Home",
+  "icon": "🌡️",
+  "version": "0.1.0",
+  "category": "climate",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Resideo API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "consumerKey", "type": "string", "label": "Consumer key (developer.honeywellhome.com)" },
+    { "key": "consumerSecret", "type": "password", "label": "Consumer secret" },
+    { "key": "refreshToken", "type": "password", "label": "Refresh token (from a one-time Authorization Code flow)" },
+    { "key": "locationId", "type": "string", "label": "Location id" },
+    { "key": "deviceId", "type": "string", "label": "Thermostat device id" }
+  ],
+  "actions": [
+    { "id": "setMode", "label": "Set Mode", "params": [{ "key": "mode", "type": "string", "label": "Heat / Cool / Auto / Off" }] },
+    { "id": "setHeatSetpoint", "label": "Set Heat Setpoint (F)", "params": [{ "key": "value", "type": "number" }] },
+    { "id": "setCoolSetpoint", "label": "Set Cool Setpoint (F)", "params": [{ "key": "value", "type": "number" }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "climate.currentTemp", "type": "number" },
+    { "id": "climate.mode", "type": "string" },
+    { "id": "climate.heatSetpoint", "type": "number" },
+    { "id": "climate.coolSetpoint", "type": "number" }
+  ]
+}

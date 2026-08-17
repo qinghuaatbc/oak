@@ -1168,6 +1168,8 @@ const BUILTIN_DRIVERS = new Set([
   "ntfy", "presence", "somfy-mylink",
   "nest", "spotify", "plex", "kodi", "nanoleaf", "wemo", "netatmo", "adguard-home",
   "twilio", "discord-webhook", "sensibo", "lg-webos",
+  "hikvision", "reolink", "home-connect", "resideo", "ifttt", "hydrawise",
+  "harmony-hub", "samsung-tizen", "opnsense", "squeezebox", "tesla-powerwall",
 ]);
 
 function listDriverManifests() {

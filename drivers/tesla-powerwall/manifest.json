@@ -1,0 +1,37 @@
+{
+  "id": "tesla-powerwall",
+  "displayName": "Tesla Powerwall (local)",
+  "icon": "🔋",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network (Gateway)",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Gateway IP address" }]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "email", "type": "string", "label": "Email (any value works for the customer login)" },
+    { "key": "password", "type": "password", "label": "Customer password (set during Powerwall installation)" },
+    { "key": "backupReservePercent", "type": "number", "label": "Backup reserve %", "default": 20 }
+  ],
+  "actions": [
+    { "id": "setSelfConsumption", "label": "Set Mode: Self-Powered", "params": [] },
+    { "id": "setBackupOnly", "label": "Set Mode: Backup-Only", "params": [] },
+    { "id": "setBackupReserve", "label": "Set Backup Reserve %", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "refresh", "label": "Refresh Now", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "battery.percent", "type": "number", "role": "level" },
+    { "id": "power.solar", "type": "number" },
+    { "id": "power.load", "type": "number" },
+    { "id": "power.battery", "type": "number" },
+    { "id": "power.grid", "type": "number" }
+  ]
+}
