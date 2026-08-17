@@ -1,0 +1,24 @@
+{
+  "id": "xbox",
+  "displayName": "Xbox (Live API)",
+  "icon": "🎮",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Xbox Live API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "clientId", "type": "string", "label": "Azure AD app client id" },
+    { "key": "clientSecret", "type": "password", "label": "Azure AD app client secret" },
+    { "key": "refreshToken", "type": "password", "label": "Microsoft account refresh token (from a one-time Authorization Code flow)" },
+    { "key": "consoleId", "type": "string", "label": "Console id (from discoverConsoles)" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Power On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Power Off", "role": "off", "params": [] },
+    { "id": "discoverConsoles", "label": "Discover Consoles", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "discovery.consoles", "type": "string" }]
+}

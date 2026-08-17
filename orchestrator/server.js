@@ -1170,6 +1170,7 @@ const BUILTIN_DRIVERS = new Set([
   "twilio", "discord-webhook", "sensibo", "lg-webos",
   "hikvision", "reolink", "home-connect", "resideo", "ifttt", "hydrawise",
   "harmony-hub", "samsung-tizen", "opnsense", "squeezebox", "tesla-powerwall",
+  "frigate", "powerview", "august", "xbox", "solaredge", "awair",
 ]);
 
 function listDriverManifests() {

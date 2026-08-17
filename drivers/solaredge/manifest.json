@@ -1,0 +1,22 @@
+{
+  "id": "solaredge",
+  "displayName": "SolarEdge Monitoring",
+  "icon": "☀️",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "SolarEdge Monitoring API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "apiKey", "type": "password", "label": "API key (monitoring account > Admin > Site Access)" },
+    { "key": "siteId", "type": "string", "label": "Site id" }
+  ],
+  "actions": [{ "id": "refresh", "label": "Refresh Now", "params": [] }],
+  "events": [],
+  "states": [
+    { "id": "power.current", "type": "number" },
+    { "id": "energy.today", "type": "number" },
+    { "id": "energy.lifetime", "type": "number" }
+  ]
+}

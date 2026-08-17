@@ -1,0 +1,33 @@
+{
+  "id": "august",
+  "displayName": "August Smart Lock (unofficial)",
+  "icon": "🔐",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "August Cloud (unofficial API)", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "identifier", "type": "string", "label": "Login identifier (phone:+1XXXXXXXXXX or email:you@example.com)" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "verificationCode", "type": "string", "label": "Verification code (fill in when prompted, then run completeLogin)" },
+    { "key": "lockId", "type": "string", "label": "Lock id (from discoverLocks)" }
+  ],
+  "actions": [
+    { "id": "login", "label": "Login", "params": [] },
+    { "id": "completeLogin", "label": "Complete Login (verification code)", "params": [] },
+    { "id": "lock", "label": "Lock", "role": "off", "params": [] },
+    { "id": "unlock", "label": "Unlock", "role": "on", "params": [] },
+    { "id": "discoverLocks", "label": "Discover Locks", "params": [] },
+    { "id": "refresh", "label": "Refresh State", "params": [] }
+  ],
+  "events": [
+    { "id": "verificationRequired", "label": "Verification Code Required", "params": [] },
+    { "id": "loggedIn", "label": "Logged In", "params": [] }
+  ],
+  "states": [
+    { "id": "lock.locked", "type": "boolean" },
+    { "id": "discovery.locks", "type": "string" }
+  ]
+}

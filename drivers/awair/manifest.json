@@ -1,0 +1,29 @@
+{
+  "id": "awair",
+  "displayName": "Awair Air Quality Monitor",
+  "icon": "🌬️",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Device IP address" }]
+      }
+    ]
+  },
+  "settings": [],
+  "actions": [{ "id": "refresh", "label": "Refresh Now", "params": [] }],
+  "events": [],
+  "states": [
+    { "id": "air.score", "type": "number" },
+    { "id": "air.temp", "type": "number" },
+    { "id": "air.humidity", "type": "number" },
+    { "id": "air.co2", "type": "number" },
+    { "id": "air.voc", "type": "number" },
+    { "id": "air.pm25", "type": "number" }
+  ]
+}

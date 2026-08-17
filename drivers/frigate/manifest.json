@@ -1,0 +1,39 @@
+{
+  "id": "frigate",
+  "displayName": "Frigate NVR",
+  "icon": "🎥",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "mqtt",
+        "label": "MQTT Broker",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Broker host" },
+          { "key": "port", "type": "number", "label": "Port", "default": 1883 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "baseTopic", "type": "string", "label": "Frigate MQTT topic prefix", "default": "frigate" },
+    { "key": "cameraName", "type": "string", "label": "Camera name (as configured in Frigate)" },
+    { "key": "objectLabel", "type": "string", "label": "Object label to track", "default": "person" },
+    { "key": "clientId", "type": "string", "label": "MQTT client id", "default": "oak-frigate" }
+  ],
+  "actions": [
+    { "id": "setDetect", "label": "Set Detection", "params": [{ "key": "on", "type": "boolean" }] },
+    { "id": "setRecordings", "label": "Set Recordings", "params": [{ "key": "on", "type": "boolean" }] },
+    { "id": "setSnapshots", "label": "Set Snapshots", "params": [{ "key": "on", "type": "boolean" }] }
+  ],
+  "events": [
+    { "id": "objectDetected", "label": "Object Detected", "params": ["label", "on"] },
+    { "id": "newEvent", "label": "New Event", "params": ["payload"] }
+  ],
+  "states": [
+    { "id": "detection.active", "type": "boolean", "role": "on" }
+  ]
+}

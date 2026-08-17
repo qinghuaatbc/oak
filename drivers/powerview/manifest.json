@@ -1,0 +1,33 @@
+{
+  "id": "powerview",
+  "displayName": "Hunter Douglas PowerView",
+  "icon": "🪟",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "PowerView Hub (local)",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Hub IP address" }]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "shadeId", "type": "string", "label": "Shade id (from discoverShades)" }
+  ],
+  "actions": [
+    { "id": "open", "label": "Open", "role": "on", "params": [] },
+    { "id": "close", "label": "Close", "role": "off", "params": [] },
+    { "id": "setPosition", "label": "Set Position", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "discoverShades", "label": "Discover Shades", "params": [] },
+    { "id": "refresh", "label": "Refresh Position", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "shade.position", "type": "number", "role": "level" },
+    { "id": "discovery.shades", "type": "string" }
+  ]
+}
