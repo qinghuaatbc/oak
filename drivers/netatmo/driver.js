@@ -36,25 +36,35 @@ function create(ctx) {
   }
 
   async function refresh() {
-    if (!accessToken && !(await refreshAccessToken())) return;
-    let res = await fetch(`${API_BASE}/getstationsdata`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (res.status === 401 && (await refreshAccessToken())) {
-      res = await fetch(`${API_BASE}/getstationsdata`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    // Wraps the whole body, including the initial refreshAccessToken()
+    // call - a network-level failure there (unreachable host, DNS
+    // failure, ...) rejects before any fetch() response exists, and
+    // onConnect() below calls refresh() without awaiting it, so an
+    // uncaught rejection here would otherwise escape as an unhandled
+    // rejection instead of a normal logged failure.
+    try {
+      if (!accessToken && !(await refreshAccessToken())) return;
+      let res = await fetch(`${API_BASE}/getstationsdata`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (res.status === 401 && (await refreshAccessToken())) {
+        res = await fetch(`${API_BASE}/getstationsdata`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      }
+      if (!res.ok) {
+        ctx.log(`Refresh failed: HTTP ${res.status}`);
+        return;
+      }
+      const data = await res.json();
+      const device = data.body && data.body.devices && data.body.devices[0];
+      if (!device) return;
+      const moduleId = ctx.config.settings.moduleId;
+      const source = moduleId ? (device.modules || []).find((m) => m._id === moduleId) : device;
+      if (!source || !source.dashboard_data) return;
+      const d = source.dashboard_data;
+      if (d.Temperature !== undefined) ctx.setState("sensor.temperature", d.Temperature);
+      if (d.Humidity !== undefined) ctx.setState("sensor.humidity", d.Humidity);
+      if (d.CO2 !== undefined) ctx.setState("sensor.co2", d.CO2);
+    } catch (err) {
+      ctx.log(`Refresh failed: ${err.message}`);
     }
-    if (!res.ok) {
-      ctx.log(`Refresh failed: HTTP ${res.status}`);
-      return;
-    }
-    const data = await res.json();
-    const device = data.body && data.body.devices && data.body.devices[0];
-    if (!device) return;
-    const moduleId = ctx.config.settings.moduleId;
-    const source = moduleId ? (device.modules || []).find((m) => m._id === moduleId) : device;
-    if (!source || !source.dashboard_data) return;
-    const d = source.dashboard_data;
-    if (d.Temperature !== undefined) ctx.setState("sensor.temperature", d.Temperature);
-    if (d.Humidity !== undefined) ctx.setState("sensor.humidity", d.Humidity);
-    if (d.CO2 !== undefined) ctx.setState("sensor.co2", d.CO2);
   }
   ctx.onAction("refresh", () => refresh());
 

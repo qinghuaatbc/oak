@@ -1,0 +1,22 @@
+{
+  "id": "speedtest",
+  "displayName": "Internet Speed Test",
+  "icon": "📶",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "none", "label": "No connection needed", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "intervalMinutes", "type": "number", "label": "Auto-run interval (minutes, 0 = manual only)", "default": 0 }
+  ],
+  "actions": [{ "id": "runTest", "label": "Run Speed Test", "params": [] }],
+  "events": [{ "id": "testComplete", "label": "Test Complete", "params": ["downloadMbps", "uploadMbps", "pingMs"] }],
+  "states": [
+    { "id": "speed.downloadMbps", "type": "number" },
+    { "id": "speed.uploadMbps", "type": "number" },
+    { "id": "speed.pingMs", "type": "number" },
+    { "id": "speed.lastRunAt", "type": "string" }
+  ]
+}

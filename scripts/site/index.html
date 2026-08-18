@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Oak — a device-driver platform you actually own</title>
-<meta name="description" content="Oak: a JSON manifest format, a sandboxed Node.js runtime, and an orchestrator for hosting your own device drivers — dashboards, 3D scenes, automations, 72 built-in drivers.">
+<meta name="description" content="Oak: a JSON manifest format, a sandboxed Node.js runtime, and an orchestrator for hosting your own device drivers — dashboards, 3D scenes, automations, 100 built-in drivers.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌳</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -368,7 +368,7 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
   <div class="wrap">
     <div class="section-head">
       <span class="section-tag">Included today</span>
-      <h2 id="driverCount">72 built-in drivers</h2>
+      <h2 id="driverCount">100 built-in drivers</h2>
       <p>Covering security panels, hubs, Zigbee/Z-Wave/Tuya ecosystems, lighting, media, cameras, climate, and notifications — plus a generic HTTP webhook driver for anything not on this list yet.</p>
     </div>
     <div class="driver-search-row">
@@ -391,6 +391,9 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
     ["📷","Hikvision","Security & cameras"],
     ["📷","Reolink","Security & cameras"],
     ["🎥","Frigate NVR","Security & cameras"],
+    ["🚨","SimpliSafe (unofficial)","Security & cameras"],
+    ["🚨","Abode Security (unofficial)","Security & cameras"],
+    ["🚨","Konnected Alarm Panel","Security & cameras"],
     ["🏠","Universal Devices ISY994/eisy","Hubs & bridges"],
     ["🏠","Home Assistant","Hubs & bridges"],
     ["🏘️","Multi-Zone Hub","Hubs & bridges"],
@@ -398,6 +401,7 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
     ["📶","Z-Wave (zwave-js-server)","Hubs & bridges"],
     ["🔧","ESPHome","Hubs & bridges"],
     ["🧠","Samsung SmartThings","Hubs & bridges"],
+    ["🏠","Fibaro Home Center","Hubs & bridges"],
     ["💡","Philips Hue","Lighting"],
     ["💡","LIFX","Lighting"],
     ["💡","Govee","Lighting"],
@@ -407,10 +411,14 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
     ["💡","Xiaomi Mi Home","Lighting"],
     ["💡","IKEA Trådfri","Lighting"],
     ["💡","Nanoleaf","Lighting"],
+    ["💡","WiZ","Lighting"],
+    ["💡","Govee (LAN API)","Lighting"],
     ["🔌","Shelly","Switches & plugs"],
     ["🔌","Generic HTTP Relay","Switches & plugs"],
     ["🔌","Generic MQTT Plug","Switches & plugs"],
     ["🔌","Belkin Wemo","Switches & plugs"],
+    ["🔌","TP-Link Kasa","Switches & plugs"],
+    ["🔌","Meross","Switches & plugs"],
     ["🔊","Sonos","Media & entertainment"],
     ["📺","Roku","Media & entertainment"],
     ["📺","Google Cast","Media & entertainment"],
@@ -424,26 +432,41 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
     ["🔊","Squeezebox / Logitech Media Server","Media & entertainment"],
     ["🎮","Logitech Harmony Hub","Media & entertainment"],
     ["🎮","Xbox (Live API)","Media & entertainment"],
+    ["🔊","Denon HEOS","Media & entertainment"],
+    ["🔊","Bose SoundTouch","Media & entertainment"],
+    ["📺","Vizio SmartCast","Media & entertainment"],
     ["🌡️","Ecobee","Climate"],
     ["🌡️","Google Nest","Climate"],
     ["🌡️","Sensibo","Climate"],
     ["🌡️","Resideo / Honeywell Home","Climate"],
+    ["🌡️","Venstar Thermostat","Climate"],
+    ["🌡️","Radio Thermostat","Climate"],
     ["🔐","Nuki Smart Lock","Locks & access"],
     ["🚪","MyQ Garage (unofficial)","Locks & access"],
     ["🪟","Somfy myLink","Locks & access"],
     ["🪟","Hunter Douglas PowerView","Locks & access"],
     ["🔐","August Smart Lock (unofficial)","Locks & access"],
-    ["💧","Rachio Irrigation","Irrigation"],
-    ["💧","Hunter Hydrawise","Irrigation"],
+    ["💧","Rachio Irrigation","Irrigation & pool"],
+    ["💧","Hunter Hydrawise","Irrigation & pool"],
+    ["💧","RainMachine","Irrigation & pool"],
+    ["💧","Netro Irrigation","Irrigation & pool"],
+    ["🏊","Pentair IntelliCenter","Irrigation & pool"],
     ["🤖","iRobot Roomba","Robots & appliances"],
     ["🏠","Home Connect (Bosch/Siemens)","Robots & appliances"],
+    ["🤖","Neato Robot Vacuum (unofficial)","Robots & appliances"],
     ["🚗","Tesla (unofficial)","Vehicles & energy"],
     ["🔋","Tesla Powerwall","Vehicles & energy"],
     ["☀️","SolarEdge Monitoring","Vehicles & energy"],
+    ["⚡","Emporia Vue","Vehicles & energy"],
+    ["⚡","Sense Energy Monitor","Vehicles & energy"],
+    ["☀️","Enphase Envoy (local)","Vehicles & energy"],
     ["⛅","OpenWeatherMap","Sensors & weather"],
     ["⛅","Netatmo","Sensors & weather"],
     ["📶","Presence Detection","Sensors & weather"],
     ["🌬️","Awair Air Quality Monitor","Sensors & weather"],
+    ["⛅","Ambient Weather Station","Sensors & weather"],
+    ["⛅","WeatherFlow Tempest","Sensors & weather"],
+    ["🌬️","PurpleAir","Sensors & weather"],
     ["🔔","Pushover","Notifications"],
     ["✈️","Telegram Bot","Notifications"],
     ["💬","Slack","Notifications"],
@@ -451,12 +474,17 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
     ["💬","Twilio SMS","Notifications"],
     ["💬","Discord Webhook","Notifications"],
     ["🪝","IFTTT Webhooks","Notifications"],
+    ["💬","Matrix","Notifications"],
+    ["🔔","Pushbullet","Notifications"],
     ["🛡️","AdGuard Home","Network & universal"],
     ["🛡️","OPNsense Firewall","Network & universal"],
     ["📡","Broadlink IR/RF","Network & universal"],
-    ["🪝","Generic Webhook","Network & universal"]
+    ["🪝","Generic Webhook","Network & universal"],
+    ["📶","UniFi Network Controller","Network & universal"],
+    ["📶","Eero (unofficial)","Network & universal"],
+    ["📶","Internet Speed Test","Network & universal"]
   ];
-  var CATEGORY_ORDER = ["Security & cameras","Hubs & bridges","Lighting","Switches & plugs","Media & entertainment","Climate","Locks & access","Irrigation","Robots & appliances","Vehicles & energy","Sensors & weather","Notifications","Network & universal"];
+  var CATEGORY_ORDER = ["Security & cameras","Hubs & bridges","Lighting","Switches & plugs","Media & entertainment","Climate","Locks & access","Irrigation & pool","Robots & appliances","Vehicles & energy","Sensors & weather","Notifications","Network & universal"];
 
   var groupsEl = document.getElementById("driverGroups");
   var searchEl = document.getElementById("driverSearch");

@@ -1,0 +1,34 @@
+{
+  "id": "fibaro",
+  "displayName": "Fibaro Home Center",
+  "icon": "🏠",
+  "version": "0.1.0",
+  "category": ["light", "switch"],
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Home Center IP address" }]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Username" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "deviceId", "type": "string", "label": "Device id" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "setValue", "label": "Set Value", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "device.on", "type": "boolean", "role": "on" },
+    { "id": "device.value", "type": "number", "role": "level" }
+  ]
+}

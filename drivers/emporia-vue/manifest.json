@@ -1,0 +1,22 @@
+{
+  "id": "emporia-vue",
+  "displayName": "Emporia Vue Energy Monitor",
+  "icon": "⚡",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Emporia Cloud (unofficial API)", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "email", "type": "string", "label": "Emporia account email" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "deviceGid", "type": "string", "label": "Device group id" }
+  ],
+  "actions": [
+    { "id": "login", "label": "Login", "params": [] },
+    { "id": "refresh", "label": "Refresh Usage", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "power.usageWatts", "type": "number" }]
+}

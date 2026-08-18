@@ -1,0 +1,21 @@
+{
+  "id": "netro",
+  "displayName": "Netro Irrigation",
+  "icon": "💧",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Netro API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "deviceKey", "type": "password", "label": "Device key (Netro app > device settings)" }
+  ],
+  "actions": [
+    { "id": "startWatering", "label": "Start Watering", "role": "on", "params": [{ "key": "zones", "type": "string", "label": "Comma-separated zone ids (blank = all)" }, { "key": "durationMinutes", "type": "number", "default": 10 }] },
+    { "id": "stopWatering", "label": "Stop Watering", "role": "off", "params": [] },
+    { "id": "discoverZones", "label": "Discover Zones", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "discovery.zones", "type": "string" }]
+}

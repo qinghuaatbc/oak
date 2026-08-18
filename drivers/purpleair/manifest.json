@@ -1,0 +1,22 @@
+{
+  "id": "purpleair",
+  "displayName": "PurpleAir Air Quality Sensor",
+  "icon": "🌬️",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "PurpleAir API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "apiKey", "type": "password", "label": "API key (api.purpleair.com > Keys)" },
+    { "key": "sensorIndex", "type": "string", "label": "Sensor index" }
+  ],
+  "actions": [{ "id": "refresh", "label": "Refresh Now", "params": [] }],
+  "events": [],
+  "states": [
+    { "id": "air.pm25", "type": "number" },
+    { "id": "air.humidity", "type": "number" },
+    { "id": "air.temperature", "type": "number" }
+  ]
+}

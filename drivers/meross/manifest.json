@@ -1,0 +1,24 @@
+{
+  "id": "meross",
+  "displayName": "Meross",
+  "icon": "🔌",
+  "version": "0.1.0",
+  "category": ["switch", "light"],
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Meross Cloud", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "email", "type": "string", "label": "Meross account email" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "deviceUuid", "type": "string", "label": "Device UUID (from discoverDevices)" },
+    { "key": "channel", "type": "number", "label": "Channel (0 for single-channel devices)", "default": 0 }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "discoverDevices", "label": "Discover Devices", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "discovery.devices", "type": "string" }]
+}

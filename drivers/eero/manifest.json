@@ -1,0 +1,27 @@
+{
+  "id": "eero",
+  "displayName": "Eero (unofficial)",
+  "icon": "📶",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Eero Cloud (unofficial API)", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "loginIdentifier", "type": "string", "label": "Phone or email used for your Eero account" },
+    { "key": "verificationCode", "type": "string", "label": "Verification code (fill in when prompted, then run completeLogin)" },
+    { "key": "networkId", "type": "string", "label": "Network id" },
+    { "key": "clientMac", "type": "string", "label": "Client MAC to track presence for" }
+  ],
+  "actions": [
+    { "id": "login", "label": "Login", "params": [] },
+    { "id": "completeLogin", "label": "Complete Login (verification code)", "params": [] },
+    { "id": "refresh", "label": "Refresh Client List", "params": [] }
+  ],
+  "events": [{ "id": "verificationRequired", "label": "Verification Code Required", "params": [] }],
+  "states": [
+    { "id": "client.online", "type": "boolean", "role": "on" },
+    { "id": "clients.count", "type": "number" }
+  ]
+}

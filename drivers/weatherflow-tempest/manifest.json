@@ -1,0 +1,26 @@
+{
+  "id": "weatherflow-tempest",
+  "displayName": "WeatherFlow Tempest",
+  "icon": "⛅",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "WeatherFlow API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "token", "type": "password", "label": "Personal access token (tempestwx.com account settings)" },
+    { "key": "stationId", "type": "string", "label": "Station id (from discoverStations)" }
+  ],
+  "actions": [
+    { "id": "discoverStations", "label": "Discover Stations", "params": [] },
+    { "id": "refresh", "label": "Refresh Now", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "weather.tempC", "type": "number" },
+    { "id": "weather.humidity", "type": "number" },
+    { "id": "weather.windAvgMps", "type": "number" },
+    { "id": "discovery.stations", "type": "string" }
+  ]
+}

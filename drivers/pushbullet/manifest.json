@@ -1,0 +1,26 @@
+{
+  "id": "pushbullet",
+  "displayName": "Pushbullet",
+  "icon": "🔔",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Pushbullet API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "accessToken", "type": "password", "label": "Access token (pushbullet.com > Settings > Account)" }
+  ],
+  "actions": [
+    {
+      "id": "sendNote",
+      "label": "Send Note",
+      "params": [
+        { "key": "title", "type": "string" },
+        { "key": "body", "type": "string" }
+      ]
+    }
+  ],
+  "events": [],
+  "states": [{ "id": "last.sentAt", "type": "string" }]
+}

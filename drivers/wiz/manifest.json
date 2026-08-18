@@ -1,0 +1,33 @@
+{
+  "id": "wiz",
+  "displayName": "WiZ",
+  "icon": "💡",
+  "version": "0.1.0",
+  "category": "light",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network (UDP)",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 38899 }
+        ]
+      }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "setBrightness", "label": "Set Brightness", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "bulb.on", "type": "boolean", "role": "on" },
+    { "id": "bulb.brightness", "type": "number", "role": "level" }
+  ]
+}

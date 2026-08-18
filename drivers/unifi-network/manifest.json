@@ -1,0 +1,33 @@
+{
+  "id": "unifi-network",
+  "displayName": "UniFi Network Controller",
+  "icon": "📶",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Controller IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 8443 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Username" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "site", "type": "string", "label": "Site name", "default": "default" },
+    { "key": "clientMac", "type": "string", "label": "Client MAC to track presence for" }
+  ],
+  "actions": [{ "id": "refresh", "label": "Refresh Client List", "params": [] }],
+  "events": [],
+  "states": [
+    { "id": "client.online", "type": "boolean", "role": "on" },
+    { "id": "clients.count", "type": "number" }
+  ]
+}

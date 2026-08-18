@@ -1,0 +1,33 @@
+{
+  "id": "tplink-kasa",
+  "displayName": "TP-Link Kasa",
+  "icon": "🔌",
+  "version": "0.1.0",
+  "category": ["switch", "light"],
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 9999 }
+        ]
+      }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "setBrightness", "label": "Set Brightness (bulbs)", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "device.on", "type": "boolean", "role": "on" },
+    { "id": "device.brightness", "type": "number", "role": "level" }
+  ]
+}

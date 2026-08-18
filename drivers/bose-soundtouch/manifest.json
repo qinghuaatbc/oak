@@ -1,0 +1,36 @@
+{
+  "id": "bose-soundtouch",
+  "displayName": "Bose SoundTouch",
+  "icon": "🔊",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Speaker IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 8090 }
+        ]
+      }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "turnOn", "label": "Power On/Off (toggle)", "role": "on", "params": [] },
+    { "id": "play", "label": "Play", "params": [] },
+    { "id": "pause", "label": "Pause", "params": [] },
+    { "id": "setVolume", "label": "Set Volume", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "mute", "label": "Mute Toggle", "params": [] },
+    { "id": "selectPreset", "label": "Select Preset", "params": [{ "key": "number", "type": "number", "min": 1, "max": 6 }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "player.state", "type": "string" },
+    { "id": "player.volume", "type": "number", "role": "level" }
+  ]
+}

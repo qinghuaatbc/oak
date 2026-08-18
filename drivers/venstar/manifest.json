@@ -1,0 +1,32 @@
+{
+  "id": "venstar",
+  "displayName": "Venstar Thermostat",
+  "icon": "🌡️",
+  "version": "0.1.0",
+  "category": "climate",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Thermostat IP address" }]
+      }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "setMode", "label": "Set Mode", "params": [{ "key": "mode", "type": "string", "label": "off / heat / cool / auto" }] },
+    { "id": "setHeatSetpoint", "label": "Set Heat Setpoint", "role": "level", "params": [{ "key": "value", "type": "number" }] },
+    { "id": "setCoolSetpoint", "label": "Set Cool Setpoint", "params": [{ "key": "value", "type": "number" }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "climate.currentTemp", "type": "number" },
+    { "id": "climate.mode", "type": "string" },
+    { "id": "climate.heatSetpoint", "type": "number", "role": "level" },
+    { "id": "climate.coolSetpoint", "type": "number" }
+  ]
+}

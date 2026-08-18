@@ -1171,6 +1171,11 @@ const BUILTIN_DRIVERS = new Set([
   "hikvision", "reolink", "home-connect", "resideo", "ifttt", "hydrawise",
   "harmony-hub", "samsung-tizen", "opnsense", "squeezebox", "tesla-powerwall",
   "frigate", "powerview", "august", "xbox", "solaredge", "awair",
+  "tplink-kasa", "meross", "wiz", "venstar", "radio-thermostat", "govee-lan",
+  "simplisafe", "abode", "konnected", "heos", "bose-soundtouch", "vizio-smartcast",
+  "ambient-weather", "weatherflow-tempest", "purpleair", "emporia-vue", "sense-energy",
+  "enphase-envoy", "rainmachine", "netro", "pentair-intellicenter", "unifi-network",
+  "eero", "speedtest", "matrix", "pushbullet", "neato", "fibaro",
 ]);
 
 function listDriverManifests() {

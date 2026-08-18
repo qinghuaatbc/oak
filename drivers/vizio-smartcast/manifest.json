@@ -1,0 +1,35 @@
+{
+  "id": "vizio-smartcast",
+  "displayName": "Vizio SmartCast TV",
+  "icon": "📺",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "TV IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 7345 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "authToken", "type": "password", "label": "Auth token (filled in after completePairing)" },
+    { "key": "pairingToken", "type": "string", "label": "Pairing token (filled in automatically by startPairing)" }
+  ],
+  "actions": [
+    { "id": "startPairing", "label": "Start Pairing", "params": [] },
+    { "id": "completePairing", "label": "Complete Pairing (enter on-screen PIN)", "params": [{ "key": "pin", "type": "string" }] },
+    { "id": "togglePower", "label": "Toggle Power", "role": "on", "params": [] },
+    { "id": "volumeUp", "label": "Volume Up", "params": [] },
+    { "id": "volumeDown", "label": "Volume Down", "params": [] },
+    { "id": "mute", "label": "Mute Toggle", "params": [] }
+  ],
+  "events": [{ "id": "pairingStarted", "label": "Pairing Started (check TV for PIN)", "params": [] }],
+  "states": []
+}

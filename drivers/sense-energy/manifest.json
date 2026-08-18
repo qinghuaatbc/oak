@@ -1,0 +1,21 @@
+{
+  "id": "sense-energy",
+  "displayName": "Sense Energy Monitor",
+  "icon": "⚡",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Sense Cloud (unofficial API)", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "email", "type": "string", "label": "Sense account email" },
+    { "key": "password", "type": "password", "label": "Password" }
+  ],
+  "actions": [{ "id": "login", "label": "Login (connects realtime feed)", "params": [] }],
+  "events": [],
+  "states": [
+    { "id": "power.usageWatts", "type": "number" },
+    { "id": "power.solarWatts", "type": "number" }
+  ]
+}

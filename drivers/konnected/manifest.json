@@ -1,0 +1,30 @@
+{
+  "id": "konnected",
+  "displayName": "Konnected Alarm Panel Interface",
+  "icon": "🚨",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 12345 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "pin", "type": "string", "label": "Output pin/zone" }
+  ],
+  "actions": [
+    { "id": "setOutputOn", "label": "Set Output On", "role": "on", "params": [] },
+    { "id": "setOutputOff", "label": "Set Output Off", "role": "off", "params": [] }
+  ],
+  "events": [],
+  "states": []
+}

@@ -1,0 +1,34 @@
+{
+  "id": "matrix",
+  "displayName": "Matrix",
+  "icon": "💬",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "homeserver",
+        "label": "Matrix Homeserver",
+        "transport": "http",
+        "fields": [{ "key": "homeserverUrl", "type": "string", "label": "Homeserver URL (e.g. https://matrix.org)" }]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "accessToken", "type": "password", "label": "Access token (from your Matrix client's settings)" },
+    { "key": "roomId", "type": "string", "label": "Default room id (e.g. !abc123:matrix.org)" }
+  ],
+  "actions": [
+    {
+      "id": "sendMessage",
+      "label": "Send Message",
+      "params": [
+        { "key": "message", "type": "string" },
+        { "key": "roomId", "type": "string" }
+      ]
+    }
+  ],
+  "events": [],
+  "states": [{ "id": "last.sentAt", "type": "string" }]
+}

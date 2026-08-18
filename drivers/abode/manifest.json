@@ -1,0 +1,24 @@
+{
+  "id": "abode",
+  "displayName": "Abode Security (unofficial)",
+  "icon": "🚨",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Abode Cloud (unofficial API)", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "email", "type": "string", "label": "Abode account email" },
+    { "key": "password", "type": "password", "label": "Password" }
+  ],
+  "actions": [
+    { "id": "login", "label": "Login", "params": [] },
+    { "id": "armAway", "label": "Arm (Away)", "role": "arm", "params": [] },
+    { "id": "armHome", "label": "Arm (Home)", "params": [] },
+    { "id": "disarm", "label": "Disarm", "role": "disarm", "params": [] },
+    { "id": "refresh", "label": "Refresh State", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "panel.mode", "type": "string" }]
+}

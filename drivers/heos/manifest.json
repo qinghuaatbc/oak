@@ -1,0 +1,37 @@
+{
+  "id": "heos",
+  "displayName": "Denon HEOS",
+  "icon": "🔊",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network (CLI)",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "HEOS device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 1255 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "playerId", "type": "string", "label": "Player id (from discoverPlayers)" }
+  ],
+  "actions": [
+    { "id": "play", "label": "Play", "role": "on", "params": [] },
+    { "id": "pause", "label": "Pause", "role": "off", "params": [] },
+    { "id": "setVolume", "label": "Set Volume", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "mute", "label": "Mute", "params": [] },
+    { "id": "unmute", "label": "Unmute", "params": [] },
+    { "id": "discoverPlayers", "label": "Discover Players", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "player.state", "type": "string" },
+    { "id": "discovery.players", "type": "string" }
+  ]
+}

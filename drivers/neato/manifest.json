@@ -1,0 +1,25 @@
+{
+  "id": "neato",
+  "displayName": "Neato Robot Vacuum (unofficial)",
+  "icon": "🤖",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Neato Cloud (unofficial API)", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "email", "type": "string", "label": "Neato account email" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "serial", "type": "string", "label": "Robot serial (from discoverRobots)" }
+  ],
+  "actions": [
+    { "id": "login", "label": "Login", "params": [] },
+    { "id": "startCleaning", "label": "Start Cleaning", "role": "on", "params": [] },
+    { "id": "stopCleaning", "label": "Stop Cleaning", "role": "off", "params": [] },
+    { "id": "sendToBase", "label": "Send to Base", "params": [] },
+    { "id": "discoverRobots", "label": "Discover Robots", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "discovery.robots", "type": "string" }]
+}

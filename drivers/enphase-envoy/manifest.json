@@ -1,0 +1,28 @@
+{
+  "id": "enphase-envoy",
+  "displayName": "Enphase Envoy (local)",
+  "icon": "☀️",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Envoy IP address" }]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "token", "type": "password", "label": "Bearer token (only needed on newer firmware - D7.x+; older Envoys need no auth)" }
+  ],
+  "actions": [{ "id": "refresh", "label": "Refresh Now", "params": [] }],
+  "events": [],
+  "states": [
+    { "id": "power.now", "type": "number" },
+    { "id": "energy.today", "type": "number" },
+    { "id": "energy.lifetime", "type": "number" }
+  ]
+}

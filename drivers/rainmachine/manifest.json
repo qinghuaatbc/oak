@@ -1,0 +1,32 @@
+{
+  "id": "rainmachine",
+  "displayName": "RainMachine Irrigation",
+  "icon": "💧",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Controller IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 8080 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "password", "type": "password", "label": "Controller password" },
+    { "key": "zoneId", "type": "string", "label": "Default zone id" }
+  ],
+  "actions": [
+    { "id": "startZone", "label": "Start Zone", "role": "on", "params": [{ "key": "zoneId", "type": "string" }, { "key": "durationSeconds", "type": "number", "default": 300 }] },
+    { "id": "stopZone", "label": "Stop Zone", "role": "off", "params": [{ "key": "zoneId", "type": "string" }] },
+    { "id": "discoverZones", "label": "Discover Zones", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "discovery.zones", "type": "string" }]
+}

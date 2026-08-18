@@ -1,0 +1,31 @@
+{
+  "id": "pentair-intellicenter",
+  "displayName": "Pentair IntelliCenter",
+  "icon": "🏊",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "IntelliCenter IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 6680 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "circuitId", "type": "string", "label": "Circuit object name (e.g. C0001, from discoverCircuits)" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "discoverCircuits", "label": "Discover Circuits", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "discovery.circuits", "type": "string" }]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "ambient-weather",
+  "displayName": "Ambient Weather Station",
+  "icon": "⛅",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Ambient Weather API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "apiKey", "type": "password", "label": "API key (ambientweather.net account settings)" },
+    { "key": "applicationKey", "type": "password", "label": "Application key" },
+    { "key": "macAddress", "type": "string", "label": "Station MAC address (from discoverStations)" }
+  ],
+  "actions": [
+    { "id": "discoverStations", "label": "Discover Stations", "params": [] },
+    { "id": "refresh", "label": "Refresh Now", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "weather.tempF", "type": "number" },
+    { "id": "weather.humidity", "type": "number" },
+    { "id": "weather.windSpeedMph", "type": "number" },
+    { "id": "discovery.stations", "type": "string" }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "simplisafe",
+  "displayName": "SimpliSafe (unofficial)",
+  "icon": "🚨",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "SimpliSafe Cloud (unofficial API)", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "refreshToken", "type": "password", "label": "Refresh token (from a one-time PKCE login flow - see driver notes)" },
+    { "key": "systemId", "type": "string", "label": "System id (from discoverSystems)" }
+  ],
+  "actions": [
+    { "id": "armAway", "label": "Arm (Away)", "role": "arm", "params": [] },
+    { "id": "armHome", "label": "Arm (Home)", "params": [] },
+    { "id": "disarm", "label": "Disarm", "role": "disarm", "params": [] },
+    { "id": "discoverSystems", "label": "Discover Systems", "params": [] },
+    { "id": "refresh", "label": "Refresh State", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "system.state", "type": "string" },
+    { "id": "discovery.systems", "type": "string" }
+  ]
+}

@@ -56,15 +56,25 @@ function create(ctx) {
   }
 
   async function refresh() {
-    const thermostatId = ctx.config.settings.thermostatId;
-    const selection = { selectionType: thermostatId ? "thermostats" : "registered", selectionMatch: thermostatId || "", includeRuntime: true, includeSettings: true };
-    const data = await apiCall("GET", { selection });
-    const thermostat = data && data.thermostatList && data.thermostatList[0];
-    if (!thermostat) return;
-    ctx.setState("climate.currentTemp", thermostat.runtime.actualTemperature / 10);
-    ctx.setState("climate.heatSetpoint", thermostat.runtime.desiredHeat / 10);
-    ctx.setState("climate.coolSetpoint", thermostat.runtime.desiredCool / 10);
-    ctx.setState("climate.hvacMode", thermostat.settings.hvacMode);
+    // The whole body is wrapped, not just individual awaits - apiCall()
+    // itself awaits refreshAccessToken() before ever making the real
+    // request, so a network failure (unreachable host, DNS failure, ...)
+    // can reject before any HTTP response exists to check .ok on. Without
+    // this try/catch that rejection would escape refresh() uncaught,
+    // since onConnect() below calls refresh() without awaiting it.
+    try {
+      const thermostatId = ctx.config.settings.thermostatId;
+      const selection = { selectionType: thermostatId ? "thermostats" : "registered", selectionMatch: thermostatId || "", includeRuntime: true, includeSettings: true };
+      const data = await apiCall("GET", { selection });
+      const thermostat = data && data.thermostatList && data.thermostatList[0];
+      if (!thermostat) return;
+      ctx.setState("climate.currentTemp", thermostat.runtime.actualTemperature / 10);
+      ctx.setState("climate.heatSetpoint", thermostat.runtime.desiredHeat / 10);
+      ctx.setState("climate.coolSetpoint", thermostat.runtime.desiredCool / 10);
+      ctx.setState("climate.hvacMode", thermostat.settings.hvacMode);
+    } catch (err) {
+      ctx.log(`Refresh failed: ${err.message}`);
+    }
   }
 
   ctx.onAction("startPinAuth", async () => {
