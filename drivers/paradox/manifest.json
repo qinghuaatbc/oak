@@ -1,0 +1,35 @@
+{
+  "id": "paradox",
+  "displayName": "Paradox Security (IP150)",
+  "icon": "🚨",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "ip150",
+        "label": "IP150/IP150+ Module",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "IP150 IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 10000 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "modulePassword", "type": "password", "label": "IP150 module password", "default": "paradox" },
+    { "key": "pcPassword", "type": "password", "label": "PC Password (4 hex digits, panel installer/programming password)" }
+  ],
+  "actions": [
+    { "id": "armAway", "label": "Arm (Away)", "role": "arm", "params": [{ "key": "partition", "type": "number", "default": 1 }] },
+    { "id": "armStay", "label": "Arm (Stay)", "params": [{ "key": "partition", "type": "number", "default": 1 }] },
+    { "id": "disarm", "label": "Disarm", "role": "disarm", "params": [{ "key": "partition", "type": "number", "default": 1 }] }
+  ],
+  "events": [
+    { "id": "connected", "label": "Connected and Logged In", "params": [] },
+    { "id": "loginFailed", "label": "Login Failed", "params": [] }
+  ],
+  "states": []
+}

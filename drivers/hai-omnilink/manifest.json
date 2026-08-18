@@ -1,0 +1,29 @@
+{
+  "id": "hai-omnilink",
+  "displayName": "HAI/Leviton OmniPro (OmniLink II)",
+  "icon": "🚨",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Controller IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 4369 }
+    ]
+  },
+  "settings": [
+    { "key": "key", "type": "password", "label": "Encryption key (32 hex chars, set on the controller's OmniLink II setup screen)" },
+    { "key": "codeNumber", "type": "number", "label": "User code number/slot (1-99, NOT the raw PIN - configure this slot on the controller)", "default": 1 }
+  ],
+  "actions": [
+    { "id": "armAway", "label": "Arm (Away)", "role": "arm", "params": [{ "key": "area", "type": "number", "default": 1 }] },
+    { "id": "armDay", "label": "Arm (Day/Stay)", "params": [{ "key": "area", "type": "number", "default": 1 }] },
+    { "id": "armNight", "label": "Arm (Night)", "params": [{ "key": "area", "type": "number", "default": 1 }] },
+    { "id": "disarm", "label": "Disarm", "role": "disarm", "params": [{ "key": "area", "type": "number", "default": 1 }] }
+  ],
+  "events": [
+    { "id": "connected", "label": "Session Established", "params": [] },
+    { "id": "loginFailed", "label": "Handshake Failed", "params": [] }
+  ],
+  "states": []
+}

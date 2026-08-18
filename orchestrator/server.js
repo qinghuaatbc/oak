@@ -1178,6 +1178,7 @@ const BUILTIN_DRIVERS = new Set([
   "eero", "speedtest", "matrix", "pushbullet", "neato", "fibaro",
   "switchbot", "global-cache", "bond", "elgato-key-light", "ewelink", "amcrest",
   "flume", "roborock", "moen-flo", "arlo", "aqara-cloud",
+  "paradox", "hai-omnilink",
 ]);
 
 function listDriverManifests() {
