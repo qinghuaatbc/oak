@@ -1,0 +1,24 @@
+{
+  "id": "moen-flo",
+  "displayName": "Moen Flo Water Shutoff",
+  "icon": "💧",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Flo by Moen Cloud (unofficial API)", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "email", "type": "string", "label": "Flo account email" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "deviceId", "type": "string", "label": "Device id" }
+  ],
+  "actions": [
+    { "id": "login", "label": "Login", "params": [] },
+    { "id": "openValve", "label": "Open Valve", "role": "on", "params": [] },
+    { "id": "closeValve", "label": "Close Valve", "role": "off", "params": [] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "valve.open", "type": "boolean", "role": "on" }]
+}

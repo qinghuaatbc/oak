@@ -1,0 +1,33 @@
+{
+  "id": "elgato-key-light",
+  "displayName": "Elgato Key Light",
+  "icon": "💡",
+  "version": "0.1.0",
+  "category": "light",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Light IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 9123 }
+        ]
+      }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "setBrightness", "label": "Set Brightness", "role": "level", "params": [{ "key": "value", "type": "number", "min": 0, "max": 100 }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "light.on", "type": "boolean", "role": "on" },
+    { "id": "light.brightness", "type": "number", "role": "level" }
+  ]
+}

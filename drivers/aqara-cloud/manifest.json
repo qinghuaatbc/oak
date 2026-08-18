@@ -1,0 +1,25 @@
+{
+  "id": "aqara-cloud",
+  "displayName": "Aqara Open Platform",
+  "icon": "🏠",
+  "version": "0.1.0",
+  "category": ["light", "switch"],
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Aqara Open API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "accessToken", "type": "password", "label": "Access token (opendoc.aqara.com developer console - see driver notes)" },
+    { "key": "appId", "type": "string", "label": "App id" },
+    { "key": "keyId", "type": "string", "label": "Key id" },
+    { "key": "appKey", "type": "password", "label": "App key" },
+    { "key": "subjectId", "type": "string", "label": "Device/resource subject id" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "setResource", "label": "Set Raw Resource", "params": [{ "key": "resourceId", "type": "string" }, { "key": "value", "type": "string" }] }
+  ],
+  "events": [],
+  "states": [{ "id": "device.on", "type": "boolean", "role": "on" }]
+}

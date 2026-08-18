@@ -1,0 +1,36 @@
+{
+  "id": "global-cache",
+  "displayName": "Global Caché (iTach/GC-100)",
+  "icon": "📡",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "tcp",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 4998 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "module", "type": "number", "label": "Module address", "default": 1 },
+    { "key": "connector", "type": "number", "label": "Connector address", "default": 1 }
+  ],
+  "actions": [
+    { "id": "sendIr", "label": "Send IR Code", "params": [{ "key": "irCode", "type": "string", "label": "Full sendir,... payload minus module:connector,ID prefix, e.g. 38000,1,1,347,173,..." }] },
+    { "id": "setStateOn", "label": "Set Relay/Serial State On", "role": "on", "params": [] },
+    { "id": "setStateOff", "label": "Set Relay/Serial State Off", "role": "off", "params": [] },
+    { "id": "discoverDevices", "label": "Discover Connected Devices", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "connector.state", "type": "boolean", "role": "on" },
+    { "id": "discovery.devices", "type": "string" }
+  ]
+}

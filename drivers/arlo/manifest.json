@@ -1,0 +1,28 @@
+{
+  "id": "arlo",
+  "displayName": "Arlo (unofficial)",
+  "icon": "📷",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Arlo Cloud (unofficial API)", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "email", "type": "string", "label": "Arlo account email" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "mfaCode", "type": "string", "label": "MFA code (fill in when prompted, then run completeLogin)" },
+    { "key": "deviceId", "type": "string", "label": "Camera device id (from discoverDevices)" }
+  ],
+  "actions": [
+    { "id": "login", "label": "Login", "params": [] },
+    { "id": "completeLogin", "label": "Complete Login (MFA code)", "params": [] },
+    { "id": "discoverDevices", "label": "Discover Devices", "params": [] },
+    { "id": "refresh", "label": "Refresh Battery/Status", "params": [] }
+  ],
+  "events": [{ "id": "mfaRequired", "label": "MFA Code Required", "params": [] }],
+  "states": [
+    { "id": "camera.batteryPercent", "type": "number" },
+    { "id": "discovery.devices", "type": "string" }
+  ]
+}

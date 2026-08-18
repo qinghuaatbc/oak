@@ -1,0 +1,27 @@
+{
+  "id": "flume",
+  "displayName": "Flume Water Monitor",
+  "icon": "💧",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "Flume API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "clientId", "type": "string", "label": "Client id (portal.flumetech.com)" },
+    { "key": "clientSecret", "type": "password", "label": "Client secret" },
+    { "key": "username", "type": "string", "label": "Flume account username/email" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "deviceId", "type": "string", "label": "Device id (from discoverDevices)" }
+  ],
+  "actions": [
+    { "id": "discoverDevices", "label": "Discover Devices", "params": [] },
+    { "id": "refresh", "label": "Refresh Usage", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "water.currentFlowRate", "type": "number" },
+    { "id": "discovery.devices", "type": "string" }
+  ]
+}

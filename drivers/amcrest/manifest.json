@@ -1,0 +1,33 @@
+{
+  "id": "amcrest",
+  "displayName": "Amcrest Camera/NVR",
+  "icon": "📷",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 80 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Username", "default": "admin" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "channel", "type": "number", "label": "Channel", "default": 1 }
+  ],
+  "actions": [
+    { "id": "ptzMove", "label": "PTZ Move", "params": [{ "key": "direction", "type": "string", "label": "Up/Down/Left/Right" }] },
+    { "id": "ptzStop", "label": "PTZ Stop", "params": [{ "key": "direction", "type": "string" }] },
+    { "id": "reboot", "label": "Reboot Device", "params": [] }
+  ],
+  "events": [],
+  "states": []
+}

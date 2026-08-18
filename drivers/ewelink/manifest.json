@@ -1,0 +1,23 @@
+{
+  "id": "ewelink",
+  "displayName": "eWeLink (Sonoff)",
+  "icon": "🔌",
+  "version": "0.1.0",
+  "category": "switch",
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "eWeLink Open API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "appId", "type": "string", "label": "App id (dev.ewelink.cc app credentials)" },
+    { "key": "appSecret", "type": "password", "label": "App secret" },
+    { "key": "refreshToken", "type": "password", "label": "Refresh token (from a one-time Authorization Code flow)" },
+    { "key": "deviceId", "type": "string", "label": "Device id" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "device.on", "type": "boolean", "role": "on" }]
+}

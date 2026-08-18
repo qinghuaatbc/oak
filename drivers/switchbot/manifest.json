@@ -1,0 +1,28 @@
+{
+  "id": "switchbot",
+  "displayName": "SwitchBot",
+  "icon": "🔘",
+  "version": "0.1.0",
+  "category": ["switch", "light"],
+  "connection": {
+    "kind": "choice",
+    "options": [{ "id": "cloud", "label": "SwitchBot API", "transport": "http", "fields": [] }]
+  },
+  "settings": [
+    { "key": "token", "type": "password", "label": "Token (SwitchBot app > Profile > Preferences > Developer Options)" },
+    { "key": "secret", "type": "password", "label": "Secret" },
+    { "key": "deviceId", "type": "string", "label": "Device id (from discoverDevices)" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "press", "label": "Press", "params": [] },
+    { "id": "discoverDevices", "label": "Discover Devices", "params": [] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "device.on", "type": "boolean", "role": "on" },
+    { "id": "discovery.devices", "type": "string" }
+  ]
+}

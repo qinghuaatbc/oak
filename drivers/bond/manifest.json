@@ -1,0 +1,31 @@
+{
+  "id": "bond",
+  "displayName": "Bond Bridge",
+  "icon": "📡",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network",
+        "transport": "http",
+        "fields": [{ "key": "host", "type": "string", "label": "Bridge IP address" }]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "token", "type": "password", "label": "Bond-Token (Bond Home app > device settings)" },
+    { "key": "deviceId", "type": "string", "label": "Device id (from discoverDevices)" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "setSpeed", "label": "Set Fan Speed", "role": "level", "params": [{ "key": "value", "type": "number", "min": 1, "max": 6 }] },
+    { "id": "toggleOpen", "label": "Toggle Open (fireplace/shade)", "params": [] },
+    { "id": "discoverDevices", "label": "Discover Devices", "params": [] }
+  ],
+  "events": [],
+  "states": [{ "id": "discovery.devices", "type": "string" }]
+}

@@ -1,0 +1,35 @@
+{
+  "id": "roborock",
+  "displayName": "Roborock Vacuum",
+  "icon": "🤖",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "local",
+        "label": "Local network (UDP)",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Device IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 54321 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "token", "type": "password", "label": "Device token (32 hex chars, extracted via Mi Home/Roborock app account tools)" }
+  ],
+  "actions": [
+    { "id": "start", "label": "Start Cleaning", "role": "on", "params": [] },
+    { "id": "pause", "label": "Pause", "params": [] },
+    { "id": "stop", "label": "Stop", "params": [] },
+    { "id": "dock", "label": "Return to Dock", "role": "off", "params": [] }
+  ],
+  "events": [{ "id": "response", "label": "Device Response", "params": ["result"] }],
+  "states": [
+    { "id": "robot.state", "type": "number" },
+    { "id": "robot.batteryPercent", "type": "number" }
+  ]
+}

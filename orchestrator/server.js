@@ -1176,6 +1176,8 @@ const BUILTIN_DRIVERS = new Set([
   "ambient-weather", "weatherflow-tempest", "purpleair", "emporia-vue", "sense-energy",
   "enphase-envoy", "rainmachine", "netro", "pentair-intellicenter", "unifi-network",
   "eero", "speedtest", "matrix", "pushbullet", "neato", "fibaro",
+  "switchbot", "global-cache", "bond", "elgato-key-light", "ewelink", "amcrest",
+  "flume", "roborock", "moen-flo", "arlo", "aqara-cloud",
 ]);
 
 function listDriverManifests() {
