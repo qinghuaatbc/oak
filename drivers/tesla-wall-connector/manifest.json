@@ -1,0 +1,27 @@
+{
+  "id": "tesla-wall-connector",
+  "displayName": "Tesla Wall Connector (Gen 3, local monitoring)",
+  "icon": "🔌",
+  "version": "0.1.0",
+  "category": "sensor",
+  "connection": {
+    "kind": "http",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Wall Connector IP address" }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "refresh", "label": "Refresh Now", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "vehicleConnected", "label": "Vehicle Connected" },
+    { "id": "contactorClosed", "label": "Contactor Closed (Charging)" },
+    { "id": "vehicleCurrentA", "label": "Vehicle Current (A)" },
+    { "id": "gridV", "label": "Grid Voltage" },
+    { "id": "sessionEnergyWh", "label": "Session Energy (Wh)" },
+    { "id": "pcbaTempC", "label": "PCBA Temp (C)" },
+    { "id": "evseState", "label": "EVSE State" }
+  ]
+}

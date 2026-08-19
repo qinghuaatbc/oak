@@ -1,0 +1,36 @@
+{
+  "id": "middleatlantic-pdu",
+  "displayName": "Middle Atlantic Premium+ PDU (SNMP)",
+  "icon": "🔌",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "snmp",
+        "label": "SNMP (UDP)",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "PDU IP address" },
+          { "key": "port", "type": "number", "label": "Port", "default": 161 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "readCommunity", "type": "string", "label": "SNMP read community", "default": "public" },
+    { "key": "writeCommunity", "type": "string", "label": "SNMP write community", "default": "private" },
+    { "key": "pduId", "type": "number", "label": "PDU ID (1 for a single-PDU device)", "default": 1 }
+  ],
+  "actions": [
+    { "id": "outletOn", "label": "Turn On Outlet", "role": "on", "params": [{ "key": "outlet", "type": "number", "label": "Outlet number" }] },
+    { "id": "outletOff", "label": "Turn Off Outlet", "role": "off", "params": [{ "key": "outlet", "type": "number", "label": "Outlet number" }] },
+    { "id": "outletCycle", "label": "Cycle Outlet", "params": [{ "key": "outlet", "type": "number", "label": "Outlet number" }] },
+    { "id": "queryOutlet", "label": "Refresh Outlet Status", "params": [{ "key": "outlet", "type": "number", "label": "Outlet number" }] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "outlet.state", "label": "Outlet State" }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "avpro-edge",
+  "displayName": "AVPro Edge Matrix Switcher (AC Series)",
+  "icon": "🔀",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Switcher IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 23 }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "route", "label": "Route Input to Output", "params": [
+      { "key": "input", "type": "number", "label": "Input (0=all)" },
+      { "key": "output", "type": "number", "label": "Output (0=all)" }
+    ] },
+    { "id": "setScalerMode", "label": "Set Scaler Mode", "params": [
+      { "key": "output", "type": "number", "label": "Output" },
+      { "key": "mode", "type": "select", "options": ["0", "1", "2", "3", "4"], "label": "0=Auto 1=Bypass 2=4K->2K 3=2K->4K 4=HDBT C Mode" }
+    ] }
+  ],
+  "events": [],
+  "states": []
+}

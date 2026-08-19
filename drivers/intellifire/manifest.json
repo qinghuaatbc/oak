@@ -1,0 +1,28 @@
+{
+  "id": "intellifire",
+  "displayName": "IntelliFire Gas Fireplace (unofficial)",
+  "icon": "🔥",
+  "version": "0.1.0",
+  "category": "climate",
+  "connection": {
+    "kind": "http",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Fireplace IP address (on the local network)" }
+    ]
+  },
+  "settings": [
+    { "key": "email", "type": "string", "label": "IntelliFire app account email" },
+    { "key": "password", "type": "password", "label": "IntelliFire app account password" },
+    { "key": "serial", "type": "string", "label": "Fireplace serial number (from the app, used once to fetch its local control key)" }
+  ],
+  "actions": [
+    { "id": "powerOn", "label": "Power On", "role": "on", "params": [] },
+    { "id": "powerOff", "label": "Power Off", "role": "off", "params": [] },
+    { "id": "setFlameHeight", "label": "Set Flame Height", "role": "level", "params": [{ "key": "height", "type": "number", "label": "Height (0-4)" }] },
+    { "id": "setFanSpeed", "label": "Set Fan Speed", "params": [{ "key": "speed", "type": "number", "label": "Speed (0-4)" }] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "status.raw", "label": "Raw Status (JSON)" }
+  ]
+}

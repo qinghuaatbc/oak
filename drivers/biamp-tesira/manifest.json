@@ -1,0 +1,37 @@
+{
+  "id": "biamp-tesira",
+  "displayName": "Biamp Tesira DSP",
+  "icon": "🎚️",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Tesira device IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 23 }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "setValue", "label": "Set Control Value", "role": "level", "params": [
+      { "key": "instanceTag", "type": "string", "label": "Instance tag (block name from the Tesira project)" },
+      { "key": "attribute", "type": "string", "label": "Attribute (e.g. level, mute)" },
+      { "key": "index", "type": "number", "label": "Index", "default": 1 },
+      { "key": "value", "type": "string", "label": "Value (e.g. -12, true)" }
+    ] },
+    { "id": "getValue", "label": "Refresh Control Value", "params": [
+      { "key": "instanceTag", "type": "string", "label": "Instance tag" },
+      { "key": "attribute", "type": "string", "label": "Attribute" },
+      { "key": "index", "type": "number", "label": "Index", "default": 1 }
+    ] },
+    { "id": "toggle", "label": "Toggle Control", "params": [
+      { "key": "instanceTag", "type": "string", "label": "Instance tag" },
+      { "key": "attribute", "type": "string", "label": "Attribute" },
+      { "key": "index", "type": "number", "label": "Index", "default": 1 }
+    ] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "control.value", "label": "Control Value" }
+  ]
+}

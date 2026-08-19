@@ -1,0 +1,25 @@
+{
+  "id": "nec-display",
+  "displayName": "NEC Commercial Display (External Control)",
+  "icon": "🖥️",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Display IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 7142 }
+    ]
+  },
+  "settings": [
+    { "key": "monitorId", "type": "string", "label": "Monitor ID letter (A=1, B=2, ... default A)", "default": "A" }
+  ],
+  "actions": [
+    { "id": "powerOn", "label": "Power On", "role": "on", "params": [] },
+    { "id": "powerOff", "label": "Power Off", "role": "off", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "power", "label": "Power State", "role": "on" }
+  ]
+}

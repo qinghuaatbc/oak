@@ -1181,6 +1181,8 @@ const BUILTIN_DRIVERS = new Set([
   "paradox", "hai-omnilink",
   "pjlink", "extron-matrix", "wyrestorm", "artnet", "onkyo-pioneer", "doorbird",
   "samsung-mdc", "furman-pwm", "qsys-core", "lutron-homeworks", "genie-aladdin", "russound-rnet",
+  "avpro-edge", "anthem-avr", "biamp-tesira", "nec-display", "tesla-wall-connector",
+  "intellifire", "middleatlantic-pdu",
 ]);
 
 function listDriverManifests() {

@@ -1,0 +1,33 @@
+{
+  "id": "anthem-avr",
+  "displayName": "Anthem AVM / MRX Processor",
+  "icon": "🔊",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Processor IP address" },
+      { "key": "port", "type": "number", "label": "Port (set in the unit's network menu)", "default": 14999 }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "powerOn", "label": "Power On", "role": "on", "params": [{ "key": "zone", "type": "number", "label": "Zone (1=main, 2=zone2)", "default": 1 }] },
+    { "id": "powerOff", "label": "Power Off", "role": "off", "params": [{ "key": "zone", "type": "number", "label": "Zone", "default": 1 }] },
+    { "id": "setVolume", "label": "Set Volume (dB)", "role": "level", "params": [
+      { "key": "zone", "type": "number", "label": "Zone", "default": 1 },
+      { "key": "db", "type": "number", "label": "Volume in dB (e.g. -35)" }
+    ] },
+    { "id": "setInput", "label": "Set Input", "params": [
+      { "key": "zone", "type": "number", "label": "Zone", "default": 1 },
+      { "key": "input", "type": "number", "label": "Input number" }
+    ] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "power", "label": "Power State", "role": "on" },
+    { "id": "volume", "label": "Volume (dB)", "role": "level" },
+    { "id": "input", "label": "Current Input" }
+  ]
+}
