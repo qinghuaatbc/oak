@@ -52,6 +52,13 @@ function loadDriverModule(driverDir) {
   return sandboxModule.exports;
 }
 
+// Self-healing reconnect backoff: starts at 1s, doubles on every failed
+// attempt, caps at 30s - fast enough to recover quickly from a brief blip
+// (a device reboot, a router hiccup) without hammering a device/network
+// that's genuinely down for longer.
+const RECONNECT_INITIAL_MS = 1000;
+const RECONNECT_MAX_MS = 30000;
+
 class Connection extends EventEmitter {
   // Thin wrapper over a persistent raw transport (TCP today; a
   // SerialConnection could implement the same {send,close,open} interface
@@ -65,6 +72,17 @@ class Connection extends EventEmitter {
     this.port = port;
     this.socket = null;
     this.connected = false;
+    // Before this, a dropped connection (device reboot, network blip) was
+    // permanent until a human opened the admin UI and manually stopped +
+    // restarted the instance - found via code review: every TCP-transport
+    // driver (dsc-powerseries and honeywell-vista included) went silently
+    // and indefinitely dark on any disconnect, with nothing in this class
+    // or DriverInstance ever calling open() again. Fixed once here instead
+    // of in every individual driver, since none of them have any way to
+    // reopen this same Connection object themselves.
+    this._closedByCaller = false; // true only after close() - distinguishes "told to stop" from "the wire dropped"
+    this._reconnectTimer = null;
+    this._reconnectDelay = RECONNECT_INITIAL_MS;
   }
   open() {
     // net.createConnection throws SYNCHRONOUSLY (before any "error" event
@@ -78,9 +96,11 @@ class Connection extends EventEmitter {
       setImmediate(() => this.emit("error", new Error(`Connection requires both host and port (got host=${JSON.stringify(this.host)}, port=${JSON.stringify(this.port)})`)));
       return;
     }
+    this._closedByCaller = false;
     this.socket = net.createConnection({ host: this.host, port: this.port });
     this.socket.on("connect", () => {
       this.connected = true;
+      this._reconnectDelay = RECONNECT_INITIAL_MS; // a real connection succeeded - forget any backoff built up from earlier failed attempts
       this.emit("open");
     });
     // Raw Buffer, deliberately not pre-decoded as UTF-8 text here - a
@@ -95,13 +115,27 @@ class Connection extends EventEmitter {
     this.socket.on("close", () => {
       this.connected = false;
       this.emit("close");
+      // "close" fires exactly once per connection attempt, always after
+      // any "error" on the same attempt (Node emits error then close) - so
+      // scheduling the retry from here alone avoids double-scheduling that
+      // listening on "error" too would cause.
+      this._scheduleReconnect();
     });
     this.socket.on("error", (err) => this.emit("error", err));
+  }
+  _scheduleReconnect() {
+    if (this._closedByCaller) return; // deliberately stopped (e.g. the admin UI's Stop button) - don't self-heal a connection nobody asked to keep
+    clearTimeout(this._reconnectTimer);
+    this._reconnectTimer = setTimeout(() => this.open(), this._reconnectDelay);
+    if (this._reconnectTimer.unref) this._reconnectTimer.unref();
+    this._reconnectDelay = Math.min(this._reconnectDelay * 2, RECONNECT_MAX_MS);
   }
   send(data) {
     if (this.socket && this.connected) this.socket.write(data);
   }
   close() {
+    this._closedByCaller = true;
+    clearTimeout(this._reconnectTimer);
     if (this.socket) this.socket.destroy();
   }
 }
