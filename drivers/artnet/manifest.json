@@ -1,0 +1,37 @@
+{
+  "id": "artnet",
+  "displayName": "Art-Net / DMX",
+  "icon": "🎛️",
+  "version": "0.1.0",
+  "category": "light",
+  "connection": {
+    "kind": "choice",
+    "options": [
+      {
+        "id": "udp",
+        "label": "Art-Net Node/Gateway",
+        "transport": "http",
+        "fields": [
+          { "key": "host", "type": "string", "label": "Target IP (unicast) or broadcast address, e.g. 2.255.255.255" },
+          { "key": "port", "type": "number", "label": "Port", "default": 6454 }
+        ]
+      }
+    ]
+  },
+  "settings": [
+    { "key": "universe", "type": "number", "label": "Universe (0-32767)", "default": 0 }
+  ],
+  "actions": [
+    { "id": "setChannel", "label": "Set Channel", "role": "level", "params": [
+      { "key": "channel", "type": "number", "label": "Channel (1-512)" },
+      { "key": "value", "type": "number", "label": "Value (0-255)" }
+    ] },
+    { "id": "setChannels", "label": "Set Multiple Channels", "params": [
+      { "key": "start", "type": "number", "label": "Start channel (1-512)", "default": 1 },
+      { "key": "values", "type": "string", "label": "Comma-separated values (0-255 each)" }
+    ] },
+    { "id": "blackout", "label": "Blackout (all channels to 0)", "params": [] }
+  ],
+  "events": [],
+  "states": []
+}

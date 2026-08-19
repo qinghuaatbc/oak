@@ -1,0 +1,26 @@
+{
+  "id": "doorbird",
+  "displayName": "DoorBird Video Intercom",
+  "icon": "🔔",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "http",
+    "fields": [
+      { "key": "host", "type": "string", "label": "DoorBird IP address" }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Username" },
+    { "key": "password", "type": "password", "label": "Password" }
+  ],
+  "actions": [
+    { "id": "openDoor", "label": "Open Door/Relay", "role": "disarm", "params": [{ "key": "relay", "type": "string", "label": "Relay (leave blank for relay 1)" }] },
+    { "id": "lightOn", "label": "Turn On Light", "params": [] }
+  ],
+  "events": [
+    { "id": "ring", "label": "Doorbell Ring", "params": [] },
+    { "id": "motion", "label": "Motion Detected", "params": [] }
+  ],
+  "states": []
+}

@@ -1,0 +1,26 @@
+{
+  "id": "samsung-mdc",
+  "displayName": "Samsung Commercial Display (MDC)",
+  "icon": "🖥️",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Display IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 1515 }
+    ]
+  },
+  "settings": [
+    { "key": "displayId", "type": "number", "label": "Display ID (0-253, or 254 for broadcast to all)", "default": 254 }
+  ],
+  "actions": [
+    { "id": "powerOn", "label": "Power On", "role": "on", "params": [] },
+    { "id": "powerOff", "label": "Power Off", "role": "off", "params": [] },
+    { "id": "setInputRaw", "label": "Set Input (raw hex code)", "params": [{ "key": "hexCode", "type": "string", "label": "Input source hex code (varies by model - check the MDC command table for this display's generation)" }] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "power", "label": "Power State", "role": "on" }
+  ]
+}

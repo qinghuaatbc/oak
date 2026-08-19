@@ -1,0 +1,27 @@
+{
+  "id": "extron-matrix",
+  "displayName": "Extron Matrix Switcher (SIS)",
+  "icon": "🔀",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Switcher IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 23 }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "tie", "label": "Route Input to Output", "params": [
+      { "key": "input", "type": "number", "label": "Input" },
+      { "key": "output", "type": "number", "label": "Output" }
+    ] },
+    { "id": "mute", "label": "Mute Output", "params": [
+      { "key": "output", "type": "number", "label": "Output" },
+      { "key": "state", "type": "select", "options": ["0", "1"], "label": "0=unmute 1=mute", "default": "1" }
+    ] }
+  ],
+  "events": [],
+  "states": []
+}

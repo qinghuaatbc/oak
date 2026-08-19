@@ -1,0 +1,26 @@
+{
+  "id": "furman-pwm",
+  "displayName": "Furman/Panamax Rack Power (CN Series)",
+  "icon": "🔌",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Serial-to-IP bridge address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 23 }
+    ]
+  },
+  "settings": [
+    { "key": "sequencer", "type": "number", "label": "Sequencer number", "default": 1 }
+  ],
+  "actions": [
+    { "id": "sequencerOn", "label": "Sequenced Power On", "role": "on", "params": [] },
+    { "id": "sequencerOff", "label": "Sequenced Power Off", "role": "off", "params": [] },
+    { "id": "bankOn", "label": "Turn On Outlet Bank", "params": [{ "key": "outlet", "type": "number", "label": "Outlet number" }] },
+    { "id": "bankOff", "label": "Turn Off Outlet Bank", "params": [{ "key": "outlet", "type": "number", "label": "Outlet number" }] },
+    { "id": "allOff", "label": "All Outlets Off", "params": [] }
+  ],
+  "events": [],
+  "states": []
+}

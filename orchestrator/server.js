@@ -1179,6 +1179,8 @@ const BUILTIN_DRIVERS = new Set([
   "switchbot", "global-cache", "bond", "elgato-key-light", "ewelink", "amcrest",
   "flume", "roborock", "moen-flo", "arlo", "aqara-cloud",
   "paradox", "hai-omnilink",
+  "pjlink", "extron-matrix", "wyrestorm", "artnet", "onkyo-pioneer", "doorbird",
+  "samsung-mdc", "furman-pwm", "qsys-core", "lutron-homeworks", "genie-aladdin", "russound-rnet",
 ]);
 
 function listDriverManifests() {

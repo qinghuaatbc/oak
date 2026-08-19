@@ -1,0 +1,27 @@
+{
+  "id": "qsys-core",
+  "displayName": "QSC Q-SYS Core",
+  "icon": "🎚️",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Q-SYS Core IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 1710 }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Username (leave blank if the Core has no users configured)" },
+    { "key": "password", "type": "password", "label": "Password" }
+  ],
+  "actions": [
+    { "id": "setControl", "label": "Set Named Control", "role": "level", "params": [
+      { "key": "name", "type": "string", "label": "Control name" },
+      { "key": "value", "type": "number", "label": "Value" }
+    ] },
+    { "id": "getControl", "label": "Refresh Named Control", "params": [{ "key": "name", "type": "string", "label": "Control name" }] }
+  ],
+  "events": [],
+  "states": []
+}

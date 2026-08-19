@@ -1,0 +1,29 @@
+{
+  "id": "onkyo-pioneer",
+  "displayName": "Onkyo / Pioneer / Integra AVR (eISCP)",
+  "icon": "🔊",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Receiver IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 60128 }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "powerOn", "label": "Power On", "role": "on", "params": [] },
+    { "id": "powerOff", "label": "Power Off", "role": "off", "params": [] },
+    { "id": "setVolume", "label": "Set Volume", "role": "level", "params": [{ "key": "level", "type": "number", "label": "Volume (0-100)" }] },
+    { "id": "volumeUp", "label": "Volume Up", "params": [] },
+    { "id": "volumeDown", "label": "Volume Down", "params": [] },
+    { "id": "setInput", "label": "Set Input", "params": [{ "key": "code", "type": "string", "label": "2-digit input code (e.g. 01=CBL/SAT, 05=PC, 10=DVD)" }] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "power", "label": "Power State", "role": "on" },
+    { "id": "volume", "label": "Volume", "role": "level" },
+    { "id": "input", "label": "Current Input" }
+  ]
+}

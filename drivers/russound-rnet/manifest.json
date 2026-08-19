@@ -1,0 +1,22 @@
+{
+  "id": "russound-rnet",
+  "displayName": "Russound RNET (legacy, lowest confidence)",
+  "icon": "🔊",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Serial-to-IP bridge address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 9999 }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "sendRawPacket", "label": "Send Raw RNET Message (advanced)", "params": [
+      { "key": "hexBody", "type": "string", "label": "Message body as hex bytes (space-separated), excluding start/end/checksum - this driver adds those" }
+    ] }
+  ],
+  "events": [],
+  "states": []
+}

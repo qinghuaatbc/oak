@@ -1,0 +1,36 @@
+{
+  "id": "pjlink",
+  "displayName": "Projector (PJLink)",
+  "icon": "📽️",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Projector IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 4352 }
+    ]
+  },
+  "settings": [
+    { "key": "password", "type": "password", "label": "PJLink password (leave blank if the projector has security disabled)" }
+  ],
+  "actions": [
+    { "id": "powerOn", "label": "Power On", "role": "on", "params": [] },
+    { "id": "powerOff", "label": "Power Off", "role": "off", "params": [] },
+    { "id": "setInput", "label": "Set Input", "params": [
+      { "key": "source", "type": "select", "options": ["1", "2", "3", "4", "5"], "label": "Source (1=RGB 2=Video 3=Digital 4=Storage 5=Network)" },
+      { "key": "number", "type": "number", "label": "Input number (1-9)", "default": 1 }
+    ] },
+    { "id": "mute", "label": "Mute", "params": [
+      { "key": "target", "type": "select", "options": ["1", "2", "3"], "label": "Target (1=video 2=audio 3=both)", "default": "3" },
+      { "key": "state", "type": "select", "options": ["0", "1"], "label": "0=off 1=on", "default": "1" }
+    ] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "power", "label": "Power State", "role": "on" },
+    { "id": "input", "label": "Current Input" },
+    { "id": "lampHours", "label": "Lamp Hours" },
+    { "id": "errorStatus", "label": "Error Status" }
+  ]
+}

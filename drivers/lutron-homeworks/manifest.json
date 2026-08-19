@@ -1,0 +1,33 @@
+{
+  "id": "lutron-homeworks",
+  "displayName": "Lutron HomeWorks / RadioRA 2 / QS (Integration Protocol)",
+  "icon": "💡",
+  "version": "0.1.0",
+  "category": "light",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Main Repeater / QS Processor IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 23 }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Telnet login", "default": "lutron" },
+    { "key": "password", "type": "password", "label": "Telnet password", "default": "integration" }
+  ],
+  "actions": [
+    { "id": "setLevel", "label": "Set Dimmer Level", "role": "level", "params": [
+      { "key": "integrationId", "type": "number", "label": "Integration ID" },
+      { "key": "level", "type": "number", "label": "Level (0-100)" },
+      { "key": "fadeSeconds", "type": "number", "label": "Fade time (seconds)", "default": 1 }
+    ] },
+    { "id": "pressButton", "label": "Press Keypad Button", "params": [
+      { "key": "integrationId", "type": "number", "label": "Integration ID" },
+      { "key": "component", "type": "number", "label": "Component number" }
+    ] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "level", "label": "Dimmer Level", "role": "level" }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "genie-aladdin",
+  "displayName": "Genie Aladdin Connect (unofficial)",
+  "icon": "🚪",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "http",
+    "fields": []
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Aladdin Connect account email" },
+    { "key": "password", "type": "password", "label": "Aladdin Connect account password" },
+    { "key": "deviceId", "type": "string", "label": "Device ID (use discoverDevices first)" },
+    { "key": "doorNumber", "type": "number", "label": "Door number", "default": 1 }
+  ],
+  "actions": [
+    { "id": "open", "label": "Open Door", "role": "on", "params": [] },
+    { "id": "close", "label": "Close Door", "role": "off", "params": [] },
+    { "id": "discoverDevices", "label": "Discover Devices", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "door.status", "label": "Door Status" }
+  ]
+}
