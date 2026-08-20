@@ -1186,7 +1186,7 @@ const BUILTIN_DRIVERS = new Set([
   "crown-hiqnet", "lg-display", "sony-bravia", "rainbird",
   "tasmota", "kramer-matrix", "panasonic-display", "justaddpower",
   "opensprinkler", "daikin", "somfy-overkiz", "tado",
-  "dahua", "akuvox",
+  "dahua", "akuvox", "ssh-cli",
 ]);
 
 function listDriverManifests() {

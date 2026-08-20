@@ -1,0 +1,35 @@
+{
+  "id": "ssh-cli",
+  "displayName": "SSH / Generic CLI",
+  "icon": "💻",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "http",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Host IP/hostname" },
+      { "key": "port", "type": "number", "label": "Port", "default": 22 }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "SSH username" },
+    { "key": "password", "type": "password", "label": "Password (leave blank if using a private key)" },
+    { "key": "privateKey", "type": "password", "label": "Private key (PEM text, leave blank if using a password)" },
+    { "key": "passphrase", "type": "password", "label": "Private key passphrase (if the key is encrypted)" },
+    { "key": "timeoutMs", "type": "number", "label": "Connection timeout (ms)", "default": 10000 }
+  ],
+  "actions": [
+    { "id": "runCommand", "label": "Run Command", "params": [
+      { "key": "command", "type": "string", "label": "Shell command to run" }
+    ] }
+  ],
+  "events": [
+    { "id": "commandCompleted", "label": "Command Completed", "params": [] }
+  ],
+  "states": [
+    { "id": "lastCommand", "label": "Last Command" },
+    { "id": "lastExitCode", "label": "Last Exit Code" },
+    { "id": "lastOutput", "label": "Last Output (stdout, truncated)" },
+    { "id": "lastError", "label": "Last Error (stderr, truncated)" }
+  ]
+}
