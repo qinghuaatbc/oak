@@ -23,7 +23,7 @@
           {
             "key": "port",
             "type": "number",
-            "label": "Port",
+            "label": "Port (80 for HTTP, or 8443 if Use HTTPS below is on - eisy's legacy local-account port on some units)",
             "default": 80
           }
         ]
@@ -31,6 +31,12 @@
     ]
   },
   "settings": [
+    {
+      "key": "useHttps",
+      "type": "boolean",
+      "label": "Use HTTPS (self-signed cert) - some eisy units only serve the legacy local admin/admin account over their HTTPS port (often 8443), even when the equivalent HTTP port (often 8080) has stopped responding",
+      "default": false
+    },
     {
       "key": "username",
       "type": "string",

@@ -22,6 +22,28 @@
 // of time, so each node is addressed manually per Dashboard slot (same
 // "zone" fixed-argument pattern zone-hub uses for its own zones).
 
+// Some eisy units serve the legacy "local account" (e.g. admin/admin)
+// only over a self-signed HTTPS port (often 8443), independent of - and
+// sometimes still working even after - the equivalent HTTP port (often
+// 8080) stops responding; found live on a real running instance whose
+// HTTP-8080 timed out completely while HTTPS-8443 with the same local
+// credentials worked. Own https.Agent scoped to just this driver's own
+// requests, same pattern as ../vizio-smartcast/../tesla-powerwall -
+// never touches global NODE_TLS_REJECT_UNAUTHORIZED.
+const https = require("https");
+const insecureAgent = new https.Agent({ rejectUnauthorized: false });
+function httpsRequest(url, headers) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, { agent: insecureAgent, headers }, (res) => {
+      let body = "";
+      res.on("data", (c) => (body += c));
+      res.on("end", () => resolve({ status: res.statusCode, ok: res.statusCode < 400, text: async () => body }));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 function xmlAttr(tag, name) {
   const m = tag.match(new RegExp(`${name}="([^"]*)"`));
   return m ? m[1] : undefined;
@@ -92,10 +114,22 @@ function parseEvent(xml) {
 }
 
 function create(ctx) {
-  const baseUrl = ctx.http.baseUrl;
+  const useHttps = Boolean(ctx.config.settings && ctx.config.settings.useHttps);
+  // Built directly from connection fields rather than ctx.http.baseUrl,
+  // which hardcodes an "http://" scheme with no way to opt into https.
+  const baseUrl = `${useHttps ? "https" : "http"}://${ctx.config.connection.host}:${ctx.config.connection.port || (useHttps ? 8443 : 80)}`;
   const username = (ctx.config.settings && ctx.config.settings.username) || "";
   const password = (ctx.config.settings && ctx.config.settings.password) || "";
   const authHeader = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+  // Unified request helper so every call site below works under either
+  // scheme without an if/else at each one - global fetch() can't be
+  // pointed at a self-signed cert without touching Node's global TLS
+  // settings, so HTTPS mode routes through the raw https.request()
+  // helper above instead.
+  function request(path, headers) {
+    const url = `${baseUrl}${path}`;
+    return useHttps ? httpsRequest(url, headers) : fetch(url, { headers });
+  }
   const RECONNECT_MS = 5000;
   let ws = null;
   let reconnectHandle = null;
@@ -132,7 +166,7 @@ function create(ctx) {
 
   async function fetchInitialStatus() {
     try {
-      const res = await fetch(`${baseUrl}/rest/status`, { headers: { Authorization: authHeader } });
+      const res = await request("/rest/status", { Authorization: authHeader });
       const xml = await res.text();
       const nodes = parseNodes(xml);
       for (const [address, props] of Object.entries(nodes)) {
@@ -148,6 +182,12 @@ function create(ctx) {
     const wsUrl = baseUrl.replace(/^http/, "ws") + "/rest/subscribe";
     ws = new WebSocket(wsUrl, "ISYSUB", {
       headers: { Authorization: authHeader, Origin: "com.universal-devices.websockets.isy" },
+      // baseUrl.replace(/^http/,"ws") turns "https://" into "wss://"
+      // correctly (the regex only matches the "http" prefix, leaving the
+      // trailing "s") - rejectUnauthorized here is the ws package's own
+      // pass-through to its underlying TLS socket options, scoped to just
+      // this connection like the HTTPS agent above.
+      ...(useHttps ? { rejectUnauthorized: false } : {}),
     });
     ws.on("open", () => ctx.log("Event stream connected:", wsUrl));
     ws.on("message", (data) => {
@@ -176,7 +216,7 @@ function create(ctx) {
       // forcing a fresh connection per command avoids this, and the cost
       // is negligible since a command is a rare, human-paced action, not
       // a high-frequency one.
-      await fetch(`${baseUrl}${path}`, { headers: { Authorization: authHeader, Connection: "close" } });
+      await request(path, { Authorization: authHeader, Connection: "close" });
     } catch (err) {
       // Without this try/catch, a network hiccup here becomes an
       // unhandled promise rejection - confirmed on a real running
@@ -212,7 +252,7 @@ function create(ctx) {
   // deviceNames setting.
   ctx.onAction("discoverNodes", async () => {
     try {
-      const res = await fetch(`${baseUrl}/rest/nodes`, { headers: { Authorization: authHeader } });
+      const res = await request("/rest/nodes", { Authorization: authHeader });
       const xml = await res.text();
       const nodes = parseNodeList(xml);
       ctx.setState("discovery.nodes", JSON.stringify(nodes));
@@ -231,7 +271,7 @@ function create(ctx) {
   // Actions panel or a macro in the meantime.
   async function programCmd(programId, command) {
     try {
-      await fetch(`${baseUrl}/rest/programs/${encodeURIComponent(programId)}/${command}`, { headers: { Authorization: authHeader, Connection: "close" } });
+      await request(`/rest/programs/${encodeURIComponent(programId)}/${command}`, { Authorization: authHeader, Connection: "close" });
     } catch (err) {
       ctx.log(`Program command failed (${programId} ${command}): ${err.message}`);
     }
@@ -241,21 +281,41 @@ function create(ctx) {
   ctx.onAction("disableProgram", ({ programId }) => programCmd(programId, "disable"));
   ctx.onAction("setVariable", async ({ varType = 2, varId, value }) => {
     try {
-      await fetch(`${baseUrl}/rest/vars/set/${varType}/${varId}/${value}`, { headers: { Authorization: authHeader, Connection: "close" } });
+      await request(`/rest/vars/set/${varType}/${varId}/${value}`, { Authorization: authHeader, Connection: "close" });
     } catch (err) {
       ctx.log(`setVariable failed (${varType}/${varId}): ${err.message}`);
     }
   });
+
+  // Polling fallback, supplementing (not replacing) the event stream -
+  // found live on a real running instance that the WS subscribe channel
+  // can silently stop pushing genuinely new events (a raw independent
+  // test confirmed it replays a historical backlog on connect but then
+  // delivers nothing further even after a real command changed a real
+  // node's state) while still reporting itself as connected the whole
+  // time - no close/error event fires, so connectEventStream's own
+  // reconnect logic never notices anything is wrong. Without this,
+  // Oak's state only reflects reality immediately after a restart
+  // (fetchInitialStatus's one-shot baseline read) and silently goes
+  // stale the moment something changes afterward. Reuses the
+  // pollIntervalMs setting, which pre-dates this driver's current
+  // event-only design (an earlier version polled exclusively, per this
+  // file's own "no fetchStatus() after the command" comment above) and
+  // was otherwise sitting unused.
+  let pollTimer = null;
 
   return {
     async onConnect() {
       ctx.log("Connecting to", baseUrl);
       await fetchInitialStatus();
       connectEventStream();
+      const pollMs = Number(ctx.config.settings && ctx.config.settings.pollIntervalMs) || 5000;
+      pollTimer = ctx.clock.every(pollMs, fetchInitialStatus);
     },
     onDisconnect() {
       stopped = true;
       if (reconnectHandle) reconnectHandle.cancel();
+      if (pollTimer) pollTimer.cancel();
       if (ws) ws.terminate();
     },
   };
