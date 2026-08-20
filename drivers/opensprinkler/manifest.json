@@ -1,0 +1,29 @@
+{
+  "id": "opensprinkler",
+  "displayName": "OpenSprinkler",
+  "icon": "💧",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "http",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Controller IP address" }
+    ]
+  },
+  "settings": [
+    { "key": "password", "type": "password", "label": "Controller password" }
+  ],
+  "actions": [
+    { "id": "startZone", "label": "Start Zone", "role": "on", "params": [
+      { "key": "station", "type": "number", "label": "Station number (0-based)" },
+      { "key": "seconds", "type": "number", "label": "Duration (seconds)", "default": 300 }
+    ] },
+    { "id": "stopZone", "label": "Stop Zone", "role": "off", "params": [{ "key": "station", "type": "number", "label": "Station number (0-based)" }] },
+    { "id": "setRainDelay", "label": "Set Rain Delay", "params": [{ "key": "hours", "type": "number", "label": "Hours" }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "stationBitmask", "label": "Station Status (bitmask)" }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "tado",
+  "displayName": "Tado Smart Thermostat",
+  "icon": "🌡️",
+  "version": "0.1.0",
+  "category": "climate",
+  "connection": {
+    "kind": "http",
+    "fields": []
+  },
+  "settings": [
+    { "key": "clientId", "type": "string", "label": "OAuth2 client_id (from a current PyTado/Tado API trace - not hardcoded here since it wasn't independently confirmed)" },
+    { "key": "homeId", "type": "string", "label": "Home ID" },
+    { "key": "zoneId", "type": "string", "label": "Zone ID" },
+    { "key": "refreshToken", "type": "password", "label": "Refresh token (filled in automatically after startDeviceAuth completes)" }
+  ],
+  "actions": [
+    { "id": "startDeviceAuth", "label": "Start Device Authorization (one-time setup)", "params": [] },
+    { "id": "setTemperature", "label": "Set Temperature", "role": "level", "params": [{ "key": "celsius", "type": "number", "label": "Temperature (C)" }] },
+    { "id": "resumeSchedule", "label": "Resume Schedule (remove manual override)", "params": [] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [
+    { "id": "authPending", "label": "Authorization Pending (check log for the verification URL/code)", "params": [] },
+    { "id": "authComplete", "label": "Authorization Complete", "params": [] }
+  ],
+  "states": [
+    { "id": "currentTemp", "label": "Current Temperature" },
+    { "id": "targetTemp", "label": "Target Temperature", "role": "level" },
+    { "id": "power", "label": "Power State", "role": "on" }
+  ]
+}

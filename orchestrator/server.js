@@ -1185,6 +1185,7 @@ const BUILTIN_DRIVERS = new Set([
   "intellifire", "middleatlantic-pdu",
   "crown-hiqnet", "lg-display", "sony-bravia", "rainbird",
   "tasmota", "kramer-matrix", "panasonic-display", "justaddpower",
+  "opensprinkler", "daikin", "somfy-overkiz", "tado",
 ]);
 
 function listDriverManifests() {

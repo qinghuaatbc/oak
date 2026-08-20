@@ -1,0 +1,28 @@
+{
+  "id": "daikin",
+  "displayName": "Daikin AC (WiFi adapter, BRP069)",
+  "icon": "❄️",
+  "version": "0.1.0",
+  "category": "climate",
+  "connection": {
+    "kind": "http",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Unit IP address" }
+    ]
+  },
+  "settings": [],
+  "actions": [
+    { "id": "powerOn", "label": "Power On", "role": "on", "params": [] },
+    { "id": "powerOff", "label": "Power Off", "role": "off", "params": [] },
+    { "id": "setTemperature", "label": "Set Temperature", "role": "level", "params": [{ "key": "temp", "type": "number", "label": "Temperature (C)" }] },
+    { "id": "setMode", "label": "Set Mode", "params": [{ "key": "mode", "type": "select", "options": ["0", "2", "3", "4", "6"], "label": "0=Auto 2=Dry 3=Cool 4=Heat 6=Fan" }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "power", "label": "Power State", "role": "on" },
+    { "id": "targetTemp", "label": "Target Temperature", "role": "level" },
+    { "id": "roomTemp", "label": "Room Temperature" },
+    { "id": "mode", "label": "Mode" }
+  ]
+}

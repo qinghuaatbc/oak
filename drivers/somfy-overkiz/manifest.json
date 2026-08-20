@@ -1,0 +1,26 @@
+{
+  "id": "somfy-overkiz",
+  "displayName": "Somfy TaHoma / Overkiz",
+  "icon": "🪟",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "http",
+    "fields": [
+      { "key": "endpoint", "type": "string", "label": "API endpoint (e.g. ha101-1.overkiz.com for Somfy Europe, ha401-1.overkiz.com for Somfy North America)", "default": "ha101-1.overkiz.com" }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "TaHoma account email" },
+    { "key": "password", "type": "password", "label": "TaHoma account password" },
+    { "key": "deviceUrl", "type": "string", "label": "Device URL (e.g. io://1234-5678-9012/12345)" }
+  ],
+  "actions": [
+    { "id": "open", "label": "Open", "role": "on", "params": [] },
+    { "id": "close", "label": "Close", "role": "off", "params": [] },
+    { "id": "setPosition", "label": "Set Position", "role": "level", "params": [{ "key": "position", "type": "number", "label": "Position (0-100, 0=closed)" }] },
+    { "id": "stop", "label": "Stop", "params": [] }
+  ],
+  "events": [],
+  "states": []
+}
