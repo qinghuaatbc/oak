@@ -66,7 +66,12 @@ function create(ctx) {
       for (let attempt = 0; attempt < 10; attempt++) {
         const data = await api(`/vehicles/${vehicleId}/wake_up`, { method: "POST" });
         if (data && data.response && data.response.state === "online") return;
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Sandbox's vm.Context doesn't expose raw setTimeout (only
+        // ctx.clock.every/after) - a bare setTimeout() here throws
+        // ReferenceError, silently breaking every "wake" attempt (caught by
+        // the try/catch above, so it failed quietly instead of crashing -
+        // found via a full-codebase sandbox-global audit).
+        await new Promise((resolve) => ctx.clock.after(2000, resolve));
       }
       ctx.log("Vehicle did not wake within the retry window");
     } catch (err) {
