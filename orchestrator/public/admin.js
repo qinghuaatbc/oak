@@ -388,6 +388,26 @@ function renderEventsPanel() {
   if (!logBuffer.length) eventsLog.innerHTML = `<p class="empty-hint">no events yet</p>`;
 }
 
+// A manifest's connection is either the older {kind:"choice", options:[...]}
+// shape (multiple named connection types, e.g. eisy's HTTP/HTTPS choice) or
+// the newer, simpler {kind:"tcp"|"http", fields:[...]} shape used directly
+// by the great majority of drivers added later in this project - "kind"
+// itself doubles as the transport name in that shape, since there's no
+// separate options array to carry a per-option transport string. Every
+// call site that used to assume options[0] unconditionally threw a
+// TypeError for any driver using the simpler shape - found live: the Add
+// Instance form for the vast majority of this project's drivers (115 of
+// 147, per a manifest count) silently failed this way, either rendering a
+// stale previous driver's fields or throwing uncaught on submit, with
+// nothing visible to the user beyond "nothing happened." Like
+// options[0] before it, this only ever looks at the FIRST connection
+// option - the admin UI has never offered a picker for choosing among
+// multiple options on a driver that declares more than one.
+function primaryConnectionOption(manifest) {
+  if (Array.isArray(manifest.connection.options)) return manifest.connection.options[0];
+  return { transport: manifest.connection.kind, fields: manifest.connection.fields || [] };
+}
+
 // Config only makes sense for exactly one instance at a time - editing
 // several instances' connection/settings at once through one form isn't a
 // coherent operation the way "show all their states in one table" is.
@@ -417,7 +437,7 @@ async function renderConfigPanel() {
       f.type === "number" ? "number" : "text"
     }" value="${value !== undefined ? value : ""}" ${running ? "disabled" : ""} /></label>`;
   }
-  const connFieldDefs = driverManifest.connection.options[0].fields || [];
+  const connFieldDefs = primaryConnectionOption(driverManifest).fields || [];
   const settingFieldDefs = driverManifest.settings || [];
   const connFields = connFieldDefs
     .filter((f) => f.type !== "keyvalue")
@@ -2944,7 +2964,7 @@ async function setupAddInstanceForm() {
       fieldsRoot.innerHTML = "";
       return;
     }
-    const connFields = (manifest.connection.options[0].fields || []).map((f) => configFieldInput("connection", f)).join("");
+    const connFields = (primaryConnectionOption(manifest).fields || []).map((f) => configFieldInput("connection", f)).join("");
     const settingFields = (manifest.settings || []).map((f) => configFieldInput("settings", f)).join("");
     fieldsRoot.innerHTML = `
       <input name="id" placeholder="instance id (e.g. relay2 - letters/numbers/hyphens only, no spaces)" pattern="[A-Za-z0-9_-]+" title="Letters, numbers, hyphens, or underscores only - no spaces" required />
@@ -2952,7 +2972,7 @@ async function setupAddInstanceForm() {
       ${connFields}
       ${settingFields}
       <button class="btn small primary" type="submit">Add</button>`;
-    (manifest.connection.options[0].fields || []).forEach((f) => f.type === "keyvalue" && wireKeyValueField(fieldsRoot, "connection", f));
+    (primaryConnectionOption(manifest).fields || []).forEach((f) => f.type === "keyvalue" && wireKeyValueField(fieldsRoot, "connection", f));
     (manifest.settings || []).forEach((f) => f.type === "keyvalue" && wireKeyValueField(fieldsRoot, "settings", f));
   }
 
@@ -2990,7 +3010,7 @@ async function setupAddInstanceForm() {
     const form = ev.target;
     const id = form.querySelector('[name="id"]').value.trim();
     const label = form.querySelector('[name="label"]').value.trim();
-    const connection = { transport: drivers.find((d) => d.id === driverPicker.value).connection.options[0].transport };
+    const connection = { transport: primaryConnectionOption(drivers.find((d) => d.id === driverPicker.value)).transport };
     const settings = {};
     form.querySelectorAll("input").forEach((input) => {
       if (input.name === "id" || input.name === "label" || input.value === "" || input.closest("[data-keyvalue-field]")) return;
