@@ -1,0 +1,30 @@
+{
+  "id": "tasmota",
+  "displayName": "Tasmota (HTTP API)",
+  "icon": "🔌",
+  "version": "0.1.0",
+  "category": "switch",
+  "connection": {
+    "kind": "http",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Device IP address" }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Web admin username (only if set on the device)" },
+    { "key": "password", "type": "password", "label": "Web admin password (only if set on the device)" },
+    { "key": "relayIndex", "type": "string", "label": "Relay number for multi-channel devices (blank = single relay)" }
+  ],
+  "actions": [
+    { "id": "turnOn", "label": "Turn On", "role": "on", "params": [] },
+    { "id": "turnOff", "label": "Turn Off", "role": "off", "params": [] },
+    { "id": "toggle", "label": "Toggle", "params": [] },
+    { "id": "setDimmer", "label": "Set Dimmer", "role": "level", "params": [{ "key": "level", "type": "number", "label": "Level (0-100)" }] },
+    { "id": "refresh", "label": "Refresh Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "power", "label": "Power State", "role": "on" },
+    { "id": "dimmer", "label": "Dimmer Level", "role": "level" }
+  ]
+}
