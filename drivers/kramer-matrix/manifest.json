@@ -1,0 +1,28 @@
+{
+  "id": "kramer-matrix",
+  "displayName": "Kramer Matrix Switcher (Protocol 3000)",
+  "icon": "🔀",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Switcher IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 5000 }
+    ]
+  },
+  "settings": [
+    { "key": "loginLevel", "type": "string", "label": "Login level (leave blank if security is disabled - the default)" },
+    { "key": "password", "type": "password", "label": "Password" }
+  ],
+  "actions": [
+    { "id": "route", "label": "Route Input to Output", "params": [
+      { "key": "layer", "type": "number", "label": "Layer (1=video)", "default": 1 },
+      { "key": "output", "type": "number", "label": "Output" },
+      { "key": "input", "type": "number", "label": "Input" }
+    ] },
+    { "id": "sendRaw", "label": "Send Raw Command (advanced - e.g. power varies by model)", "params": [{ "key": "command", "type": "string", "label": "Command (without # prefix or CR)" }] }
+  ],
+  "events": [],
+  "states": []
+}

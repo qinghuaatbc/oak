@@ -1,0 +1,25 @@
+{
+  "id": "panasonic-display",
+  "displayName": "Panasonic Commercial Display (NTCONTROL)",
+  "icon": "🖥️",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Display IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 1024 }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Username (only if security is enabled on the display)", "default": "admin1" },
+    { "key": "password", "type": "password", "label": "Password", "default": "panasonic" }
+  ],
+  "actions": [
+    { "id": "powerOn", "label": "Power On", "role": "on", "params": [] },
+    { "id": "powerOff", "label": "Power Off", "role": "off", "params": [] },
+    { "id": "sendRaw", "label": "Send Raw Command (advanced - e.g. input select varies by model)", "params": [{ "key": "command", "type": "string", "label": "Command (e.g. IIS:HM1)" }] }
+  ],
+  "events": [],
+  "states": []
+}
