@@ -1,0 +1,26 @@
+{
+  "id": "lg-display",
+  "displayName": "LG Commercial Display (Set-ID)",
+  "icon": "🖥️",
+  "version": "0.1.0",
+  "category": "media",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Display IP address (or serial-to-IP bridge)" },
+      { "key": "port", "type": "number", "label": "Port (verify against this model - 9761 is well-attested by installers but not LG's own PDF)", "default": 9761 }
+    ]
+  },
+  "settings": [
+    { "key": "setId", "type": "number", "label": "Set ID (1-1000, or 0 for broadcast - no ACK on broadcast)", "default": 1 }
+  ],
+  "actions": [
+    { "id": "powerOn", "label": "Power On", "role": "on", "params": [] },
+    { "id": "powerOff", "label": "Power Off", "role": "off", "params": [] },
+    { "id": "setInputRaw", "label": "Set Input (raw hex code)", "params": [{ "key": "hexCode", "type": "string", "label": "Input source hex code (see this model's Set-ID command table)" }] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "power", "label": "Power State", "role": "on" }
+  ]
+}

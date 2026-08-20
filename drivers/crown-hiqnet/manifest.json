@@ -1,0 +1,32 @@
+{
+  "id": "crown-hiqnet",
+  "displayName": "Crown Amplifier (HiQnet, advanced)",
+  "icon": "🔊",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "tcp",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Amplifier IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 3804 }
+    ]
+  },
+  "settings": [
+    { "key": "destDevice", "type": "string", "label": "Destination Device Address (4 hex chars)", "default": "0001" },
+    { "key": "destVd", "type": "string", "label": "Destination Virtual Device (2 hex chars)", "default": "00" },
+    { "key": "destObject", "type": "string", "label": "Destination Object Address (6 hex chars, 3 levels)", "default": "010000" }
+  ],
+  "actions": [
+    { "id": "setParameter", "label": "Set Parameter (advanced - requires this model's Parameter_ID map)", "params": [
+      { "key": "paramId", "type": "number", "label": "Parameter ID (from System Architect's product definition for this exact model)" },
+      { "key": "value", "type": "number", "label": "Value (signed 32-bit)" }
+    ] },
+    { "id": "getParameter", "label": "Get Parameter", "params": [
+      { "key": "paramId", "type": "number", "label": "Parameter ID" }
+    ] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "parameter.value", "label": "Parameter Value" }
+  ]
+}

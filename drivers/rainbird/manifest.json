@@ -1,0 +1,29 @@
+{
+  "id": "rainbird",
+  "displayName": "Rain Bird Irrigation (LNK WiFi)",
+  "icon": "💧",
+  "version": "0.1.0",
+  "category": "generic",
+  "connection": {
+    "kind": "http",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Controller IP address" }
+    ]
+  },
+  "settings": [
+    { "key": "password", "type": "password", "label": "Local API password (set in the Rain Bird app)" }
+  ],
+  "actions": [
+    { "id": "startZone", "label": "Start Zone", "role": "on", "params": [
+      { "key": "zone", "type": "number", "label": "Zone number" },
+      { "key": "minutes", "type": "number", "label": "Minutes", "default": 10 }
+    ] },
+    { "id": "stopAll", "label": "Stop All Zones", "role": "off", "params": [] },
+    { "id": "refresh", "label": "Refresh Zone Status", "params": [] }
+  ],
+  "events": [],
+  "states": [
+    { "id": "activeZones", "label": "Active Zones (bitmask)" },
+    { "id": "availableZones", "label": "Available Zones (bitmask)" }
+  ]
+}

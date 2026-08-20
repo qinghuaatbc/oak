@@ -1183,6 +1183,7 @@ const BUILTIN_DRIVERS = new Set([
   "samsung-mdc", "furman-pwm", "qsys-core", "lutron-homeworks", "genie-aladdin", "russound-rnet",
   "avpro-edge", "anthem-avr", "biamp-tesira", "nec-display", "tesla-wall-connector",
   "intellifire", "middleatlantic-pdu",
+  "crown-hiqnet", "lg-display", "sony-bravia", "rainbird",
 ]);
 
 function listDriverManifests() {
