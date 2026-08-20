@@ -165,10 +165,26 @@ function create(ctx) {
   }
 
   async function sendCommand(address, control, value) {
-    const path = value !== undefined ? `/rest/nodes/${encodeURIComponent(address)}/cmd/${control}/${value}` : `/rest/nodes/${encodeURIComponent(address)}/cmd/${control}`;
-    // No fetchStatus() after the command the way the old polling version
-    // needed - the event stream reports the resulting state change itself.
-    await fetch(`${baseUrl}${path}`, { headers: { Authorization: authHeader } });
+    try {
+      const path = value !== undefined ? `/rest/nodes/${encodeURIComponent(address)}/cmd/${control}/${value}` : `/rest/nodes/${encodeURIComponent(address)}/cmd/${control}`;
+      // No fetchStatus() after the command the way the old polling version
+      // needed - the event stream reports the resulting state change itself.
+      // Connection: close - found on a real unit that its HTTP server's
+      // Keep-Alive timeout (5s) is short enough that Node's fetch() can
+      // hand back a pooled socket the server already dropped, surfacing
+      // as a generic "fetch failed" TypeError with no HTTP status at all;
+      // forcing a fresh connection per command avoids this, and the cost
+      // is negligible since a command is a rare, human-paced action, not
+      // a high-frequency one.
+      await fetch(`${baseUrl}${path}`, { headers: { Authorization: authHeader, Connection: "close" } });
+    } catch (err) {
+      // Without this try/catch, a network hiccup here becomes an
+      // unhandled promise rejection - confirmed on a real running
+      // instance: every onAction below funnels through this function, so
+      // one missing try/catch silently swallowed every node on/off/level
+      // command with zero feedback anywhere (not even entry.lastError).
+      ctx.log(`Command failed (${address} ${control}): ${err.message}`);
+    }
   }
 
   ctx.onAction("nodeOn", ({ address }) => sendCommand(address, "DON"));
@@ -214,13 +230,21 @@ function create(ctx) {
   // fit the on/off/level model), reachable via the Driver tab's raw
   // Actions panel or a macro in the meantime.
   async function programCmd(programId, command) {
-    await fetch(`${baseUrl}/rest/programs/${encodeURIComponent(programId)}/${command}`, { headers: { Authorization: authHeader } });
+    try {
+      await fetch(`${baseUrl}/rest/programs/${encodeURIComponent(programId)}/${command}`, { headers: { Authorization: authHeader, Connection: "close" } });
+    } catch (err) {
+      ctx.log(`Program command failed (${programId} ${command}): ${err.message}`);
+    }
   }
   ctx.onAction("runProgram", ({ programId, clause = "run" }) => programCmd(programId, clause));
   ctx.onAction("enableProgram", ({ programId }) => programCmd(programId, "enable"));
   ctx.onAction("disableProgram", ({ programId }) => programCmd(programId, "disable"));
   ctx.onAction("setVariable", async ({ varType = 2, varId, value }) => {
-    await fetch(`${baseUrl}/rest/vars/set/${varType}/${varId}/${value}`, { headers: { Authorization: authHeader } });
+    try {
+      await fetch(`${baseUrl}/rest/vars/set/${varType}/${varId}/${value}`, { headers: { Authorization: authHeader, Connection: "close" } });
+    } catch (err) {
+      ctx.log(`setVariable failed (${varType}/${varId}): ${err.message}`);
+    }
   });
 
   return {
