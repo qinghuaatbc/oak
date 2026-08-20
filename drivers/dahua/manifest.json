@@ -1,0 +1,34 @@
+{
+  "id": "dahua",
+  "displayName": "Dahua Camera / NVR / VTO Intercom",
+  "icon": "📷",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "http",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Device IP address" },
+      { "key": "port", "type": "number", "label": "Port", "default": 80 }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "Username" },
+    { "key": "password", "type": "password", "label": "Password" },
+    { "key": "channel", "type": "number", "label": "Channel (for NVR multi-camera; use 1 for a single camera or VTO)", "default": 1 }
+  ],
+  "actions": [
+    { "id": "openDoor", "label": "Open Door/Relay", "role": "disarm", "params": [] },
+    { "id": "ptzStart", "label": "PTZ Move (continuous)", "params": [
+      { "key": "code", "type": "select", "options": ["Up", "Down", "Left", "Right", "ZoomTele", "ZoomWide"], "label": "Direction" },
+      { "key": "speed", "type": "number", "label": "Speed (0-8)", "default": 4 }
+    ] },
+    { "id": "ptzStop", "label": "PTZ Stop", "params": [{ "key": "code", "type": "select", "options": ["Up", "Down", "Left", "Right", "ZoomTele", "ZoomWide"], "label": "Direction" }] },
+    { "id": "reboot", "label": "Reboot Device", "params": [] }
+  ],
+  "events": [
+    { "id": "motion", "label": "Motion Detected", "params": [] },
+    { "id": "ring", "label": "Doorbell Ring (VTO)", "params": [] },
+    { "id": "alarmEvent", "label": "Other Alarm Event (raw passthrough)", "params": [] }
+  ],
+  "states": []
+}

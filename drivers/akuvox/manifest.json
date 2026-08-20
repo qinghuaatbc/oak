@@ -1,0 +1,23 @@
+{
+  "id": "akuvox",
+  "displayName": "Akuvox IP Intercom",
+  "icon": "🔔",
+  "version": "0.1.0",
+  "category": "security",
+  "connection": {
+    "kind": "http",
+    "fields": [
+      { "key": "host", "type": "string", "label": "Intercom IP address" }
+    ]
+  },
+  "settings": [
+    { "key": "username", "type": "string", "label": "HTTP API username (set under Settings -> HTTP API on the device)" },
+    { "key": "password", "type": "password", "label": "HTTP API password" }
+  ],
+  "actions": [
+    { "id": "openDoor", "label": "Open Door", "role": "disarm", "params": [{ "key": "doorNum", "type": "select", "options": ["1", "2"], "label": "Relay (1=A, 2=B)", "default": "1" }] },
+    { "id": "closeDoor", "label": "Close Door", "params": [{ "key": "doorNum", "type": "select", "options": ["1", "2"], "label": "Relay", "default": "1" }] }
+  ],
+  "events": [],
+  "states": []
+}
