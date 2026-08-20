@@ -131,6 +131,25 @@ function create(ctx) {
     return useHttps ? httpsRequest(url, headers) : fetch(url, { headers });
   }
   const RECONNECT_MS = 5000;
+  // Staleness-detection reconnect, ported from a proven design in this
+  // project's own prior QTI/RTI-ecosystem eisy driver (workshop/eisy):
+  // that driver's own header comment records observing, on a real eISY,
+  // that the subscribe connection can go silently stale and stay
+  // reported as "connected" indefinitely with no further events ever
+  // arriving - nothing about a close/error event ever fires, so the
+  // existing reconnect-on-close logic above never notices. Confirmed
+  // independently here too: a raw test script bypassing this driver
+  // entirely showed the same behavior against a real eisy - the WS
+  // stayed "open" while genuinely new events stopped arriving. Fixed the
+  // same way that prior driver fixed it: track the last time ANY message
+  // arrived (including heartbeats) and force a reconnect if it's been
+  // too long, rather than trusting the socket's own open/close state.
+  // 180s, not something shorter, matches that driver's own tuning - a
+  // shorter interval risks reconnecting before a real event ever gets a
+  // chance to arrive under load.
+  const STALE_MS = 180000;
+  let lastActivityTime = 0;
+  let staleCheckTimer = null;
   let ws = null;
   let reconnectHandle = null;
   let stopped = false;
@@ -189,8 +208,12 @@ function create(ctx) {
       // this connection like the HTTPS agent above.
       ...(useHttps ? { rejectUnauthorized: false } : {}),
     });
-    ws.on("open", () => ctx.log("Event stream connected:", wsUrl));
+    ws.on("open", () => {
+      lastActivityTime = Date.now();
+      ctx.log("Event stream connected:", wsUrl);
+    });
     ws.on("message", (data) => {
+      lastActivityTime = Date.now(); // any message counts, including heartbeats - see checkStaleness below
       const xml = data.toString();
       const { control, node, action } = parseEvent(xml);
       if (!control || !node || action === undefined) return; // heartbeat or non-node message
@@ -304,6 +327,25 @@ function create(ctx) {
   // was otherwise sitting unused.
   let pollTimer = null;
 
+  // Checked periodically rather than via a single long setTimeout so it
+  // keeps working across any number of reconnects without needing to be
+  // rescheduled from inside connectEventStream itself - a light
+  // reconnect (terminate + reopen, no full status refetch) mirrors the
+  // referenced driver's own reasoning: the node list is already known,
+  // so there's no need to redo discovery just to re-subscribe.
+  function checkStaleness() {
+    if (stopped || !lastActivityTime) return;
+    if (Date.now() - lastActivityTime > STALE_MS) {
+      ctx.log(`No subscription activity in over ${STALE_MS / 1000}s - reopening event stream`);
+      if (reconnectHandle) reconnectHandle.cancel(); // avoid a second, redundant reconnect stacking on top of this one
+      if (ws) {
+        ws.removeAllListeners("close"); // this is already a deliberate reconnect - the normal close handler's own reconnectHandle would otherwise schedule a duplicate
+        ws.terminate();
+      }
+      connectEventStream();
+    }
+  }
+
   return {
     async onConnect() {
       ctx.log("Connecting to", baseUrl);
@@ -311,11 +353,13 @@ function create(ctx) {
       connectEventStream();
       const pollMs = Number(ctx.config.settings && ctx.config.settings.pollIntervalMs) || 5000;
       pollTimer = ctx.clock.every(pollMs, fetchInitialStatus);
+      staleCheckTimer = ctx.clock.every(30000, checkStaleness);
     },
     onDisconnect() {
       stopped = true;
       if (reconnectHandle) reconnectHandle.cancel();
       if (pollTimer) pollTimer.cancel();
+      if (staleCheckTimer) staleCheckTimer.cancel();
       if (ws) ws.terminate();
     },
   };
