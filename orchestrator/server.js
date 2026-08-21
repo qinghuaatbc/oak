@@ -848,7 +848,7 @@ function sanitizeGlbScene(s, catIds) {
 // "slot" widget type with a {cat, slotId} pointer covers every device
 // category at once; only camera and macro (Oak's other two non-category
 // top-level entities) get their own widget types.
-const LAYOUT_WIDGET_TYPES = new Set(["slot", "camera", "macro", "pageLink", "appUrl", "label", "varDisplay"]);
+const LAYOUT_WIDGET_TYPES = new Set(["slot", "camera", "macro", "pageLink", "appUrl", "webObject", "label", "varDisplay"]);
 function sanitizeWidget(w, catIds) {
   if (!w || typeof w !== "object" || !LAYOUT_WIDGET_TYPES.has(w.type)) return null;
   const out = {
@@ -886,6 +886,10 @@ function sanitizeWidget(w, catIds) {
     if (typeof w.url !== "string" || !w.url) return null;
     out.url = w.url.slice(0, 500);
     out.openInNewTab = Boolean(w.openInNewTab);
+  } else if (w.type === "webObject") {
+    out.label = typeof w.label === "string" ? w.label.slice(0, 60) : "Web Object";
+    if (typeof w.url !== "string" || !w.url) return null;
+    out.url = w.url.slice(0, 500);
   } else if (w.type === "label") {
     out.text = typeof w.text === "string" ? w.text.slice(0, 200) : "";
   } else if (w.type === "varDisplay") {

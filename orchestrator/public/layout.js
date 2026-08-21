@@ -180,6 +180,23 @@ function buildAppUrlWidget(w) {
   el.addEventListener("click", () => window.open(w.url, w.openInNewTab ? "_blank" : "_self"));
   return { el, refresh: () => {}, cleanup: () => {} };
 }
+// No driver involved at all - just an iframe pointed at a URL, same "enter a
+// URL, done" simplicity as the Camera widget's rtspUrl field, but without
+// Camera's server-side RTSP-to-WS transcode pipeline: an iframe can only load
+// content that's already a normal web page, so nothing server-side is needed
+// (or possible) here. Sites that send X-Frame-Options/CSP frame-ancestors
+// (most banks, some SaaS admin panels) will refuse to render inside the
+// iframe - that's the target site's own choice, not fixable from this side.
+function buildWebObjectWidget(w) {
+  const el = document.createElement("div");
+  el.className = "lo-widget lo-w-webobject";
+  gridStyle(el, w);
+  const frame = document.createElement("iframe");
+  frame.className = "lo-w-frame";
+  frame.src = w.url || "about:blank";
+  el.appendChild(frame);
+  return { el, refresh: () => {}, cleanup: () => {} };
+}
 function buildLabelWidget(w) {
   const el = document.createElement("div");
   el.className = "lo-widget";
@@ -208,6 +225,7 @@ function buildWidget(w) {
   if (w.type === "macro") return buildMacroWidget(w);
   if (w.type === "pageLink") return buildPageLinkWidget(w);
   if (w.type === "appUrl") return buildAppUrlWidget(w);
+  if (w.type === "webObject") return buildWebObjectWidget(w);
   if (w.type === "label") return buildLabelWidget(w);
   if (w.type === "varDisplay") return buildVarDisplayWidget(w);
   return brokenWidget(w, "Unknown widget type");

@@ -2123,7 +2123,7 @@ function makeDragGhost(label) {
 
 function layoutWidgetIcon(w) {
   if (w.type === "slot") return catIcon(w.cat);
-  return { camera: "📷", macro: "▶️", pageLink: "🔗", appUrl: "🌐", label: "📝", varDisplay: "📊" }[w.type] || "❔";
+  return { camera: "📷", macro: "▶️", pageLink: "🔗", appUrl: "🌐", webObject: "🖼️", label: "📝", varDisplay: "📊" }[w.type] || "❔";
 }
 function layoutWidgetLabel(w) {
   if (w.type === "slot") {
@@ -2132,7 +2132,7 @@ function layoutWidgetLabel(w) {
   }
   if (w.type === "camera") return (layoutCamerasCache.find((c) => c.id === w.cameraId) || {}).name || "(missing camera)";
   if (w.type === "macro") return (layoutMacrosCache.find((m) => m.id === w.macroId) || {}).name || "(missing macro)";
-  if (w.type === "pageLink" || w.type === "appUrl") return w.label || "Link";
+  if (w.type === "pageLink" || w.type === "appUrl" || w.type === "webObject") return w.label || "Link";
   if (w.type === "label") return w.text || "(empty label)";
   if (w.type === "varDisplay") return w.label || "Value";
   return w.type;
@@ -2195,6 +2195,7 @@ function renderLayoutPalette() {
     return { type: "pageLink", label: target.name, targetPageId: target.id, x, y, w: 2, h: 1 };
   });
   addChip("App URL", "🌐", (x, y) => ({ type: "appUrl", label: "Link", url: "https://", x, y, w: 2, h: 1 }));
+  addChip("Web Object", "🖼️", (x, y) => ({ type: "webObject", label: "Web Object", url: "https://", x, y, w: 3, h: 3 }));
   addChip("Label", "📝", (x, y) => ({ type: "label", text: "Label", x, y, w: 2, h: 1 }));
   addChip("Variable Display", "📊", (x, y) =>
     instanceIds.length ? { type: "varDisplay", label: "Value", instanceId: instanceIds[0], stateId: "", x, y, w: 2, h: 1 } : (alert("Add a driver instance first."), null)
@@ -2322,6 +2323,10 @@ function renderLayoutWidgetEditor(widget) {
     fieldsHtml = `<label><span class="lbl">Label</span><input id="lwLabel" type="text" value="${widget.label || ""}" /></label>
       <label><span class="lbl">URL</span><input id="lwUrl" type="text" value="${widget.url || ""}" /></label>
       <label style="display:flex; align-items:center; gap:6px; flex-direction:row;"><input id="lwNewTab" type="checkbox" ${widget.openInNewTab ? "checked" : ""} /> <span class="lbl" style="margin:0;">Open in new tab</span></label>`;
+  } else if (widget.type === "webObject") {
+    fieldsHtml = `<label><span class="lbl">Label (shown in the widget list only)</span><input id="lwLabel" type="text" value="${widget.label || ""}" /></label>
+      <label><span class="lbl">URL</span><input id="lwUrl" type="text" value="${widget.url || ""}" /></label>
+      <p class="empty-hint">Embeds the page live on the dashboard, like a Camera tile - not a link. Only works if the site allows being framed (some sites, e.g. most banks, block this).</p>`;
   } else if (widget.type === "label") {
     fieldsHtml = `<label><span class="lbl">Text</span><input id="lwText" type="text" value="${widget.text || ""}" /></label>`;
   } else if (widget.type === "varDisplay") {
