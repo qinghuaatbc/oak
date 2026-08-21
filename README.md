@@ -26,7 +26,65 @@ note on independence from any third-party driver SDK.
   API (`GET /api/instances`, `GET /api/instances/:id/state`,
   `GET /api/instances/:id/events`, `POST /api/instances/:id/action/:actionId`).
 
-## Try it
+## Install
+
+The install script sets up Node.js (if it's missing), clones the repo,
+installs dependencies, and registers Oak as a background service that
+starts on boot/login and restarts on crash — systemd on Linux, launchd on
+macOS, Task Scheduler on Windows.
+
+**Linux — Debian, Ubuntu, or Raspberry Pi OS** (Raspberry Pi OS is
+Debian-based with systemd, so this is the exact same installer and command —
+nothing Pi-specific to do; on anything else without systemd it exits with
+manual steps instead of failing partway through):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/install.sh | bash
+```
+
+**macOS** (registered as a launchd LaunchAgent instead of a systemd service;
+uses Homebrew for Node.js if it's missing but won't install Homebrew itself;
+never needs sudo):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/install-macos.sh | bash
+```
+
+**Windows** (registered as a per-user Scheduled Task with an AtLogOn
+trigger; uses winget for Node.js if it's missing but won't install winget
+itself; never needs Administrator):
+
+```powershell
+irm https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/install-windows.ps1 | iex
+```
+
+**Or clone first, run locally** — same result on any OS, useful if you want
+to read the script before running it:
+
+```sh
+git clone https://github.com/qinghuaatbc/oak.git ~/oak-app/oak
+~/oak-app/oak/scripts/install.sh                # Linux, defaults to port 8702
+~/oak-app/oak/scripts/install-macos.sh 8080     # macOS, or pick your own port
+~/oak-app/oak/scripts/install-windows.ps1 -Port 8080   # Windows, PowerShell
+```
+
+Once installed, open the admin panel from any device on the same network:
+
+```
+http://<machine-ip>:8702/admin.html   # configure drivers, dashboard, layout
+http://<machine-ip>:8702/live.html    # the day-to-day control surface
+```
+
+Re-run the same script any time to update — it's idempotent, pulling the
+latest code, reinstalling dependencies, and restarting the service:
+
+```sh
+~/oak-app/oak/scripts/install.sh          # Linux
+~/oak-app/oak/scripts/install-macos.sh    # macOS
+~/oak-app/oak/scripts/install-windows.ps1 # Windows
+```
+
+## Try it (from source, without installing as a service)
 
 ```sh
 node example/demo.js              # dsc-powerseries against a fake Envisalink
