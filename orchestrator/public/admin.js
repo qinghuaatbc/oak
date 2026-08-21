@@ -167,7 +167,16 @@ function renderInstancesList() {
       manifests.delete(id);
       statesByInstance.delete(id);
       runningByInstance.delete(id);
-      fullRefresh();
+      // Same family as the Stop/Start staleness fix above: if the Config
+      // tab is open for the instance just deleted, renderInstanceFilter()
+      // (called via renderActivePanel(), inside fullRefresh()'s call
+      // chain) already resets the selector back to "All instances" once
+      // this id drops out of instanceIds - explicitly requesting a
+      // rerender here lets the Config panel notice that and fall back to
+      // its "pick an instance" placeholder instead of continuing to show
+      // a now-nonexistent instance's stale, still-editable form.
+      await fullRefresh();
+      renderActivePanel({ allowConfigRerender: true });
     });
     btnRow.appendChild(delBtn);
 
