@@ -20,6 +20,22 @@ if [ "$EUID" -eq 0 ]; then
   exit 1
 fi
 
+# This installer targets a systemd-based Linux machine specifically (the
+# Node.js setup step uses apt, and the service step writes a systemd unit
+# file) - checked explicitly and early, with a clear message, rather than
+# letting an unsupported OS run halfway through and fail confusingly on
+# `tee: /etc/systemd/system/oak.service: No such file or directory` (the
+# exact failure this had before this check existed, on a real run on
+# macOS - no apt, no systemd, no /etc/systemd/system directory at all).
+if [ "$(uname -s)" != "Linux" ] || ! command -v systemctl >/dev/null 2>&1; then
+  echo "This installer is for a systemd-based Linux machine (Debian/Ubuntu-family) - it uses apt for Node.js and writes a systemd unit file for the background service." >&2
+  echo "On macOS (or any other OS), install manually instead:" >&2
+  echo "  git clone $REPO_URL" >&2
+  echo "  cd oak && npm install && cp orchestrator/config.example.json orchestrator/config.json" >&2
+  echo "  node orchestrator/server.js" >&2
+  exit 1
+fi
+
 if ! command -v node >/dev/null 2>&1; then
   echo "==> Installing Node.js..."
   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
