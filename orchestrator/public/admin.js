@@ -148,7 +148,12 @@ function renderInstancesList() {
       ev.stopPropagation();
       const result = running ? await stopInstance(id) : await startInstance(id);
       if (result.error) alert(result.error);
-      fullRefresh();
+      // See configToggleRunBtn's own handler for why plain fullRefresh()
+      // alone isn't enough - the Config tab can be open for THIS same
+      // instance while its Stop/Start is clicked from here instead, and
+      // needs the same explicit rerender to pick up the new running state.
+      await fullRefresh();
+      renderActivePanel({ allowConfigRerender: true });
     });
     btnRow.appendChild(toggleRunBtn);
 
@@ -563,7 +568,20 @@ async function renderConfigPanel() {
   document.getElementById("configToggleRunBtn").addEventListener("click", async () => {
     const result = running ? await stopInstance(id) : await startInstance(id);
     if (result.error) alert(result.error);
-    fullRefresh();
+    // Plain fullRefresh() alone does NOT re-render this panel - its own
+    // internal renderActivePanel() call defaults allowConfigRerender to
+    // false specifically so a frequent live-state refresh never wipes out
+    // an in-progress edit here (see this function's own header comment).
+    // But that means clicking Stop/Start from *inside* this same panel
+    // left it showing the pre-toggle running state's disabled/enabled
+    // fields even though the instance genuinely did stop/start - found
+    // live: a user reported being unable to edit config right after
+    // stopping an instance from this exact button. Explicitly requesting
+    // a rerender here is the "action known to change what this panel
+    // should show" this file's own comment already says should trigger
+    // one - it just wasn't wired up for this specific button before.
+    await fullRefresh();
+    renderActivePanel({ allowConfigRerender: true });
   });
 
   document.getElementById("editLabelForm").addEventListener("submit", async (ev) => {
