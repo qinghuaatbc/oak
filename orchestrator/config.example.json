@@ -1,16 +1,3 @@
 {
-  "instances": [
-    {
-      "id": "alarm1",
-      "driver": "dsc-powerseries",
-      "connection": { "host": "127.0.0.1", "port": 4025, "transport": "tcp" },
-      "settings": { "password": "user", "accessCode": "1234" }
-    },
-    {
-      "id": "relay1",
-      "driver": "http-relay",
-      "connection": { "host": "127.0.0.1", "port": 8081, "transport": "http" },
-      "settings": { "pollIntervalMs": 5000 }
-    }
-  ]
+  "instances": []
 }
