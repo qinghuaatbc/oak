@@ -218,9 +218,28 @@ class DriverInstance extends EventEmitter {
   // driver instance's callback becomes an "error" event on that instance,
   // never an uncaught exception that could take down a host process
   // running many instances at once.
+  // Catches synchronous throws (the try/catch below) AND async rejections
+  // (the .catch() below) from whatever fn() returns - found live on a real
+  // running instance (eisy) that without the latter, an async action
+  // handler's rejection became an unhandled promise rejection instead of
+  // a normal, visible "error" event: every ctx.onAction handler funnels
+  // through action() -> _guarded(), and action()'s own caller (server.js's
+  // REST route) never awaits or catches the promise action() returns, so
+  // a rejecting async handler had nothing else to catch it either. This
+  // was the exact architectural root cause behind three separate bugs
+  // manually found and fixed driver-by-driver earlier in this project
+  // (wemo, ecobee, netatmo, unifi-network, eisy, tesla) before finally
+  // being fixed once here instead - every future driver (including any
+  // future community/uploaded one) now gets this for free, rather than
+  // depending on its author remembering to wrap their own async body in
+  // try/catch.
   _guarded(where, fn) {
     try {
-      return fn();
+      const result = fn();
+      if (result && typeof result.then === "function") {
+        result.catch((err) => this.emit("error", { where, error: err }));
+      }
+      return result;
     } catch (err) {
       this.emit("error", { where, error: err });
     }
