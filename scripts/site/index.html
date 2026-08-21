@@ -590,25 +590,33 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
     <div class="section-head">
       <span class="section-tag">Get running</span>
       <h2>Install in one line, or step by step</h2>
-      <p>The script sets up Node.js (if it's missing), clones the repo, installs dependencies, and registers Oak as a systemd service that starts on boot and restarts on crash.</p>
+      <p>The script sets up Node.js (if it's missing), clones the repo, installs dependencies, and registers Oak as a background service that starts on boot/login and restarts on crash — systemd on Linux, launchd on macOS.</p>
     </div>
     <div class="steps">
       <div class="step">
         <div class="step-num"></div>
         <div class="step-body">
-          <h3>One line, on a fresh Debian/Ubuntu machine</h3>
-          <p>Downloads and runs the installer directly — no manual clone needed. On anything else (macOS, another distro without systemd), it exits with the exact manual steps to run instead, rather than failing partway through.</p>
+          <h3>Linux — Debian, Ubuntu, or Raspberry Pi OS</h3>
+          <p>One line, no manual clone needed. Raspberry Pi OS is Debian-based with systemd, so this is the exact same installer and the exact same command — nothing Pi-specific to do. On anything else without systemd, it exits with manual steps instead of failing partway through.</p>
           <pre><span class="k">curl</span> -fsSL https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/install.sh | <span class="k">bash</span></pre>
         </div>
       </div>
       <div class="step">
         <div class="step-num"></div>
         <div class="step-body">
+          <h3>macOS</h3>
+          <p>Same idea, but registered as a launchd LaunchAgent instead of a systemd service — macOS has no systemd. Uses Homebrew for Node.js if it's missing (won't install Homebrew itself). Never needs sudo.</p>
+          <pre><span class="k">curl</span> -fsSL https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/install-macos.sh | <span class="k">bash</span></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
           <h3>Or clone first, run locally</h3>
-          <p>Same result — useful if you want to read the script before running it.</p>
+          <p>Same result on either OS — useful if you want to read the script before running it.</p>
           <pre><span class="k">git</span> clone https://github.com/qinghuaatbc/oak.git ~/oak-app/oak
-~/oak-app/oak/scripts/install.sh          <span class="cmt" style="color:var(--code-faint)"># defaults to port 8702</span>
-~/oak-app/oak/scripts/install.sh 8080     <span class="cmt" style="color:var(--code-faint)"># or pick your own port</span></pre>
+~/oak-app/oak/scripts/install.sh                <span class="cmt" style="color:var(--code-faint)"># Linux, defaults to port 8702</span>
+~/oak-app/oak/scripts/install-macos.sh 8080     <span class="cmt" style="color:var(--code-faint)"># macOS, or pick your own port</span></pre>
         </div>
       </div>
       <div class="step">
@@ -625,10 +633,12 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
         <div class="step-body">
           <h3>Re-run any time to update</h3>
           <p>The script is idempotent — it pulls the latest code, reinstalls dependencies, and restarts the service.</p>
-          <pre><span class="k">~/oak-app/oak/scripts/install.sh</span></pre>
+          <pre><span class="k">~/oak-app/oak/scripts/install.sh</span>          <span class="cmt" style="color:var(--code-faint)"># Linux</span>
+<span class="k">~/oak-app/oak/scripts/install-macos.sh</span>    <span class="cmt" style="color:var(--code-faint)"># macOS</span></pre>
         </div>
       </div>
     </div>
+    <p style="margin-top:28px; opacity:0.7; font-size:0.95rem;">Windows isn't supported by these scripts yet — it's a different service model (no systemd or launchd) and hasn't been verified end-to-end. Everything above runs today on Linux (including Raspberry Pi) and macOS.</p>
   </div>
 </section>
 
