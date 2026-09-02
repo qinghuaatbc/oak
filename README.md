@@ -98,8 +98,12 @@ node orchestrator/server.js
 
 ## Status
 
-Early scaffold — one TCP-transport driver, one HTTP-transport driver, and a
-polling-based (not yet WebSocket) orchestrator. Command codes in the DSC
-driver beyond login/keepalive/zone/partition status are a plausible
-starting point, not yet verified against the official TPI command
-reference or real hardware.
+147 built-in drivers (`drivers/`), each a manifest + sandboxed `vm.Context`
+instance, hosted behind one orchestrator (`orchestrator/server.js`) with a
+WebSocket-backed live dashboard, an admin panel, a drag-and-drop Layout
+builder, and 3D scene mesh-binding (including binding a device to a mesh
+directly by dragging it onto the 3D view from the Layout editor). Under
+active development, not a finished product — some driver command sets are a
+plausible starting point rather than verified against every device's full
+protocol; see each driver's own manifest for what's actually been tested
+against real hardware.

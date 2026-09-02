@@ -12,6 +12,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const auth = require("./auth");
 const { spawn } = require("child_process");
 const { loadDriver } = require("../runtime/loader");
 const { isWebSocketUpgrade, acceptUpgrade } = require("./ws-lite");
@@ -901,13 +902,28 @@ function sanitizeWidget(w, catIds) {
   }
   return out;
 }
+function sanitizeLayoutBackground(bg) {
+  if (!bg || typeof bg !== "object") return null;
+  // A 3D scene background - {type:"3d", glbId} pointing at bindingsCache.glbs
+  // by id, same "pointer, not copy" reasoning as a slot widget's {cat,
+  // slotId} (see sanitizeWidget's own comment) or a mesh binding's {cat, id}
+  // (sanitizeMeshBinding above) - loosely validated (type-checked, not
+  // existence-checked against the real glbs list) to match the precedent
+  // already set by pageLink's targetPageId just below, which isn't
+  // cross-checked against the real pages list either.
+  if (bg.type === "3d") {
+    return typeof bg.glbId === "string" && bg.glbId ? { type: "3d", glbId: bg.glbId } : null;
+  }
+  // The original flat-image shape.
+  return typeof bg.url === "string" ? { url: bg.url } : null;
+}
 function sanitizePage(p, catIds) {
   if (!p || typeof p !== "object") return null;
   const widgets = Array.isArray(p.widgets) ? p.widgets.map((w) => sanitizeWidget(w, catIds)).filter(Boolean) : [];
   return {
     id: typeof p.id === "string" && p.id ? p.id : crypto.randomBytes(4).toString("hex"),
     name: typeof p.name === "string" && p.name ? p.name.slice(0, 60) : "Untitled",
-    background: p.background && typeof p.background.url === "string" ? { url: p.background.url } : null,
+    background: sanitizeLayoutBackground(p.background),
     widgets,
   };
 }
@@ -1348,6 +1364,29 @@ const server = http.createServer(async (req, res) => {
   // but nothing about it can be controlled.
   const parts = decodeURIComponent(url.pathname).split("/").filter(Boolean);
 
+  // Session gate - replaces Caddy's basic_auth (disabled on the live VPS
+  // since 2026-08-14 over an iOS PWA bug basic_auth itself couldn't be
+  // fixed around - see auth.js's own header comment for the full story).
+  // /login.html, /api/login, and /ws (handled by the separate
+  // server.on("upgrade", ...) listener below, never even reaching this
+  // callback) are the only paths reachable without a session.
+  if (!auth.isPublicPath(url.pathname) && !auth.hasValidSession(req)) {
+    if (parts[0] === "api") return sendJson(res, 401, { error: "Not signed in" });
+    if (req.method === "GET") {
+      res.writeHead(302, { Location: `/login.html?next=${encodeURIComponent(url.pathname)}` });
+      return res.end();
+    }
+    res.writeHead(401);
+    return res.end("Not signed in");
+  }
+
+  if (parts[0] === "api" && parts[1] === "login" && parts.length === 2 && req.method === "POST") {
+    return auth.handleLogin(req, res, readJsonBody, sendJson);
+  }
+  if (parts[0] === "api" && parts[1] === "logout" && parts.length === 2 && req.method === "POST") {
+    return auth.handleLogout(req, res, sendJson);
+  }
+
   if (parts[0] !== "api") {
     if (req.method === "GET") return serveStatic(req, res);
     res.writeHead(404);
@@ -1739,4 +1778,18 @@ server.on("upgrade", (req, socket) => {
   });
 });
 
-server.listen(PORT, () => console.log(`Oak orchestrator listening on :${PORT}`));
+// Gated on require.main so this file can be require()'d by a test (to reach
+// the pure sanitize* functions below) without also binding a real socket -
+// `node server.js` (how this actually runs in production/the LaunchAgent)
+// still starts the server exactly as before, since require.main === module
+// is true in that case; only an external require() skips it.
+if (require.main === module) {
+  server.listen(PORT, () => console.log(`Oak orchestrator listening on :${PORT}`));
+}
+
+// Exported for orchestrator/test/*.test.js - the pure, side-effect-free
+// validation functions, plus the http.Server instance itself (still not
+// listening on anything - see the require.main guard above - a test calls
+// .listen(0, ...) itself for an ephemeral port, same as any other consumer
+// of this module would).
+module.exports = { sanitizeWidget, sanitizePage, sanitizeMeshBinding, sanitizeGlbScene, sanitizeLayoutBackground, server };

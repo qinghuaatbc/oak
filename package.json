@@ -4,6 +4,9 @@
   "private": true,
   "description": "Independently-designed device-driver platform: JSON manifests + a sandboxed Node.js runtime + an orchestrator",
   "license": "MIT",
+  "scripts": {
+    "test": "node --test orchestrator/test/*.test.js"
+  },
   "dependencies": {
     "node-coap-client": "^3.0.0",
     "ssh2": "^1.17.0",

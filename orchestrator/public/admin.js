@@ -2113,12 +2113,35 @@ function pointerOverCanvas(ev) {
   const rect = document.getElementById("layoutCanvas").getBoundingClientRect();
   return ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom;
 }
-function makeDragGhost(label) {
+// Styled to echo the actual chip/widget it's standing in for (icon + name,
+// same shape as buildLayoutWidgetBox's own lw-name row) rather than a bare
+// text label - so what you're dragging is recognizable while it's still
+// mid-air, not just once it lands.
+function makeDragGhost(icon, label) {
   const ghost = document.createElement("div");
   ghost.className = "layout-drag-ghost";
-  ghost.textContent = label;
+  ghost.innerHTML = `<span class="ghost-icon">${icon}</span><span class="ghost-label">${label}</span>`;
   document.body.appendChild(ghost);
   return ghost;
+}
+
+// A brief, non-blocking confirmation - used specifically where an action's
+// result isn't already obvious some other way (a mesh binding doesn't
+// visibly change the model's appearance the way a 2D widget landing on the
+// grid is already its own confirmation) - not sprinkled onto every action.
+let layoutToastTimer = null;
+function showLayoutToast(message) {
+  let el = document.getElementById("layoutToast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "layoutToast";
+    el.className = "layout-toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.classList.add("show");
+  clearTimeout(layoutToastTimer);
+  layoutToastTimer = setTimeout(() => el.classList.remove("show"), 2200);
 }
 
 function layoutWidgetIcon(w) {
@@ -2144,32 +2167,60 @@ function layoutWidgetLabel(w) {
 // separate list to maintain), plus cameras, macros, and 4 fixed special
 // chips. Dragging a chip onto the canvas places a widget there.
 // ---------------------------------------------------------------------
+// Collapsed/expanded state persists per category label across re-renders
+// (a plain Set, not saved to the server - purely a local UI convenience,
+// same "doesn't need to survive a reload" scope as e.g. layoutPreviewOn).
+const layoutPaletteCollapsed = new Set();
 function renderLayoutPalette() {
   const root = document.getElementById("layoutPalette");
   root.innerHTML = "";
+  let currentGroupChips = null; // the chip-list <div> for whichever addGroupLabel() ran most recently
   function addGroupLabel(text) {
-    const el = document.createElement("div");
-    el.className = "layout-palette-group-label";
-    el.textContent = text;
-    root.appendChild(el);
+    const group = document.createElement("div");
+    group.className = "layout-palette-group";
+    const header = document.createElement("button");
+    header.type = "button";
+    header.className = "layout-palette-group-header";
+    const chips = document.createElement("div");
+    chips.className = "layout-palette-group-chips";
+    const collapsed = layoutPaletteCollapsed.has(text);
+    header.innerHTML = `<span class="chevron">${collapsed ? "▸" : "▾"}</span><span>${text}</span>`;
+    chips.hidden = collapsed;
+    header.addEventListener("click", () => {
+      if (layoutPaletteCollapsed.has(text)) layoutPaletteCollapsed.delete(text);
+      else layoutPaletteCollapsed.add(text);
+      renderLayoutPalette();
+    });
+    group.append(header, chips);
+    root.appendChild(group);
+    currentGroupChips = chips;
   }
   function addChip(label, icon, buildWidget) {
     const chip = document.createElement("div");
     chip.className = "layout-palette-chip";
-    chip.textContent = `${icon} ${label}`;
+    chip.dataset.search = label.toLowerCase();
+    chip.innerHTML = `<span class="chip-icon">${icon}</span><span class="chip-label">${label}</span>`;
     chip.addEventListener("pointerdown", (ev) => {
       ev.preventDefault();
       startPointerDrag(ev, {
-        onDragStart: () => makeDragGhost(label),
+        onDragStart: () => makeDragGhost(icon, label),
         onDrop: (dropEv) => {
           if (!pointerOverCanvas(dropEv)) return;
+          const partial = buildWidget(0, 0); // x/y are placeholders here - real placement below depends on which mode the page is in
+          if (!partial) return;
+          // 3D-background page: only a "slot" chip (an actual device) has
+          // an equivalent in the mesh-binding shape ({cat, id} - see
+          // sanitizeMeshBinding) - camera/macro/label/etc chips have
+          // nothing to bind to a mesh, so they're silently ignored here
+          // rather than misplaced onto a grid that isn't being shown.
+          if (partial.type === "slot" && tryLayoutMeshBindDrop(dropEv, partial.cat, partial.slotId)) return;
+          if (currentLayoutBackgroundGlb()) return; // non-slot chip on a 3D page - nothing sensible to do
           const { x, y } = layoutGridCellFromPoint(dropEv.clientX, dropEv.clientY);
-          const partial = buildWidget(x, y);
-          if (partial) addLayoutWidget(partial);
+          addLayoutWidget({ ...partial, x, y });
         },
       });
     });
-    root.appendChild(chip);
+    currentGroupChips.appendChild(chip);
   }
   catOrder().forEach((cat) => {
     const slots = bindingsCache[cat] || [];
@@ -2200,7 +2251,29 @@ function renderLayoutPalette() {
   addChip("Variable Display", "📊", (x, y) =>
     instanceIds.length ? { type: "varDisplay", label: "Value", instanceId: instanceIds[0], stateId: "", x, y, w: 2, h: 1 } : (alert("Add a driver instance first."), null)
   );
+  applyLayoutPaletteFilter();
 }
+// Filters chips by the search box's current text, hiding whole groups that
+// have no match; a non-empty search auto-expands every group regardless of
+// its collapsed state, so a match hiding inside a collapsed group is never
+// invisible - the collapse state itself isn't touched, so clearing the
+// search returns every group to how the user left it.
+function applyLayoutPaletteFilter() {
+  const term = document.getElementById("layoutPaletteSearch").value.trim().toLowerCase();
+  document.querySelectorAll("#layoutPalette .layout-palette-group").forEach((group) => {
+    const chipsEl = group.querySelector(".layout-palette-group-chips");
+    let anyMatch = false;
+    chipsEl.querySelectorAll(".layout-palette-chip").forEach((chip) => {
+      const match = !term || chip.dataset.search.includes(term);
+      chip.hidden = !match;
+      if (match) anyMatch = true;
+    });
+    group.hidden = !anyMatch;
+    if (term) chipsEl.hidden = false;
+    else chipsEl.hidden = layoutPaletteCollapsed.has(group.querySelector(".layout-palette-group-header span:last-child").textContent);
+  });
+}
+document.getElementById("layoutPaletteSearch").addEventListener("input", applyLayoutPaletteFilter);
 function addLayoutWidget(partial) {
   pushLayoutUndo();
   const widget = { id: Math.random().toString(16).slice(2, 10), locked: false, ...partial };
@@ -2218,11 +2291,75 @@ function addLayoutWidget(partial) {
 // ---------------------------------------------------------------------
 function renderLayoutCanvas() {
   const canvas = document.getElementById("layoutCanvas");
-  canvas.innerHTML = "";
   const page = currentLayoutPage();
-  if (!page) return;
+  renderLayoutBg3DSelect();
+  if (!page) { canvas.innerHTML = ""; return; }
+
+  const glbScene = currentLayoutBackgroundGlb();
+  if (glbScene) {
+    renderLayoutCanvas3D(canvas, glbScene);
+    return;
+  }
+
+  // Not a 3D background (flat image or none) - the original path. If the
+  // canvas was previously showing the 3D wrap, this innerHTML wipe removes
+  // it from the DOM; the underlying viewer/WebGL context keeps running in
+  // the background (create3DViewer has no dispose/teardown - see its own
+  // header comment), same known limitation as switching away from any
+  // scene on the dedicated 3D tab, not something newly introduced here.
+  canvas.innerHTML = "";
   canvas.style.backgroundImage = page.background && page.background.url ? `url(${page.background.url})` : "";
   page.widgets.forEach((w) => canvas.appendChild(buildLayoutWidgetBox(w)));
+}
+
+// The wrap div create3DViewer.init() appends its actual <canvas> into
+// (once, the first time init() ever runs - see viewer3d.js:47-55) is kept
+// as a real, still-alive DOM node here rather than ever being recreated:
+// create3DViewer exposes no way to re-fetch or re-parent the renderer's
+// canvas element from outside the module (its return value is just
+// {init, loadGLB, updateVisuals, getMeshNames, meshByName}), so a *second*
+// wrap div with the same id would leave the real WebGL canvas orphaned,
+// still rendering, invisible, wherever the first wrap div ended up. Moving
+// this same element between "not in the DOM" and "appended into
+// #layoutCanvas" (an appendChild of an already-attached node relocates it,
+// it doesn't clone it) is the only safe way to show/hide it repeatedly.
+let layoutCanvas3dWrapEl = null;
+function ensureLayoutCanvas3dWrap() {
+  if (!layoutCanvas3dWrapEl) {
+    layoutCanvas3dWrapEl = document.createElement("div");
+    layoutCanvas3dWrapEl.id = "layoutCanvas3dWrap";
+    layoutCanvas3dWrapEl.style.cssText = "width:100%; height:100%;";
+  }
+  return layoutCanvas3dWrapEl;
+}
+
+// 3D-background mode: mount (once per distinct scene) the same live,
+// orbit-able viewer the "3D" tab itself uses, instead of drawing 2D widget
+// boxes - a widget "placed" here is a mesh binding (bindingsCache.glbs[..]
+// .meshBindings), not a page.widgets[] entry, so there's nothing to loop
+// over and append here the way the 2D path appends buildLayoutWidgetBox
+// per widget. Re-render is close to a no-op once the right scene is
+// already mounted and its wrap is already in the DOM, specifically so
+// calling renderLayoutCanvas() again after every drag-bind (matching the
+// 2D path's own habit) doesn't tear down and rebuild the WebGL scene.
+function renderLayoutCanvas3D(canvas, glbScene) {
+  const wrap = ensureLayoutCanvas3dWrap();
+  if (canvas.firstElementChild !== wrap) {
+    canvas.innerHTML = "";
+    canvas.style.backgroundImage = "";
+    canvas.appendChild(wrap); // relocates the real node - see ensureLayoutCanvas3dWrap's comment
+  }
+  if (layoutViewer3dLoadedGlbId !== glbScene.id) {
+    const mount = async () => {
+      if (!layoutViewer3dInited) {
+        await layoutViewer3d.init();
+        layoutViewer3dInited = true;
+      }
+      layoutViewer3d.loadGLB(glbScene.url);
+      layoutViewer3dLoadedGlbId = glbScene.id;
+    };
+    mount();
+  }
 }
 function buildLayoutWidgetBox(w) {
   const box = document.createElement("div");
@@ -2248,7 +2385,7 @@ function buildLayoutWidgetBox(w) {
 }
 function startLayoutWidgetMove(startEv, widget) {
   startPointerDrag(startEv, {
-    onDragStart: () => makeDragGhost(layoutWidgetLabel(widget)),
+    onDragStart: () => makeDragGhost(layoutWidgetIcon(widget), layoutWidgetLabel(widget)),
     onDrop: (ev) => {
       if (!pointerOverCanvas(ev)) return;
       const { x, y } = layoutGridCellFromPoint(ev.clientX, ev.clientY);
@@ -2527,6 +2664,24 @@ document.getElementById("layoutBgClearBtn").addEventListener("click", async () =
   await persistLayoutPages();
   renderLayoutCanvas();
 });
+function renderLayoutBg3DSelect() {
+  const sel = document.getElementById("layoutBg3DSelect");
+  const page = currentLayoutPage();
+  const currentGlbId = page && page.background && page.background.type === "3d" ? page.background.glbId : "";
+  const scenes = (bindingsCache && bindingsCache.glbs) || [];
+  sel.innerHTML =
+    `<option value="">3D scene as background…</option>` +
+    scenes.map((s) => `<option value="${s.id}"${s.id === currentGlbId ? " selected" : ""}>${s.name}</option>`).join("");
+}
+document.getElementById("layoutBg3DSelect").addEventListener("change", async (ev) => {
+  const page = currentLayoutPage();
+  if (!page) return;
+  const glbId = ev.target.value;
+  pushLayoutUndo();
+  page.background = glbId ? { type: "3d", glbId } : null;
+  await persistLayoutPages();
+  renderLayoutCanvas();
+});
 function reloadLayoutPreview() {
   document.getElementById("layoutPreviewFrame").src = `layout.html?preview=${Date.now()}&page=${encodeURIComponent(layoutCurrentPageId || "")}`;
 }
@@ -2626,6 +2781,71 @@ const viewer3d = create3DViewer({
   onLoadProgress: createGlbProgressHandler("glb3dProgressTrack", "glb3dProgressBar"),
 });
 let viewer3dInited = false;
+
+// A second, independent viewer instance for the Layout editor's own canvas
+// (create3DViewer is instance-agnostic and takes its target container by
+// id via opts.wrapId - see viewer3d.js's own header comment - so a second
+// instance pointed at a different wrapId is the same pattern as the first,
+// not a new mechanism). A real user click on this canvas is not exposed as
+// its own interaction here (see the editable:true comment below for why
+// it's on anyway) - binding a mesh happens by dragging a palette chip onto
+// it (addChip's onDrop, above renderLayoutPalette).
+function currentLayoutBackgroundGlb() {
+  const page = currentLayoutPage();
+  if (!page || !page.background || page.background.type !== "3d") return null;
+  return (bindingsCache.glbs || []).find((s) => s.id === page.background.glbId) || null;
+}
+// create3DViewer's raycasting (viewer3d.js:81-90) is private to that
+// module - camera/meshes/raycaster are closure variables, not part of its
+// returned {init, loadGLB, updateVisuals, getMeshNames, meshByName} API,
+// so an external caller (this file) can't run its own raycast against
+// them directly. Reusing the module's OWN internal click handler instead
+// (editable:true routes every click to onEditClick, same path the "3D"
+// tab's edit mode already uses) needs zero changes to viewer3d.js: a
+// synthetic click dispatched at the drop's clientX/clientY runs the same
+// raycast internally and calls onEditClick with whatever mesh it hit.
+// pendingLayoutMeshBindTarget carries "which device is being dropped"
+// across that synchronous dispatch - dispatchEvent() for a sync listener
+// returns only after the listener (and thus onEditClick) has already run.
+let pendingLayoutMeshBindTarget = null; // {cat, id} or null
+const layoutViewer3d = create3DViewer({
+  wrapId: "layoutCanvas3dWrap",
+  editable: () => true, // a bare click still no-ops below when no drag set a pending target
+  onEditClick: (meshName) => {
+    if (!pendingLayoutMeshBindTarget) return;
+    const scene = currentLayoutBackgroundGlb();
+    if (!scene) return;
+    pushLayoutUndo();
+    const binding = { cat: pendingLayoutMeshBindTarget.cat, id: pendingLayoutMeshBindTarget.id, animType: "" };
+    scene.meshBindings[meshName] = binding;
+    pendingLayoutMeshBindTarget = null;
+    persistBindings();
+    layoutViewer3d.updateVisuals();
+    const slot = bindingSlot(bindingsCache, binding);
+    showLayoutToast(`Bound ${slot ? slot.name : "device"} to "${meshName}"`);
+  },
+  getMeshBindings: () => (currentLayoutBackgroundGlb() || {}).meshBindings || {},
+  resolveOnLevel: resolveMeshOnLevel,
+});
+let layoutViewer3dInited = false;
+let layoutViewer3dLoadedGlbId = null; // which scene's .glb is currently loaded, so re-render doesn't reload/flicker the same one
+
+// Called from a palette chip's/placed widget's onDrop when the current
+// Layout page has a 3D background - dispatches a synthetic click at the
+// drop point so viewer3d.js's own raycast (see comment above) finds the
+// mesh, if any, under it. Returns whether the current page is even in 3D
+// mode at all, not whether a mesh was actually hit (a miss is a normal,
+// silent no-op - same as dropping outside the 2D canvas entirely).
+function tryLayoutMeshBindDrop(dropEv, cat, id) {
+  if (!currentLayoutBackgroundGlb()) return false;
+  const wrap = document.getElementById("layoutCanvas3dWrap");
+  const canvasEl = wrap && wrap.querySelector("canvas");
+  if (!canvasEl) return true; // still "was a 3D page" even if the model hasn't loaded/rendered yet
+  pendingLayoutMeshBindTarget = { cat, id };
+  canvasEl.dispatchEvent(new MouseEvent("click", { clientX: dropEv.clientX, clientY: dropEv.clientY, bubbles: true }));
+  pendingLayoutMeshBindTarget = null; // no-op if onEditClick already consumed it; cleans up a miss (no mesh hit)
+  return true;
+}
 
 function renderGlb3DHint() {
   const scene = currentGlb3DScene();
