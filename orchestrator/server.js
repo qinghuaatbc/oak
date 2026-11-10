@@ -345,6 +345,12 @@ function startRuntime(id, entry) {
 }
 
 function addInstance(id, spec) {
+  // spec.driver is joined onto DRIVERS_DIR below and the result is loaded
+  // and executed - a value like "../../somewhere" would run code from
+  // outside the drivers folder. Same character set uploadDriver() allows.
+  if (typeof spec.driver !== "string" || !/^[A-Za-z0-9_-]+$/.test(spec.driver)) {
+    throw new Error(`Invalid driver id "${spec.driver}"`);
+  }
   const driverDir = path.join(DRIVERS_DIR, spec.driver);
   const manifest = JSON.parse(fs.readFileSync(path.join(driverDir, "manifest.json"), "utf8"));
   const entry = { spec, manifest, driverInstance: null, running: false, recentEvents: [], lastState: {}, lastError: null };
@@ -1367,9 +1373,10 @@ const server = http.createServer(async (req, res) => {
   // Session gate - replaces Caddy's basic_auth (disabled on the live VPS
   // since 2026-08-14 over an iOS PWA bug basic_auth itself couldn't be
   // fixed around - see auth.js's own header comment for the full story).
-  // /login.html, /api/login, and /ws (handled by the separate
-  // server.on("upgrade", ...) listener below, never even reaching this
-  // callback) are the only paths reachable without a session.
+  // /login.html and /api/login are the only paths reachable without a
+  // session. WebSocket upgrades (/ws, /camera-ws) never reach this
+  // callback - the server.on("upgrade", ...) listener below applies the
+  // same session check itself.
   if (!auth.isPublicPath(url.pathname) && !auth.hasValidSession(req)) {
     if (parts[0] === "api") return sendJson(res, 401, { error: "Not signed in" });
     if (req.method === "GET") {
@@ -1731,6 +1738,16 @@ server.on("upgrade", (req, socket) => {
   const url = new URL(req.url, "http://localhost");
   if (!isWebSocketUpgrade(req)) {
     socket.destroy();
+    return;
+  }
+
+  // Same session gate as the HTTP routes. Both /ws (live state of every
+  // instance, comm signaling) and /camera-ws (hands a caller-chosen URL to
+  // ffmpeg) were previously open to anyone who could reach the port. The
+  // browser sends the oak_session cookie on the upgrade request itself, so
+  // every page that opens these sockets (already behind login) keeps working.
+  if (!auth.hasValidSession(req)) {
+    socket.end("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
     return;
   }
 

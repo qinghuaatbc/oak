@@ -48,7 +48,9 @@ function create(ctx) {
         let buffered = "";
         for await (const chunk of res.body) {
           if (!monitoring) return;
-          buffered += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk;
+          // fetch body chunks are Uint8Array, not Buffer - decode them as bytes
+          // (string concatenation would give "67,111,100,...").
+          buffered += Buffer.from(chunk).toString("utf8");
           let idx;
           while ((idx = buffered.indexOf("\n")) !== -1) {
             const line = buffered.slice(0, idx).trim();

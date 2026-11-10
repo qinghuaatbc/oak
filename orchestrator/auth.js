@@ -66,16 +66,14 @@ function hasValidSession(req) {
 }
 
 // Paths that must stay reachable without a session - the login page and
-// the endpoint that creates one, plus the WebSocket upgrade path. The `/ws`
-// entry here is belt-and-suspenders documentation, not load-bearing: the
-// real WebSocket upgrade is handled by server.js's own `server.on("upgrade",
-// ...)` listener, a separate code path from the http.createServer request
-// callback this module's check runs inside of, so it never actually
-// reaches this check either way - see server.js's own upgrade handler.
+// the endpoint that creates one. WebSocket upgrades are handled by
+// server.js's own `server.on("upgrade", ...)` listener, a separate code path
+// from the http.createServer request callback this check runs inside of;
+// that listener calls hasValidSession() itself.
 const PUBLIC_PATHS = new Set(["/login.html", "/api/login"]);
 
 function isPublicPath(pathname) {
-  return PUBLIC_PATHS.has(pathname) || pathname === "/ws";
+  return PUBLIC_PATHS.has(pathname);
 }
 
 function handleLogin(req, res, readJsonBody, sendJson) {
