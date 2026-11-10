@@ -75,6 +75,14 @@ http://<machine-ip>:8702/admin.html   # configure drivers, dashboard, layout
 http://<machine-ip>:8702/live.html    # the day-to-day control surface
 ```
 
+On a first install the script asks for a username and password — that's
+the login for both pages. It's saved in `orchestrator/admin.json`, the
+password only as a salted hash. Change it any time, no restart needed:
+
+```sh
+node ~/oak-app/oak/scripts/set-login.js
+```
+
 Re-run the same script any time to update — it's idempotent, pulling the
 latest code, reinstalling dependencies, and restarting the service:
 

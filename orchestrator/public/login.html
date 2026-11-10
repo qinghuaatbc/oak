@@ -25,7 +25,8 @@
 <form id="loginForm">
   <h1>🌳 Oak</h1>
   <div class="error" id="loginError"></div>
-  <input type="password" id="password" placeholder="Password" autocomplete="current-password" autofocus required />
+  <input type="text" id="username" placeholder="Username" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required />
+  <input type="password" id="password" placeholder="Password" autocomplete="current-password" required />
   <button type="submit" id="loginBtn">Sign in</button>
 </form>
 <script>
@@ -39,7 +40,7 @@ document.getElementById("loginForm").addEventListener("submit", async (ev) => {
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: document.getElementById("password").value }),
+      body: JSON.stringify({ username: document.getElementById("username").value.trim(), password: document.getElementById("password").value }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));

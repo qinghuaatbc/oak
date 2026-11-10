@@ -77,6 +77,22 @@ if (-not (Test-Path $configPath)) {
     Write-Host "==> orchestrator\config.json already exists, leaving it alone."
 }
 
+# The admin login (username + password, the password kept only as a hash -
+# see scripts\set-login.js). Asked for once, on a first install; an update
+# re-run keeps the one already set. For automation with no one to ask, set
+# OAK_ADMIN_USER and OAK_ADMIN_PASSWORD first.
+$adminFile = Join-Path $InstallDir "orchestrator\admin.json"
+if (Test-Path $adminFile) {
+    Write-Host "==> Login already set up (orchestrator\admin.json), keeping it. To change it: node scripts\set-login.js"
+} elseif ($env:OAK_ADMIN_PASSWORD) {
+    Write-Host "==> Setting the admin login from OAK_ADMIN_USER / OAK_ADMIN_PASSWORD..."
+    $adminUser = if ($env:OAK_ADMIN_USER) { $env:OAK_ADMIN_USER } else { "admin" }
+    node scripts\set-login.js --user $adminUser --password $env:OAK_ADMIN_PASSWORD
+} else {
+    Write-Host "==> Set up the admin login (you'll sign in to Oak with these):"
+    node scripts\set-login.js
+}
+
 # Scheduled Task actions can't set a per-task environment variable directly,
 # unlike systemd's Environment= or launchd's EnvironmentVariables dict - so
 # the port is baked into a small launcher script instead of the task itself.
@@ -113,6 +129,7 @@ if (-not $ip) { $ip = "<this-machine-ip>" }
 Write-Host ""
 Write-Host "Admin panel: http://${ip}:$Port/admin.html"
 Write-Host "Live view:   http://${ip}:$Port/live.html"
+Write-Host "Sign in with the username and password set above (change them: node `"$InstallDir\scripts\set-login.js`")."
 Write-Host "Logs:        Get-Content `"$InstallDir\oak.log`" -Wait"
 Write-Host "Stop:        Stop-ScheduledTask -TaskName $TaskName"
 Write-Host "Start again: Start-ScheduledTask -TaskName $TaskName"

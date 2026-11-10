@@ -62,6 +62,24 @@ else
   echo "==> orchestrator/config.json already exists, leaving it alone."
 fi
 
+# The admin login (username + password, the password kept only as a hash -
+# see scripts/set-login.js). Asked for once, on a first install; an update
+# re-run keeps the one already set. It's read from the terminal (/dev/tty),
+# not stdin, so it still works when this script itself arrives on stdin
+# (`curl ... | bash`). With no terminal at all (automation), set
+# OAK_ADMIN_USER and OAK_ADMIN_PASSWORD instead.
+if [ -f orchestrator/admin.json ]; then
+  echo "==> Login already set up (orchestrator/admin.json), keeping it. To change it: node scripts/set-login.js"
+elif [ -n "${OAK_ADMIN_PASSWORD:-}" ]; then
+  echo "==> Setting the admin login from OAK_ADMIN_USER / OAK_ADMIN_PASSWORD..."
+  node scripts/set-login.js --user "${OAK_ADMIN_USER:-admin}" --password "$OAK_ADMIN_PASSWORD"
+elif ( exec < /dev/tty ) 2>/dev/null; then
+  echo "==> Set up the admin login (you'll sign in to Oak with these):"
+  node scripts/set-login.js < /dev/tty
+else
+  echo "==> No terminal to ask for a login on - run 'node scripts/set-login.js' in $INSTALL_DIR before signing in." >&2
+fi
+
 echo "==> Writing launchd agent (port $PORT)..."
 mkdir -p "$HOME/Library/LaunchAgents"
 cat > "$PLIST_PATH" << EOF
@@ -101,8 +119,18 @@ EOF
 # currently loaded at all (e.g. a genuinely first-time install) - that
 # failure is expected and safe to ignore, same idempotent-rerun spirit as
 # install.sh's own "safe to re-run" design.
+#
+# bootstrap itself has also been seen to fail with "5: Input/output error"
+# on a real Mac where the plist was fine and the legacy `load -w` then
+# worked - and with `set -e`, that failure used to end this script with the
+# service never loaded, Oak never started and no log written. So: fall
+# back to load -w instead of stopping there.
 launchctl bootout "gui/$(id -u)" "$PLIST_PATH" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+if ! launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH" 2>/dev/null; then
+  echo "==> launchctl bootstrap failed - falling back to launchctl load -w..."
+  launchctl unload "$PLIST_PATH" 2>/dev/null || true
+  launchctl load -w "$PLIST_PATH"
+fi
 
 echo "==> Done."
 sleep 1
@@ -110,6 +138,7 @@ IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null |
 echo
 echo "Admin panel: http://${IP}:$PORT/admin.html"
 echo "Live view:   http://${IP}:$PORT/live.html"
+echo "Sign in with the username and password set above (change them: node $INSTALL_DIR/scripts/set-login.js)."
 echo "Logs:        tail -f $INSTALL_DIR/oak.log"
 echo "Stop:        launchctl bootout gui/\$(id -u) $PLIST_PATH"
 echo "Start again: launchctl bootstrap gui/\$(id -u) $PLIST_PATH"

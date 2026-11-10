@@ -64,6 +64,24 @@ else
   echo "==> orchestrator/config.json already exists, leaving it alone."
 fi
 
+# The admin login (username + password, the password kept only as a hash -
+# see scripts/set-login.js). Asked for once, on a first install; an update
+# re-run keeps the one already set. It's read from the terminal (/dev/tty),
+# not stdin, so it still works when this script itself arrives on stdin
+# (`curl ... | bash`). With no terminal at all (automation), set
+# OAK_ADMIN_USER and OAK_ADMIN_PASSWORD instead.
+if [ -f orchestrator/admin.json ]; then
+  echo "==> Login already set up (orchestrator/admin.json), keeping it. To change it: node scripts/set-login.js"
+elif [ -n "${OAK_ADMIN_PASSWORD:-}" ]; then
+  echo "==> Setting the admin login from OAK_ADMIN_USER / OAK_ADMIN_PASSWORD..."
+  node scripts/set-login.js --user "${OAK_ADMIN_USER:-admin}" --password "$OAK_ADMIN_PASSWORD"
+elif ( exec < /dev/tty ) 2>/dev/null; then
+  echo "==> Set up the admin login (you'll sign in to Oak with these):"
+  node scripts/set-login.js < /dev/tty
+else
+  echo "==> No terminal to ask for a login on - run 'node scripts/set-login.js' in $INSTALL_DIR before signing in." >&2
+fi
+
 echo "==> Writing systemd service (port $PORT)..."
 sudo tee /etc/systemd/system/oak.service > /dev/null << EOF
 [Unit]
@@ -93,3 +111,4 @@ IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 echo
 echo "Admin panel: http://${IP:-<this-machine-ip>}:$PORT/admin.html"
 echo "Live view:   http://${IP:-<this-machine-ip>}:$PORT/live.html"
+echo "Sign in with the username and password set above (change them: node $INSTALL_DIR/scripts/set-login.js)."

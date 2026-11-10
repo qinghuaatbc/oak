@@ -7,31 +7,78 @@
 // reconfiguring Caddy. A session cookie doesn't have this problem - it's
 // the standard fix for exactly this class of bug.
 //
-// Deliberately minimal: one shared admin password (ADMIN_PASSWORD env var),
-// not a user table - matching the simplicity of the basic_auth model this
-// replaces, not adding scope (per-user accounts, password reset, etc.)
-// nobody asked for on a self-hosted single-operator tool.
+// Deliberately minimal: one admin login, not a user table - matching the
+// simplicity of the basic_auth model this replaces, not adding scope
+// (per-user accounts, password reset, etc.) nobody asked for on a
+// self-hosted single-operator tool.
+//
+// Where the login comes from, first found wins:
+//   1. orchestrator/admin.json - { username, salt, hash }, written by
+//      scripts/set-login.js (which the installers run). The password is
+//      kept only as a salted scrypt hash, never in plain text. Read on
+//      every login attempt, so a changed login works without a restart.
+//   2. ADMIN_PASSWORD (and optionally ADMIN_USER) env vars - how installs
+//      from before admin.json existed are set up, e.g. the live VPS. With
+//      no ADMIN_USER, the username isn't checked, so those keep working.
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 
 const SESSION_COOKIE = "oak_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const sessions = new Map(); // token -> expiresAt (ms since epoch)
+// (OAK_ADMIN_FILE lets the tests point at a file of their own.)
+const ADMIN_FILE = process.env.OAK_ADMIN_FILE || path.join(__dirname, "admin.json");
+const SCRYPT_KEYLEN = 64;
 
-function passwordConfigured() {
-  return typeof process.env.ADMIN_PASSWORD === "string" && process.env.ADMIN_PASSWORD.length > 0;
+/** The stored login from admin.json, or null if there is none (or it's unreadable). */
+function storedLogin() {
+  try {
+    const login = JSON.parse(fs.readFileSync(ADMIN_FILE, "utf8"));
+    if (typeof login.username === "string" && typeof login.salt === "string" && typeof login.hash === "string") return login;
+  } catch {}
+  return null;
 }
 
-// Constant-time compare so a wrong-length or wrong-content guess doesn't
-// leak timing information about how much of the password matched -
-// crypto.timingSafeEqual itself throws on mismatched lengths, so the
-// length check has to happen first (and is fine to be a fast/non-constant
-// check, unlike the actual byte comparison - password length isn't the
-// secret here, its content is).
+/** A login record for admin.json: the username, a fresh salt, and the password's scrypt hash. */
+function makeLogin(username, password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(String(password), salt, SCRYPT_KEYLEN).toString("hex");
+  return { username: String(username), salt, hash };
+}
+
+function passwordConfigured() {
+  return storedLogin() !== null || (typeof process.env.ADMIN_PASSWORD === "string" && process.env.ADMIN_PASSWORD.length > 0);
+}
+
+// Constant-time compare so a wrong guess doesn't leak timing information
+// about how much of it matched. Both sides are hashed to the same length
+// first, since crypto.timingSafeEqual throws on mismatched lengths - so a
+// guess's length leaks nothing either.
+function same(candidate, expected) {
+  const digest = (s) => crypto.createHash("sha256").update(String(s ?? "")).digest();
+  return crypto.timingSafeEqual(digest(candidate), digest(expected));
+}
+
+// Both the username and the password are always compared, and only then
+// combined, so the response time doesn't tell a right username from a
+// wrong one.
+function checkLogin(username, password) {
+  const login = storedLogin();
+  if (login) {
+    const userOk = same(username, login.username);
+    const actual = crypto.scryptSync(String(password ?? ""), login.salt, SCRYPT_KEYLEN);
+    const passOk = crypto.timingSafeEqual(actual, Buffer.from(login.hash, "hex"));
+    return userOk && passOk;
+  }
+  const userOk = process.env.ADMIN_USER ? same(username, process.env.ADMIN_USER) : true;
+  const passOk = same(password, process.env.ADMIN_PASSWORD || "");
+  return userOk && passOk;
+}
+
+/** The password alone (the env-var setup, with no username): kept for older callers. */
 function checkPassword(candidate) {
-  const expected = Buffer.from(process.env.ADMIN_PASSWORD || "");
-  const actual = Buffer.from(String(candidate || ""));
-  if (actual.length !== expected.length) return false;
-  return crypto.timingSafeEqual(actual, expected);
+  return same(candidate, process.env.ADMIN_PASSWORD || "");
 }
 
 function sweepExpiredSessions() {
@@ -78,11 +125,11 @@ function isPublicPath(pathname) {
 
 function handleLogin(req, res, readJsonBody, sendJson) {
   if (!passwordConfigured()) {
-    return sendJson(res, 500, { error: "ADMIN_PASSWORD is not set on the server - login is not possible until it is." });
+    return sendJson(res, 500, { error: "No login is set up on the server yet - run `node scripts/set-login.js` there (or set ADMIN_PASSWORD), then try again." });
   }
   return readJsonBody(req).then((body) => {
-    if (!checkPassword(body.password)) {
-      return sendJson(res, 401, { error: "Wrong password" });
+    if (!checkLogin(body.username, body.password)) {
+      return sendJson(res, 401, { error: "Wrong username or password" });
     }
     const token = crypto.randomBytes(32).toString("hex");
     sessions.set(token, Date.now() + SESSION_TTL_MS);
@@ -103,4 +150,4 @@ function handleLogout(req, res, sendJson) {
   return sendJson(res, 200, { ok: true });
 }
 
-module.exports = { hasValidSession, isPublicPath, handleLogin, handleLogout, passwordConfigured, SESSION_COOKIE, checkPassword };
+module.exports = { hasValidSession, isPublicPath, handleLogin, handleLogout, passwordConfigured, SESSION_COOKIE, checkPassword, checkLogin, makeLogin, ADMIN_FILE };
