@@ -38,6 +38,18 @@ function callFn(fn, slot) {
 const FALLBACK_POLL_MS = 10000;
 const REFRESH_DEBOUNCE_MS = 150;
 
+// Deep-link support for native clients that embed just this page instead
+// of a full browser tab (see oak/qml-app/qml/DashboardPage.qml's "3D"
+// entry) - ?view=3d jumps straight to the 3D scene once it's known to
+// exist (below, once bootstrapAndRefresh() confirms a scene is actually
+// there). ?embed=1 itself is handled by an inline script in live.html's
+// <head>, synchronously, before body even starts rendering - doing it
+// here instead (a deferred module script) painted the sidebar/topbar once
+// visible, then hid them a moment later on every load.
+const urlParams = new URLSearchParams(location.search);
+const requestedView = urlParams.get("view");
+const requestedOpenComm = urlParams.get("openComm") === "1";
+
 const grid = document.getElementById("skyGrid");
 const sidebar = document.getElementById("skySidebar");
 const live3dPanelEl = document.getElementById("live3dPanel");
@@ -729,7 +741,13 @@ const comm = createCommPanel({ WS, langZh: () => langZh });
 
 async function bootstrapAndRefresh() {
   bindingsData = await getBindings();
-  refresh();
+  await refresh();
+  // Deep-link, once it's actually known whether a 3D scene exists (the
+  // same hasScenes() check renderSidebar() uses to decide whether to show
+  // the "3D" nav button at all) - a bare ?view=3d on a server with no
+  // uploaded scene silently falls back to the normal "All" view instead
+  // of switching to an empty/nonexistent panel.
+  if (requestedView === "3d" && panel3d.hasScenes()) setActiveCategory("__3d__");
 }
 bootstrapAndRefresh();
 WS.onPush((msg) => {
@@ -745,4 +763,13 @@ WS.onStatus((connected) => {
   updateConnLabel();
 });
 comm.init();
+// Same deep-link idea as ?view=3d, for comm.js's own floating chat/call
+// panel - a native client (oak-app's Dashboard chat button) wants to
+// open straight into it, in a small embedded popup, without navigating
+// its own UI away to show the rest of this page. commBtn is comm.js's own
+// closure-local variable (not live.js's - a fresh getElementById here,
+// not a shared reference); its real click handler (comm.js's
+// setPanelOpen) is reused as-is via a simulated click, rather than
+// exposing comm.js's internals for one extra call site.
+if (requestedOpenComm) document.getElementById("commBtn")?.click();
 setInterval(refresh, FALLBACK_POLL_MS);

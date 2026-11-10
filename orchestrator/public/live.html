@@ -85,6 +85,33 @@
   .sky-cat.active{ opacity:1; background:var(--cat-active-bg); }
 
   .sky-main{ position:relative; flex:1; padding:24px 28px; overflow:auto; display:flex; flex-direction:column; }
+  /* ?embed=1 - a native client embedding just this page brings its own
+     navigation chrome, so this page's sidebar/topbar would be a redundant
+     second one. Content (the card grid or #live3dPanel) still renders
+     normally. The class lands on <html>, not <body> - see the inline
+     script right after this <style> block for why. */
+  html.sky-embed .sky-sidebar, html.sky-embed .sky-topbar{ display:none; }
+  html.sky-embed .sky-main{ padding:12px; }
+  /* CommPopup.qml (the native app's floating chat/call popup) loads this
+     page with ?openComm=1 into a small WebEngineView that already has its
+     own native background/border - this page's own body background (the
+     full blue gradient) still showed through around the small
+     .comm-panel box, a redundant "page behind the panel" look the native
+     side doesn't want. #commPanelClose is that popup's only way to
+     dismiss the panel from inside the page - and since it just toggles
+     .sky-hidden on #commPanel via JS, with no way to reach back into the
+     native Popup and call its own close(), that native side now closes
+     itself (native click-outside/Escape, or the OS-standard ways to
+     dismiss a popup) instead, so this button is hidden rather than left
+     as a second, non-functional-looking close affordance. */
+  html.comm-embed body{ background:transparent; }
+  html.comm-embed #commPanelClose{ display:none; }
+  /* Transparent body alone wasn't enough - .sky-main (overflow:auto, the
+     dashboard's card grid) was still fully rendered underneath, its own
+     scrollable area visible behind the small comm panel as an unwanted
+     second "window". The popup only ever wants .comm-panel; nothing else
+     from the page has a reason to render at all in this mode. */
+  html.comm-embed .sky-main{ display:none; }
   .sky-topbar{ display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
   .sky-title{ font-size:1.1rem; font-weight:700; margin-right:auto; }
   .topbtn{ width:34px; height:34px; padding:0; border-radius:50%; background:var(--sidebar-bg); border:1px solid var(--sidebar-border); cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--ink); font-size:15px; font-weight:700; position:relative; }
@@ -160,6 +187,21 @@
   @keyframes glbProgressIndeterminate{ 0%{ transform:translateX(-40%); width:40%; } 100%{ transform:translateX(250%); width:40%; } }
   .glb-progress-indeterminate{ animation:glbProgressIndeterminate 1.1s ease-in-out infinite; }
 </style>
+<script>
+  // Adds the embed-hiding class before body even starts rendering, not
+  // after - live.js is a deferred module script, so doing this same check
+  // there (as it also used to, for the ?view=3d part of this same
+  // deep-link feature) meant the sidebar/topbar painted once, visible,
+  // then got hidden a moment later: a real, visible flash on every load.
+  // Synchronous and inline, targeting <html> (not <body>, since <body>
+  // doesn't exist yet this early) so it can run here in <head>.
+  if (new URLSearchParams(location.search).get("embed") === "1") {
+    document.documentElement.classList.add("sky-embed");
+  }
+  if (new URLSearchParams(location.search).get("openComm") === "1") {
+    document.documentElement.classList.add("comm-embed");
+  }
+</script>
 </head>
 <body>
 <div class="sky-wrap">
