@@ -39,6 +39,40 @@ test("admin.json keeps only a salted hash, never the password itself", () => {
   assert.notEqual(auth.makeLogin("admin", "same").salt, auth.makeLogin("admin", "same").salt);
 });
 
+test("several logins: each with its own password; one left is written as { username, salt, hash }", () => {
+  auth.saveLogins([auth.makeLogin("admin", "one"), auth.makeLogin("anna", "two")]);
+  assert.equal(auth.checkLogin("admin", "one"), true);
+  assert.equal(auth.checkLogin("anna", "two"), true);
+  assert.equal(auth.checkLogin("admin", "two"), false);
+  assert.equal(auth.checkLogin("anna", "one"), false);
+  assert.deepEqual(auth.storedLogins().map((l) => l.username), ["admin", "anna"]);
+  auth.saveLogins([auth.makeLogin("anna", "two")]);
+  assert.equal(JSON.parse(fs.readFileSync(auth.ADMIN_FILE, "utf8")).username, "anna");
+});
+
+test("set-login.js adds, changes, lists and removes logins, never the last", () => {
+  const { execFileSync } = require("child_process");
+  const run = (...a) => {
+    try {
+      return { out: execFileSync(process.execPath, [path.join(__dirname, "../../scripts/set-login.js"), ...a], { encoding: "utf8", stdio: "pipe" }), code: 0 };
+    } catch (e) {
+      return { out: String(e.stderr), code: e.status };
+    }
+  };
+  fs.rmSync(auth.ADMIN_FILE, { force: true });
+  assert.match(run("--user", "admin", "--password", "one").out, /Login added/);
+  assert.match(run("--user", "anna", "--password", "two").out, /2 login\(s\)/);
+  assert.match(run("--user", "anna", "--password", "three").out, /Password changed/);
+  assert.equal(auth.checkLogin("anna", "three"), true);
+  assert.equal(run("--list").out, "admin\nanna\n");
+  assert.equal(run("--remove", "nobody").code, 1);
+  assert.match(run("--remove", "admin").out, /1 login\(s\) left/);
+  const last = run("--remove", "anna");
+  assert.equal(last.code, 1);
+  assert.match(last.out, /only login/);
+  assert.equal(auth.checkLogin("anna", "three"), true);
+});
+
 test("with admin.json, the env vars are not used", () => {
   fs.writeFileSync(auth.ADMIN_FILE, JSON.stringify(auth.makeLogin("admin", "from-file")));
   withEnv({ ADMIN_USER: "envuser", ADMIN_PASSWORD: "from-env" }, () => {

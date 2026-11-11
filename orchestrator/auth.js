@@ -7,14 +7,15 @@
 // reconfiguring Caddy. A session cookie doesn't have this problem - it's
 // the standard fix for exactly this class of bug.
 //
-// Deliberately minimal: one admin login, not a user table - matching the
-// simplicity of the basic_auth model this replaces, not adding scope
-// (per-user accounts, password reset, etc.) nobody asked for on a
-// self-hosted single-operator tool.
+// Deliberately minimal: admin logins that all may do everything - no roles,
+// no password reset by mail - matching the basic_auth model this replaces.
+// There can be several (scripts/set-login.js adds one or changes one's
+// password; --remove takes one away, never the last).
 //
-// Where the login comes from, first found wins:
-//   1. orchestrator/admin.json - { username, salt, hash }, written by
-//      scripts/set-login.js (which the installers run). The password is
+// Where the logins come from, first found wins:
+//   1. orchestrator/admin.json - { username, salt, hash } for one login, or
+//      { logins: [ ... ] } for several - written by scripts/set-login.js
+//      (which the installers run); the same file as oak-rs's. The password is
 //      kept only as a salted scrypt hash, never in plain text. Read on
 //      every login attempt, so a changed login works without a restart.
 //   2. ADMIN_PASSWORD (and optionally ADMIN_USER) env vars - how installs
@@ -31,13 +32,26 @@ const sessions = new Map(); // token -> expiresAt (ms since epoch)
 const ADMIN_FILE = process.env.OAK_ADMIN_FILE || path.join(__dirname, "admin.json");
 const SCRYPT_KEYLEN = 64;
 
-/** The stored login from admin.json, or null if there is none (or it's unreadable). */
-function storedLogin() {
+/** @typedef {{ username: string, salt: string, hash: string }} Login */
+
+/** @param {any} l @returns {l is Login} */
+const isLogin = (l) => !!l && typeof l.username === "string" && typeof l.salt === "string" && typeof l.hash === "string";
+
+/** The stored logins from admin.json; none if there is none (or it's unreadable). @returns {Login[]} */
+function storedLogins() {
   try {
-    const login = JSON.parse(fs.readFileSync(ADMIN_FILE, "utf8"));
-    if (typeof login.username === "string" && typeof login.salt === "string" && typeof login.hash === "string") return login;
+    const data = JSON.parse(fs.readFileSync(ADMIN_FILE, "utf8"));
+    if (Array.isArray(data.logins)) return data.logins.filter(isLogin);
+    if (isLogin(data)) return [data];
   } catch {}
-  return null;
+  return [];
+}
+
+/** Writes admin.json, readable by this user only; one login as { username, salt, hash }. @param {Login[]} logins */
+function saveLogins(logins) {
+  const data = logins.length === 1 ? logins[0] : { logins };
+  fs.writeFileSync(ADMIN_FILE, JSON.stringify(data, null, 2) + "\n", { mode: 0o600 });
+  fs.chmodSync(ADMIN_FILE, 0o600);
 }
 
 /** A login record for admin.json: the username, a fresh salt, and the password's scrypt hash. */
@@ -48,7 +62,7 @@ function makeLogin(username, password) {
 }
 
 function passwordConfigured() {
-  return storedLogin() !== null || (typeof process.env.ADMIN_PASSWORD === "string" && process.env.ADMIN_PASSWORD.length > 0);
+  return storedLogins().length > 0 || (typeof process.env.ADMIN_PASSWORD === "string" && process.env.ADMIN_PASSWORD.length > 0);
 }
 
 // Constant-time compare so a wrong guess doesn't leak timing information
@@ -60,16 +74,21 @@ function same(candidate, expected) {
   return crypto.timingSafeEqual(digest(candidate), digest(expected));
 }
 
-// Both the username and the password are always compared, and only then
+// Every stored login is tried, username and password both, and only then
 // combined, so the response time doesn't tell a right username from a
 // wrong one.
 function checkLogin(username, password) {
-  const login = storedLogin();
-  if (login) {
-    const userOk = same(username, login.username);
-    const actual = crypto.scryptSync(String(password ?? ""), login.salt, SCRYPT_KEYLEN);
-    const passOk = crypto.timingSafeEqual(actual, Buffer.from(login.hash, "hex"));
-    return userOk && passOk;
+  const logins = storedLogins();
+  if (logins.length) {
+    let found = false;
+    for (const login of logins) {
+      const userOk = same(username, login.username);
+      const actual = crypto.scryptSync(String(password ?? ""), login.salt, SCRYPT_KEYLEN);
+      const expected = Buffer.from(login.hash, "hex");
+      const passOk = expected.length === actual.length && crypto.timingSafeEqual(actual, expected);
+      found = found || (userOk && passOk);
+    }
+    return found;
   }
   const userOk = process.env.ADMIN_USER ? same(username, process.env.ADMIN_USER) : true;
   const passOk = same(password, process.env.ADMIN_PASSWORD || "");
@@ -150,4 +169,4 @@ function handleLogout(req, res, sendJson) {
   return sendJson(res, 200, { ok: true });
 }
 
-module.exports = { hasValidSession, isPublicPath, handleLogin, handleLogout, passwordConfigured, SESSION_COOKIE, checkPassword, checkLogin, makeLogin, ADMIN_FILE };
+module.exports = { hasValidSession, isPublicPath, handleLogin, handleLogout, passwordConfigured, SESSION_COOKIE, checkPassword, checkLogin, makeLogin, storedLogins, saveLogins, ADMIN_FILE };
