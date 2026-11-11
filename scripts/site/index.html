@@ -252,7 +252,7 @@ footer{ padding:44px 0 60px; border-top:1px solid var(--line-soft); }
       <a href="#features">Features</a>
       <a href="#drivers">Drivers</a>
       <a href="#install">Install</a>
-      <a href="#rust">Rust</a>
+      <a href="#download">Download</a>
       <a href="#https">Going public</a>
       <a class="nav-cta" href="https://github.com/qinghuaatbc/oak" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
@@ -653,12 +653,12 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
   </div>
 </section>
 
-<section id="rust">
+<section id="download">
   <div class="wrap">
     <div class="section-head">
       <span class="section-tag">Also available</span>
-      <h2>Oak in Rust: one file, no Node.js</h2>
-      <p><b>oak-rs</b> runs the same 147 drivers, unchanged, in a JavaScript engine built into a single <code>oak-server</code> program, with the same admin page and the same login. Nothing else to install: the one command below downloads the program for your system, checks it, asks you to choose a login, and runs it as a service - launchd on macOS, systemd on Linux, a real Windows service on Windows. It starts in about 7 ms and idles at about 7 MB of memory (Node: 85 ms, 53 MB).</p>
+      <h2>The download version: one file, nothing else to install</h2>
+      <p>Oak also comes as a single program, <code>oak-server</code>, with the same 147 drivers, the same admin page and the same login built in. No Node.js, no source code to clone: the one command below downloads the program for your system, checks it, asks you to choose a login, and runs it as a service - launchd on macOS, systemd on Linux, a real Windows service on Windows. It starts in about 7 ms and idles at about 7 MB of memory (the Node.js version: 85 ms, 53 MB). It can be installed beside the Node.js version: it uses port 8090 and its own service name, <code>oak-rs</code>.</p>
     </div>
     <div class="steps">
       <div class="step">
@@ -686,7 +686,7 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
         </div>
       </div>
     </div>
-    <p style="margin-top:28px; opacity:0.7; font-size:0.95rem;">oak-rs covers the drivers and their devices - adding, starting, actions, states, events. Live updates, macros, automations, dashboard bindings and camera streaming are in the Node.js version only, for now.</p>
+    <p style="margin-top:28px; opacity:0.7; font-size:0.95rem;">The download version covers the drivers and their devices - adding, starting, actions, states, events. Live updates, macros, automations, dashboard bindings and camera streaming are in the Node.js version only, for now.</p>
   </div>
 </section>
 
