@@ -2,6 +2,12 @@
 // see server.js's startCameraFfmpeg) -> fragmented MP4 over a raw binary
 // WebSocket -> MediaSource here -> <video>. No browser plugin - MSE
 // decodes H.264 natively.
+//
+// In the Oak desktop client the page is the same, but the client plays the
+// cameras itself: it sets window.oakCameraService to its own local service,
+// which reads the camera directly and sends its H.264 or H.265 as it is (no
+// transcoding, nothing through the server), saying first which codec:
+// {"type":"codec","mime":"video/mp4; codecs=\"hvc1...\""}.
 
 const CAMERA_CODEC_CANDIDATES = [
   'video/mp4; codecs="avc1.640028"',
@@ -48,15 +54,32 @@ export function attachCameraPlayer(videoEl, rtspUrl) {
     videoEl.src = URL.createObjectURL(mediaSource);
     mediaSource.addEventListener("sourceopen", () => {
       if (stopped) return;
-      sourceBuffer = mediaSource.addSourceBuffer(pickMimeType());
-      sourceBuffer.addEventListener("updateend", pumpQueue);
-      ws = new WebSocket(`${location.protocol === "https:" ? "wss://" : "ws://"}${location.host}/camera-ws?url=${encodeURIComponent(rtspUrl)}`);
+      // (Made once the type is known: named by the stream, else the H.264 guess.)
+      const openBuffer = (mime) => {
+        sourceBuffer = mediaSource.addSourceBuffer(mime);
+        sourceBuffer.addEventListener("updateend", pumpQueue);
+      };
+      const base = window.oakCameraService || `${location.protocol === "https:" ? "wss://" : "ws://"}${location.host}`;
+      ws = new WebSocket(`${base}/camera-ws?url=${encodeURIComponent(rtspUrl)}`);
       ws.binaryType = "arraybuffer";
       ws.addEventListener("message", (ev) => {
         if (typeof ev.data === "string") {
+          let msg = null;
+          try {
+            msg = JSON.parse(ev.data);
+          } catch (e) {}
+          if (msg && msg.type === "codec" && !sourceBuffer) {
+            try {
+              openBuffer(msg.mime);
+            } catch (e) {
+              console.error("camera stream: this browser can't play", msg.mime);
+            }
+            return;
+          }
           console.error("camera stream error:", ev.data);
           return;
         }
+        if (!sourceBuffer) openBuffer(pickMimeType());
         pendingChunks.push(new Uint8Array(ev.data));
         pumpQueue();
       });
