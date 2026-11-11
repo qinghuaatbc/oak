@@ -648,6 +648,16 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
 <span class="k">~/oak-app/oak/scripts/install-windows.ps1</span>  <span class="cmt" style="color:var(--code-faint)"># Windows</span></pre>
         </div>
       </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h3>Uninstall</h3>
+          <p>Removes the service and stops Oak. The folder stays - your login and devices are still there if you install again; add <code>--purge</code> (Windows: set <code>$env:OAK_PURGE = 1</code> first) to delete it too. Node.js stays installed.</p>
+          <pre><span class="k">curl</span> -fsSL https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/uninstall.sh | <span class="k">bash</span>                  <span class="cmt" style="color:var(--code-faint)"># macOS, Linux</span>
+<span class="k">curl</span> -fsSL https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/uninstall.sh | <span class="k">bash</span> -s -- --purge     <span class="cmt" style="color:var(--code-faint)"># ...and delete the folder</span>
+<span class="k">irm</span> https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/uninstall-windows.ps1 | <span class="k">iex</span>          <span class="cmt" style="color:var(--code-faint)"># Windows</span></pre>
+        </div>
+      </div>
     </div>
     <p style="margin-top:28px; opacity:0.7; font-size:0.95rem;">Everything above runs today on Linux (including Raspberry Pi), macOS, and Windows.</p>
   </div>
@@ -683,6 +693,16 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
           <h3>Open it, update it</h3>
           <p>The admin page is on port 8090. Run the same command again to update; your login, devices and drivers stay. The programs on their own, to run anywhere: <a href="download/">goldknighttech.ca/oak/download</a>.</p>
           <pre><span class="k">http://</span>&lt;machine-ip&gt;:8090/</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h3>Uninstall</h3>
+          <p>The installer prints the exact command at the end. It removes the service and the built-in drivers; your login and devices stay for a later install, and drivers you changed are kept. <code>--purge</code> removes everything.</p>
+          <pre><span class="k">"~/Library/Application Support/oak-rs/oak-server"</span> uninstall      <span class="cmt" style="color:var(--code-faint)"># macOS</span>
+<span class="k">sudo /opt/oak-rs/oak-server</span> uninstall                             <span class="cmt" style="color:var(--code-faint)"># Linux</span>
+<span class="k">&amp; "C:\ProgramData\oak-rs\oak-server.exe"</span> uninstall               <span class="cmt" style="color:var(--code-faint)"># Windows, as Administrator</span></pre>
         </div>
       </div>
     </div>

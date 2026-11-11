@@ -109,6 +109,16 @@ latest code, reinstalling dependencies, and restarting the service:
 ~/oak-app/oak/scripts/install-windows.ps1 # Windows
 ```
 
+To uninstall: the service goes and Oak stops; `~/oak-app/oak` stays, with
+your login and devices, unless you add `--purge` (Windows: `-Purge`, or
+`$env:OAK_PURGE = 1` before the `irm` line). Node.js stays installed.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/uninstall.sh | bash              # macOS, Linux
+curl -fsSL https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/uninstall.sh | bash -s -- --purge
+irm https://raw.githubusercontent.com/qinghuaatbc/oak/main/scripts/uninstall-windows.ps1 | iex           # Windows
+```
+
 ## Try it (from source, without installing as a service)
 
 ```sh
