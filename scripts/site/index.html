@@ -252,6 +252,7 @@ footer{ padding:44px 0 60px; border-top:1px solid var(--line-soft); }
       <a href="#features">Features</a>
       <a href="#drivers">Drivers</a>
       <a href="#install">Install</a>
+      <a href="#rust">Rust</a>
       <a href="#https">Going public</a>
       <a class="nav-cta" href="https://github.com/qinghuaatbc/oak" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
@@ -649,6 +650,43 @@ curl -fsSL <span class="str">https://raw.githubusercontent.com/qinghuaatbc/oak/m
       </div>
     </div>
     <p style="margin-top:28px; opacity:0.7; font-size:0.95rem;">Everything above runs today on Linux (including Raspberry Pi), macOS, and Windows.</p>
+  </div>
+</section>
+
+<section id="rust">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-tag">Also available</span>
+      <h2>Oak in Rust: one file, no Node.js</h2>
+      <p><b>oak-rs</b> runs the same 147 drivers, unchanged, in a JavaScript engine built into a single <code>oak-server</code> program, with the same admin page and the same login. Nothing else to install: the one command below downloads the program for your system, checks it, asks you to choose a login, and runs it as a service - launchd on macOS, systemd on Linux, a real Windows service on Windows. It starts in about 7 ms and idles at about 7 MB of memory (Node: 85 ms, 53 MB).</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h3>macOS and Linux (including Raspberry Pi)</h3>
+          <p>On Linux it asks for your sudo password and starts at boot; on macOS it starts when you log in, without sudo.</p>
+          <pre><span class="k">curl</span> -fsSL https://goldknighttech.ca/oak/install.sh | <span class="k">sh</span></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h3>Windows</h3>
+          <p>In PowerShell opened as Administrator. Installs the service "oak", started at boot and let through the firewall.</p>
+          <pre><span class="k">irm</span> https://goldknighttech.ca/oak/install.ps1 | <span class="k">iex</span></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div class="step-body">
+          <h3>Open it, update it</h3>
+          <p>The admin page is on port 8090. Run the same command again to update; your login, devices and drivers stay. The programs on their own, to run anywhere: <a href="download/">goldknighttech.ca/oak/download</a>.</p>
+          <pre><span class="k">http://</span>&lt;machine-ip&gt;:8090/</pre>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:28px; opacity:0.7; font-size:0.95rem;">oak-rs covers the drivers and their devices - adding, starting, actions, states, events. Live updates, macros, automations, dashboard bindings and camera streaming are in the Node.js version only, for now.</p>
   </div>
 </section>
 
