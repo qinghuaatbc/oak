@@ -1,6 +1,7 @@
 "use strict";
 // Cameras: the saved list (/api/cameras) and the ffmpeg process that turns
 // one camera's RTSP stream into fragmented MP4 for a /camera-ws socket.
+const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
 const { loadJsonArray, saveJsonArray, sendJson, readJsonBody } = require("./http-util");
@@ -19,6 +20,20 @@ let cameras = loadJsonArray(CAMERAS_PATH); // [{id, name, rtspUrl}]
 // re-discovering the same bug against real hardware; reusing the known-good
 // flags is the point of "reference QTI" here.
 const activeCameraProcs = new Set();
+
+// ffmpeg: OAK_FFMPEG, else on the PATH, else where Homebrew and Linux put it -
+// a service (launchd especially) gets a PATH without /opt/homebrew/bin, so a
+// plain spawn("ffmpeg") failed there with ENOENT though ffmpeg was installed.
+function ffmpegPath() {
+  if (process.env.OAK_FFMPEG) return process.env.OAK_FFMPEG;
+  const name = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+  const dirs = [...(process.env.PATH || "").split(path.delimiter), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"];
+  for (const dir of dirs) {
+    if (dir && fs.existsSync(path.join(dir, name))) return path.join(dir, name);
+  }
+  return name;
+}
+
 function startCameraFfmpeg(rtspUrl, ws) {
   const args = [
     "-rtsp_transport", "tcp",
@@ -37,7 +52,7 @@ function startCameraFfmpeg(rtspUrl, ws) {
     "-reset_timestamps", "1",
     "pipe:1",
   ];
-  const proc = spawn("ffmpeg", args, { stdio: ["ignore", "pipe", "pipe"] });
+  const proc = spawn(ffmpegPath(), args, { stdio: ["ignore", "pipe", "pipe"] });
   activeCameraProcs.add(proc);
 
   // An unreachable/misconfigured camera doesn't necessarily make ffmpeg
