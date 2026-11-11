@@ -69,7 +69,21 @@ fi
 # (`curl ... | bash`). With no terminal at all (automation), set
 # OAK_ADMIN_USER and OAK_ADMIN_PASSWORD instead.
 if [ -f orchestrator/admin.json ]; then
-  echo "==> Login already set up (orchestrator/admin.json), keeping it. To change it: node scripts/set-login.js"
+  # An update: the logins stay unless asked otherwise (as oak-rs's installer).
+  if ( exec < /dev/tty ) 2>/dev/null; then
+    names="$(node scripts/set-login.js --list | paste -sd, - | sed 's/,/, /g')"
+    printf "==> Logins already set up: %s. Keep them? [Y/n]: " "$names"
+    read -r keep < /dev/tty || keep=""
+    case "$keep" in
+      [nN]*)
+        echo "    A username already there gets the new password; a new one is added."
+        node scripts/set-login.js < /dev/tty
+        ;;
+      *) echo "==> Keeping them. To change them later: node scripts/set-login.js" ;;
+    esac
+  else
+    echo "==> Login already set up (orchestrator/admin.json), keeping it. To change it: node scripts/set-login.js"
+  fi
 elif [ -n "${OAK_ADMIN_PASSWORD:-}" ]; then
   echo "==> Setting the admin login from OAK_ADMIN_USER / OAK_ADMIN_PASSWORD..."
   node scripts/set-login.js --user "${OAK_ADMIN_USER:-admin}" --password "$OAK_ADMIN_PASSWORD"

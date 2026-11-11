@@ -78,12 +78,25 @@ if (-not (Test-Path $configPath)) {
 }
 
 # The admin login (username + password, the password kept only as a hash -
-# see scripts\set-login.js). Asked for once, on a first install; an update
-# re-run keeps the one already set. For automation with no one to ask, set
+# see scripts\set-login.js). Asked for on a first install; an update re-run
+# asks whether to keep the ones already set. For automation with no one to ask, set
 # OAK_ADMIN_USER and OAK_ADMIN_PASSWORD first.
 $adminFile = Join-Path $InstallDir "orchestrator\admin.json"
 if (Test-Path $adminFile) {
-    Write-Host "==> Login already set up (orchestrator\admin.json), keeping it. To change it: node scripts\set-login.js"
+    # An update: the logins stay unless asked otherwise (as oak-rs's installer);
+    # with no one to ask (automation), they are kept.
+    if ([Environment]::UserInteractive -and -not $env:OAK_ADMIN_PASSWORD) {
+        $names = (node scripts\set-login.js --list) -join ", "
+        $keep = Read-Host "==> Logins already set up: $names. Keep them? [Y/n]"
+        if ($keep -match '^\s*n') {
+            Write-Host "    A username already there gets the new password; a new one is added."
+            node scripts\set-login.js
+        } else {
+            Write-Host "==> Keeping them. To change them later: node scripts\set-login.js"
+        }
+    } else {
+        Write-Host "==> Login already set up (orchestrator\admin.json), keeping it. To change it: node scripts\set-login.js"
+    }
 } elseif ($env:OAK_ADMIN_PASSWORD) {
     Write-Host "==> Setting the admin login from OAK_ADMIN_USER / OAK_ADMIN_PASSWORD..."
     $adminUser = if ($env:OAK_ADMIN_USER) { $env:OAK_ADMIN_USER } else { "admin" }
