@@ -4,7 +4,7 @@
 
 const http = require("http");
 const path = require("path");
-const { loadDriver } = require("../runtime/loader");
+const { loadDriver, EVENTS } = require("../runtime/loader");
 
 let relayOn = false;
 const server = http.createServer((req, res) => {
@@ -30,9 +30,9 @@ server.listen(0, "127.0.0.1", () => {
     settings: { pollIntervalMs: 1000 },
   });
 
-  driver.on("event", (ev) => console.log("[driver event]", ev.id, ev.params));
-  driver.on("state", (s) => console.log("[driver state]", s.id, s.instanceKey, "=", s.value));
-  driver.on("error", (e) => console.log("[driver error]", e.where, e.error.message));
+  driver.on(EVENTS.EVENT, (ev) => console.log("[driver event]", ev.id, ev.params));
+  driver.on(EVENTS.STATE, (s) => console.log("[driver state]", s.id, s.instanceKey, "=", s.value));
+  driver.on(EVENTS.ERROR, (e) => console.log("[driver error]", e.where, e.error.message));
 
   driver.start();
 

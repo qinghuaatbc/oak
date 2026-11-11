@@ -49,7 +49,7 @@ function loadDriverModule(driverDir) {
   const wrapped = `(function (module, exports, require) {\n${source}\n})`;
   const compiled = vm.runInContext(wrapped, sandbox, { filename: filePath });
   compiled(sandboxModule, sandboxModule.exports, sandbox.require);
-  return sandboxModule.exports;
+  return /** @type {{create: Function}} */ (sandboxModule.exports);
 }
 
 // Self-healing reconnect backoff: starts at 1s, doubles on every failed
@@ -162,16 +162,37 @@ class Clock {
   }
 }
 
+/** The events a DriverInstance emits - listen with `driver.on(EVENTS.STATE, ...)`. */
+const EVENTS = Object.freeze({
+  /** {id, instanceKey, value} - ctx.setState() */
+  STATE: "state",
+  /** {id, params} - ctx.emitEvent() */
+  EVENT: "event",
+  /** {where, error} - a throw/rejection in driver code, or a socket error */
+  ERROR: "error",
+});
+
+/** One running driver; see EVENTS for what it emits. */
 class DriverInstance extends EventEmitter {
+  /**
+   * @param {object} manifest the driver's manifest.json
+   * @param {{create: Function}} driverModule driver.js's exports
+   * @param {{connection: object, settings: object}} config
+   */
   constructor(manifest, driverModule, config) {
     super();
     this.manifest = manifest;
     this.config = config;
+    /** @type {Map<string, any>} state id (or "id#instanceKey") -> value */
     this.state = new Map();
     this.clock = new Clock();
+    /** @type {"tcp" | "http"} */
     this.transport = (config.connection && config.connection.transport) || "tcp";
+    /** @type {Connection | null} only for transport "tcp" */
     this.connection = this.transport === "tcp" ? new Connection(config.connection) : null;
+    /** @type {HttpClient | null} only for transport "http" */
     this.http = this.transport === "http" ? new HttpClient(config.connection) : null;
+    /** @type {Map<string, (params: object) => any>} action id -> the driver's handler */
     this.actionHandlers = new Map();
 
     const ctx = {
@@ -183,13 +204,13 @@ class DriverInstance extends EventEmitter {
       setState: (id, value, instanceKey) => {
         const key = instanceKey !== undefined ? `${id}#${instanceKey}` : id;
         this.state.set(key, value);
-        this.emit("state", { id, instanceKey, value });
+        this.emit(EVENTS.STATE, { id, instanceKey, value });
       },
       getState: (id, instanceKey) => {
         const key = instanceKey !== undefined ? `${id}#${instanceKey}` : id;
         return this.state.get(key);
       },
-      emitEvent: (eventId, params) => this.emit("event", { id: eventId, params }),
+      emitEvent: (eventId, params) => this.emit(EVENTS.EVENT, { id: eventId, params }),
       onAction: (actionId, handler) => this.actionHandlers.set(actionId, handler),
     };
 
@@ -206,7 +227,7 @@ class DriverInstance extends EventEmitter {
       // misleading "[FATAL - uncaught]" instead of the same safe,
       // recoverable "error" event every other driver-code failure already
       // goes through via _guarded() above.
-      this.connection.on("error", (err) => this.emit("error", { where: "connection", error: err }));
+      this.connection.on("error", (err) => this.emit(EVENTS.ERROR, { where: "connection", error: err }));
     }
   }
 
@@ -237,11 +258,11 @@ class DriverInstance extends EventEmitter {
     try {
       const result = fn();
       if (result && typeof result.then === "function") {
-        result.catch((err) => this.emit("error", { where, error: err }));
+        result.catch((err) => this.emit(EVENTS.ERROR, { where, error: err }));
       }
       return result;
     } catch (err) {
-      this.emit("error", { where, error: err });
+      this.emit(EVENTS.ERROR, { where, error: err });
     }
   }
 
@@ -284,4 +305,4 @@ function loadDriver(driverDir, config) {
   return new DriverInstance(manifest, driverModule, config);
 }
 
-module.exports = { loadDriver, Connection, HttpClient, Clock, DriverInstance };
+module.exports = { loadDriver, Connection, HttpClient, Clock, DriverInstance, EVENTS };

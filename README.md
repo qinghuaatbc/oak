@@ -21,10 +21,27 @@ note on independence from any third-party driver SDK.
   events — proves the platform isn't secretly TCP-shaped underneath.
 - `example/` — standalone fake device servers plus small end-to-end demo
   scripts, so each driver can be exercised without any real hardware.
-- `orchestrator/` — an MVP host that loads a set of instances from
+- `orchestrator/` — the host that loads a set of instances from
   `config.json` (see `config.example.json`) and exposes them over a REST
   API (`GET /api/instances`, `GET /api/instances/:id/state`,
-  `GET /api/instances/:id/events`, `POST /api/instances/:id/action/:actionId`).
+  `GET /api/instances/:id/events`, `POST /api/instances/:id/action/:actionId`)
+  and a WebSocket at `/ws`. One file per job:
+
+  | File | What it does |
+  |---|---|
+  | `server.js` | starts everything, checks the login, hands each `/api/<name>` request to its module, `/ws` |
+  | `instances.js` | the configured instances (add, start, stop, edit, remove, save), `/api/instances`, `/api/health` |
+  | `automations.js` | macros, automations, sunrise/sunset, time triggers, `/api/macros`, `/api/automations`, `/api/settings` |
+  | `bindings.js` | Dashboard slots, 3D scenes, Layout pages, `/api/bindings` |
+  | `drivers.js` | driver packages, `/api/drivers` |
+  | `cameras.js` | cameras and ffmpeg, `/api/cameras`, `/camera-ws` |
+  | `files.js` | the pages in `public/`, uploaded models and images |
+  | `comm.js` | calls, chat and push between `live.html` sessions |
+  | `auth.js` | login and sessions |
+  | `broadcast.js`, `http-util.js` | `broadcast()` to every `/ws` client; JSON helpers |
+
+  `npm test` runs the tests in `orchestrator/test/`. With `jsconfig.json`,
+  VS Code type-checks the orchestrator and runtime from their JSDoc types.
 
 ## Install
 

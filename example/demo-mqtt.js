@@ -4,7 +4,7 @@
 // independently of the driver) and load the real driver against it.
 const { spawn } = require("child_process");
 const path = require("path");
-const { loadDriver } = require("../runtime/loader");
+const { loadDriver, EVENTS } = require("../runtime/loader");
 
 const PORT = 18830 + Math.floor(Math.random() * 1000);
 const broker = spawn(process.execPath, [path.join(__dirname, "fake-mqtt-broker.js")], {
@@ -19,9 +19,9 @@ setTimeout(() => {
     settings: { baseTopic: "home/plug1", clientId: "oak-demo" },
   });
 
-  driver.on("event", (ev) => console.log("[driver event]", ev.id, ev.params));
-  driver.on("state", (s) => console.log("[driver state]", s.id, s.instanceKey, "=", s.value));
-  driver.on("error", (e) => console.log("[driver error]", e.where, e.error.message));
+  driver.on(EVENTS.EVENT, (ev) => console.log("[driver event]", ev.id, ev.params));
+  driver.on(EVENTS.STATE, (s) => console.log("[driver state]", s.id, s.instanceKey, "=", s.value));
+  driver.on(EVENTS.ERROR, (e) => console.log("[driver error]", e.where, e.error.message));
 
   driver.start();
 
