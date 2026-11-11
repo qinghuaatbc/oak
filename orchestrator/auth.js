@@ -142,6 +142,19 @@ function isPublicPath(pathname) {
   return PUBLIC_PATHS.has(pathname);
 }
 
+/**
+ * The session cookie. Secure (sent over HTTPS only) when the request came
+ * over HTTPS - directly, or through a proxy such as Caddy that says so in
+ * X-Forwarded-Proto. Over plain http (Oak on a home network, at
+ * http://192.168.x.x:8702) a Secure cookie is thrown away by the browser,
+ * so signing in would seem to fail; there it is sent without the flag.
+ */
+function sessionCookie(req, value, maxAgeSeconds) {
+  const proto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+  const https = req.socket?.encrypted || proto === "https";
+  return `${SESSION_COOKIE}=${value}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly;${https ? " Secure;" : ""} SameSite=Lax`;
+}
+
 function handleLogin(req, res, readJsonBody, sendJson) {
   if (!passwordConfigured()) {
     return sendJson(res, 500, { error: "No login is set up on the server yet - run `node scripts/set-login.js` there (or set ADMIN_PASSWORD), then try again." });
@@ -153,11 +166,9 @@ function handleLogin(req, res, readJsonBody, sendJson) {
     const token = crypto.randomBytes(32).toString("hex");
     sessions.set(token, Date.now() + SESSION_TTL_MS);
     // HttpOnly (JS on the page can't read it - nothing to steal via XSS),
-    // Secure (only sent over HTTPS - the live deployment is HTTPS-only
-    // behind Caddy; local http://localhost testing still works because
-    // browsers special-case "Secure" as not required for localhost),
-    // SameSite=Lax (sent on normal navigation, not on cross-site requests).
-    res.setHeader("Set-Cookie", `${SESSION_COOKIE}=${token}; Path=/; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}; HttpOnly; Secure; SameSite=Lax`);
+    // Secure over HTTPS (see sessionCookie), SameSite=Lax (sent on normal
+    // navigation, not on cross-site requests).
+    res.setHeader("Set-Cookie", sessionCookie(req, token, Math.floor(SESSION_TTL_MS / 1000)));
     return sendJson(res, 200, { ok: true });
   });
 }
@@ -165,7 +176,7 @@ function handleLogin(req, res, readJsonBody, sendJson) {
 function handleLogout(req, res, sendJson) {
   const token = parseCookies(req)[SESSION_COOKIE];
   if (token) sessions.delete(token);
-  res.setHeader("Set-Cookie", `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`);
+  res.setHeader("Set-Cookie", sessionCookie(req, "", 0));
   return sendJson(res, 200, { ok: true });
 }
 

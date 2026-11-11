@@ -11,7 +11,7 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 const { server } = require("../server.js");
 
-function request(port, method, urlPath, { body, cookie } = {}) {
+function request(port, method, urlPath, { body, cookie, headers = {} } = {}) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
     const req = http.request(
@@ -23,6 +23,7 @@ function request(port, method, urlPath, { body, cookie } = {}) {
         headers: {
           ...(data ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data) } : {}),
           ...(cookie ? { Cookie: cookie } : {}),
+          ...headers,
         },
       },
       (res) => {
@@ -86,6 +87,14 @@ test("the right password logs in, and the resulting session cookie unlocks a pre
 
     const health = await request(port, "GET", "/api/health", { cookie });
     assert.equal(health.status, 200);
+  }));
+
+test("the session cookie is Secure over HTTPS (behind a proxy) and not over plain http, where a browser would drop it", () =>
+  withServer(async (port) => {
+    const plain = await request(port, "POST", "/api/login", { body: { password: process.env.ADMIN_PASSWORD } });
+    assert.doesNotMatch(String(plain.headers["set-cookie"]), /Secure/);
+    const proxied = await request(port, "POST", "/api/login", { body: { password: process.env.ADMIN_PASSWORD }, headers: { "X-Forwarded-Proto": "https" } });
+    assert.match(String(proxied.headers["set-cookie"]), /; Secure;/);
   }));
 
 test("logging out invalidates the session - the same cookie stops working afterward", () =>
