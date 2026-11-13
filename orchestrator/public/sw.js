@@ -9,7 +9,8 @@ self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim(
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;
-  let payload = { title: "Oak", body: "", icon: "/icon-192.png", data: {} };
+  // (Relative to where Oak is: its root, or under a path behind a proxy.)
+  let payload = { title: "Oak", body: "", icon: new URL("icon-192.png", self.registration.scope).href, data: {} };
   try {
     payload = { ...payload, ...event.data.json() };
   } catch (e) {
@@ -36,7 +37,7 @@ self.addEventListener("notificationclick", (event) => {
       for (const c of list) {
         if (c.url.includes("/live.html") && "focus" in c) return c.focus();
       }
-      if (clients.openWindow) return clients.openWindow("/live.html");
+      if (clients.openWindow) return clients.openWindow(new URL("live.html", self.registration.scope).href);
     })
   );
 });

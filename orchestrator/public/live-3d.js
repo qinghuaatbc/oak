@@ -6,6 +6,7 @@
 // there's no edit mode; tapping a bound mesh toggles its device exactly
 // like tapping a flat card does, via the `dispatchToggle` callback the
 // host page supplies.
+import { oakUrl } from "./base.js";
 import { create3DViewer } from "./viewer3d.js";
 import { resolveMeshOnLevel, createGlbProgressHandler } from "./roles.js";
 
@@ -51,7 +52,7 @@ export function create3DPanel({ sceneRowId, getBindingsData, getStatesByInstance
 
   async function loadCurrentScene() {
     const scene = currentScene();
-    if (scene && scene.url) viewer3d.loadGLB(scene.url);
+    if (scene && scene.url) viewer3d.loadGLB(oakUrl(scene.url));
   }
 
   // Returns whether there's anything to show - the host page uses this

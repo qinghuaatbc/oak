@@ -8,6 +8,7 @@
 // which reads the camera directly and sends its H.264 or H.265 as it is (no
 // transcoding, nothing through the server), saying first which codec:
 // {"type":"codec","mime":"video/mp4; codecs=\"hvc1...\""}.
+import { BASE } from "./base.js";
 
 const CAMERA_CODEC_CANDIDATES = [
   'video/mp4; codecs="avc1.640028"',
@@ -59,7 +60,7 @@ export function attachCameraPlayer(videoEl, rtspUrl) {
         sourceBuffer = mediaSource.addSourceBuffer(mime);
         sourceBuffer.addEventListener("updateend", pumpQueue);
       };
-      const base = window.oakCameraService || `${location.protocol === "https:" ? "wss://" : "ws://"}${location.host}`;
+      const base = window.oakCameraService || `${location.protocol === "https:" ? "wss://" : "ws://"}${location.host}${BASE}`;
       ws = new WebSocket(`${base}/camera-ws?url=${encodeURIComponent(rtspUrl)}`);
       ws.binaryType = "arraybuffer";
       ws.addEventListener("message", (ev) => {

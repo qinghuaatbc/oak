@@ -9,6 +9,7 @@
 // direct comment on why: a full rebuild mid-drag is exactly the bug that
 // bit its admin tile grid once already, and the ring widget below needs
 // real dragging to work at all.
+import { oakUrl } from "./base.js";
 import { listInstances, getState, callAction, getBindings, runMacro } from "./api.js";
 import { connectWS } from "./live-socket.js";
 import { createCommPanel } from "./comm.js";
@@ -192,7 +193,7 @@ function buildRingCard(slot, cat) {
     thumb.setAttribute("cy", ty.toFixed(2));
     const customIcon = on ? slot.imageOn : slot.imageOff;
     if (customIcon) {
-      iconImg.setAttribute("href", customIcon);
+      iconImg.setAttribute("href", oakUrl(customIcon));
       iconImg.style.display = "";
       bulb.style.display = "none";
     } else {
@@ -382,7 +383,7 @@ function buildPlainCard(slot, cat) {
     card.dataset.on = on ? "1" : "0";
     const customIcon = on ? slot.imageOn : slot.imageOff;
     if (customIcon) {
-      iconImg.src = customIcon;
+      iconImg.src = oakUrl(customIcon);
       iconImg.style.display = "";
       iconEl.style.display = "none";
     } else {

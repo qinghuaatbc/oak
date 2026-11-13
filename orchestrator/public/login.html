@@ -30,6 +30,18 @@
   <button type="submit" id="loginBtn">Sign in</button>
 </form>
 <script>
+// Where Oak is: "" at a host's root, "/oak-app" behind a proxy (see base.js).
+const base = location.pathname.replace(/\/[^/]*$/, "");
+
+/** Where to go once signed in: the page asked for, if it is one of Oak's
+ *  own ("admin.html", "live.html?x=1", or "/live.html" from older links). */
+function nextPage() {
+  const next = new URLSearchParams(location.search).get("next") || "";
+  if (/^\/[A-Za-z0-9._~-]/.test(next)) return base + next;
+  if (/^[A-Za-z0-9._~-][A-Za-z0-9._~\/-]*(\?[^#]*)?$/.test(next)) return next;
+  return "admin.html";
+}
+
 document.getElementById("loginForm").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const btn = document.getElementById("loginBtn");
@@ -37,7 +49,7 @@ document.getElementById("loginForm").addEventListener("submit", async (ev) => {
   errEl.classList.remove("show");
   btn.disabled = true;
   try {
-    const res = await fetch("/api/login", {
+    const res = await fetch(base + "/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: document.getElementById("username").value.trim(), password: document.getElementById("password").value }),
@@ -49,8 +61,7 @@ document.getElementById("loginForm").addEventListener("submit", async (ev) => {
       btn.disabled = false;
       return;
     }
-    const params = new URLSearchParams(location.search);
-    location.href = params.get("next") || "/admin.html";
+    location.href = nextPage();
   } catch (e) {
     errEl.textContent = "Could not reach the server";
     errEl.classList.add("show");

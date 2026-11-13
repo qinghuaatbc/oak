@@ -6,6 +6,7 @@
 // widget type since Oak's Dashboard is already unified around one
 // generic slot shape per category - camera/macro/pageLink/appUrl/label/
 // varDisplay each still get their own small builder, same as QTI.
+import { oakUrl } from "./base.js";
 import { listInstances, getState, getBindings, callAction, runMacro, listCameras, listMacros } from "./api.js";
 import { connectWS } from "./live-socket.js";
 import { attachCameraPlayer } from "./camera-player.js";
@@ -116,7 +117,7 @@ function buildSlotWidget(w) {
     // buildRingCard comment) - re-applied every refresh, not just once.
     const customIcon = on ? slot.imageOn : slot.imageOff;
     if (customIcon) {
-      iconImgEl.src = customIcon;
+      iconImgEl.src = oakUrl(customIcon);
       iconImgEl.style.display = "";
       iconEl.style.display = "none";
     } else {
@@ -177,7 +178,7 @@ function buildAppUrlWidget(w) {
   el.className = "lo-widget tappable";
   gridStyle(el, w);
   el.innerHTML = `<div class="lo-w-icon">🌐</div><div class="lo-w-name">${w.label || "Link"}</div>`;
-  el.addEventListener("click", () => window.open(w.url, w.openInNewTab ? "_blank" : "_self"));
+  el.addEventListener("click", () => window.open(oakUrl(w.url), w.openInNewTab ? "_blank" : "_self"));
   return { el, refresh: () => {}, cleanup: () => {} };
 }
 // No driver involved at all - just an iframe pointed at a URL, same "enter a
@@ -193,7 +194,7 @@ function buildWebObjectWidget(w) {
   gridStyle(el, w);
   const frame = document.createElement("iframe");
   frame.className = "lo-w-frame";
-  frame.src = w.url || "about:blank";
+  frame.src = oakUrl(w.url) || "about:blank";
   el.appendChild(frame);
   return { el, refresh: () => {}, cleanup: () => {} };
 }
@@ -240,7 +241,7 @@ function renderCanvas() {
     canvasEl.innerHTML = `<p class="lo-empty">No layout pages configured yet - add one on the admin Layout tab.</p>`;
     return;
   }
-  canvasEl.style.backgroundImage = page.background && page.background.url ? `url(${page.background.url})` : "";
+  canvasEl.style.backgroundImage = page.background && page.background.url ? `url(${oakUrl(page.background.url)})` : "";
   if (!page.widgets.length) {
     canvasEl.innerHTML = `<p class="lo-empty">This page has no widgets yet.</p>`;
     return;

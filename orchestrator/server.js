@@ -107,7 +107,9 @@ const server = http.createServer(async (req, res) => {
   if (!auth.isPublicPath(url.pathname) && !auth.hasValidSession(req)) {
     if (parts[0] === "api") return sendJson(res, 401, { error: "Not signed in" });
     if (req.method === "GET") {
-      res.writeHead(302, { Location: `/login.html?next=${encodeURIComponent(url.pathname)}` });
+      // (Relative, so it works behind a proxy that serves Oak under a path too.)
+      const up = "../".repeat(Math.max(0, url.pathname.split("/").length - 2));
+      res.writeHead(302, { Location: `${up}login.html?next=${encodeURIComponent(url.pathname.slice(1) + url.search)}` });
       return res.end();
     }
     res.writeHead(401);

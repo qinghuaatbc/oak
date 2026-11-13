@@ -66,7 +66,10 @@ test("an unauthenticated page request redirects to the login page, not served di
   withServer(async (port) => {
     const res = await request(port, "GET", "/admin.html");
     assert.equal(res.status, 302);
-    assert.match(res.headers.location, /^\/login\.html\?next=/);
+    // Relative, so it also works behind a proxy serving Oak under a path (/oak-app/...).
+    assert.equal(res.headers.location, "login.html?next=admin.html");
+    const deeper = await request(port, "GET", "/models/home.glb");
+    assert.equal(deeper.headers.location, "../login.html?next=models%2Fhome.glb");
   }));
 
 test("/login.html and /api/login stay reachable without a session (or nothing could ever log in)", () =>

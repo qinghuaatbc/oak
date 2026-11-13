@@ -1,3 +1,4 @@
+import { oakUrl } from "./base.js";
 import {
   listInstances, getManifest, getState, callAction, listDrivers, addInstance, deleteInstance,
   getConfig, editInstance, stopInstance, startInstance,
@@ -1088,7 +1089,7 @@ function buildSlotImageSection(slot) {
     lbl.textContent = pickerLabel;
     const preview = document.createElement("img");
     preview.style.cssText = `width:36px; height:36px; object-fit:contain; border:1px solid var(--line); border-radius:6px; background:var(--bg); display:${slot[key] ? "block" : "none"};`;
-    if (slot[key]) preview.src = slot[key];
+    if (slot[key]) preview.src = oakUrl(slot[key]);
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
@@ -1104,7 +1105,7 @@ function buildSlotImageSection(slot) {
         return;
       }
       slot[key] = result.url;
-      preview.src = result.url;
+      preview.src = oakUrl(result.url);
       preview.style.display = "block";
       persistBindings();
     });
@@ -2308,7 +2309,7 @@ function renderLayoutCanvas() {
   // header comment), same known limitation as switching away from any
   // scene on the dedicated 3D tab, not something newly introduced here.
   canvas.innerHTML = "";
-  canvas.style.backgroundImage = page.background && page.background.url ? `url(${page.background.url})` : "";
+  canvas.style.backgroundImage = page.background && page.background.url ? `url(${oakUrl(page.background.url)})` : "";
   page.widgets.forEach((w) => canvas.appendChild(buildLayoutWidgetBox(w)));
 }
 
@@ -2355,7 +2356,7 @@ function renderLayoutCanvas3D(canvas, glbScene) {
         await layoutViewer3d.init();
         layoutViewer3dInited = true;
       }
-      layoutViewer3d.loadGLB(glbScene.url);
+      layoutViewer3d.loadGLB(oakUrl(glbScene.url));
       layoutViewer3dLoadedGlbId = glbScene.id;
     };
     mount();
@@ -2874,7 +2875,7 @@ async function loadGlb3DScene(sceneId) {
     hintEl.textContent = scene ? "Upload a .glb for this scene to get started" : "Add a scene and upload a .glb to get started";
   } else {
     hintEl.style.display = "none";
-    viewer3d.loadGLB(scene.url);
+    viewer3d.loadGLB(oakUrl(scene.url));
   }
   renderGlb3DHint();
 }
@@ -2963,7 +2964,7 @@ document.getElementById("glbUploadBtn").addEventListener("click", async () => {
   await persistBindings();
   document.getElementById("glbHint").style.display = "none";
   if (!viewer3dInited) await initViewer3DWithRetry();
-  viewer3d.loadGLB(scene.url);
+  viewer3d.loadGLB(oakUrl(scene.url));
   renderGlb3DHint();
 });
 

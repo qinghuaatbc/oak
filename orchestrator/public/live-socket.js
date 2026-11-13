@@ -3,6 +3,7 @@
 // same requestId-keyed pending-promise pattern - Comm (chat/calling) needs
 // real request/response over the same channel the server otherwise just
 // pushes state/event updates through.
+import { BASE } from "./base.js";
 export function connectWS() {
   let socket = null;
   let nextId = 1;
@@ -12,7 +13,7 @@ export function connectWS() {
 
   function connect() {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    socket = new WebSocket(`${proto}//${location.host}/ws`);
+    socket = new WebSocket(`${proto}//${location.host}${BASE}/ws`);
     socket.addEventListener("open", () => {
       for (const fn of statusListeners) fn(true);
     });
