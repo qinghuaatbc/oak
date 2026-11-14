@@ -2,13 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>Oak Live</title>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
 <script>
   if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  // An app on a phone, not a page: iOS doesn't zoom it with two fingers (the floor plan's own pinch still works).
+  document.addEventListener("gesturestart", e => e.preventDefault());
 </script>
 <style>
+  /* No double-tap zoom; on a phone no zooming into a field either (iOS zooms into text under 16px). */
+  html{ touch-action:manipulation; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+  @media (pointer: coarse){ input, select, textarea{ font-size:16px !important; } }
   /* Palette + card/sidebar language ported directly from qti/public/
      live.html's own :root tokens - QTI is this project's own code, so this
      is reusing its actual design system, not approximating it. Trimmed to
